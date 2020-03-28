@@ -1,0 +1,10 @@
+[package]
+name = "hints"
+version = "0.1.0"
+authors = ["Roberto Vidal <vidal.roberto.j@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+syn-codegen = "0.1.0"
+serde = "1.0.105"
+serde_json = "1.0.50"

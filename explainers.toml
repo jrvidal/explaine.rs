@@ -1,0 +1,496 @@
+# Includes material from the Rust reference
+# https://doc.rust-lang.org/reference/
+# License:
+# https://github.com/rust-lang/reference/blob/59c1c1dd4b0426c90a63415bdbc2f124755e72d2/LICENSE-MIT
+# https://github.com/rust-lang/reference/blob/59c1c1dd4b0426c90a63415bdbc2f124755e72d2/LICENSE-APACHE
+
+[Use]
+title = "`use` Item"
+info = "A `use` declaration acts like a shortcut by shortening the path to the item in a module."
+book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html"
+keyword = "use"
+
+[Macro]
+title = "Macro invocation"
+info = "A macro is a special form that generates syntax at compile time. They are distinguished by the final bang (`!`) symbol."
+book = "ch19-06-macros.html"
+
+["Attribute.outer"]
+title = "Attribute"
+variant = "Attribute"
+info = "Attributes assign metadata to expressions, statements and other elements."
+pattern = "{ outer: true }"
+
+["Attribute.inner"]
+title = "Attribute"
+variant = "Attribute"
+info = """Attributes assign metadata to expressions, statements and other elements.
+
+In particular, this is an _inner_ attribute (because it has the "bang" form: `#![foo]` instead of `#[foo]`),
+which means it applies to the item that contains it.
+"""
+pattern = "{ outer: false }"
+
+[ItemExternCrate]
+title = "`extern crate`"
+info = "An `extern crate` declaration specifies a dependency on an external crate."
+keyword = "extern"
+
+[ItemInlineMod]
+title = "Inline `mod`"
+info = "A module is a container for items. In this case they're defined inline together with its declaration."
+keyword = "mod"
+book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
+
+[ItemExternMod]
+title = "External `mod`"
+info = "A module is a container for items. In this case the items are defined in a separated file."
+keyword = "mod"
+book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
+
+[FnToken]
+title = "Function/method declaration"
+info = "The `fn` token signifies a function or method declaration."
+keyword = "fn"
+
+[TraitItemMethod]
+title = "Trait method"
+info = "A method inside a trait."
+book = "ch10-02-traits.html"
+
+[ImplItemMethod]
+title = "Type method"
+info = "This is a method declaration for a type."
+book = "ch05-03-method-syntax.html"
+
+[AsRename]
+title = "Rename"
+info = "The `as` keyword allows renames of imported items, for instance, to avoid conflict with locally defined items."
+book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#providing-new-names-with-the-as-keyword"
+
+[QualifiedAs]
+title = "Fully qualified syntax for trait items"
+info = """The `as` keyword allows specifying the trait among the several that a type might implement
+for which we're trying to call a given method on a type."""
+keyword = "as"
+book = "ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name"
+
+[AsRenameExternCrate]
+title = "Rename"
+info = "The `as` keyword allows renames of external crates."
+keyword = "as"
+
+[AsCast]
+title = "Cast"
+info = "The `as` keyword allows casting between certain types."
+keyword = "as"
+
+[ExprClosureArguments]
+title = "Closure arguments"
+info = "Two vertical bars `| ··· |` enclose the list of arguments of a closure."
+book = "ch13-01-closures.html"
+
+[ExprClosureAsync]
+title = "Async closure"
+info = "This marks an async closure."
+keyword ="async"
+
+[ExprClosureStatic]
+info = "???"
+
+[AsyncExpression]
+info = "AsyncExpression"
+keyword ="async"
+
+[AsyncFn]
+info = "An async function."
+keyword ="async"
+
+[AwaitExpression]
+info = "An `.await` expression suspends the computation of an `async` function until the awaited future is ready."
+keyword ="await"
+
+[Break]
+title = "`break`"
+info = "A `break` expression terminates the surrounding loop."
+pattern = "{ .. }"
+book = "ch03-05-control-flow.html"
+keyword = "break"
+
+[ImplItemConst]
+title = "Associated constant"
+info = "An _associated constant_ that can be accessed as a nested item."
+keyword = "const"
+
+[TraitItemConst]
+title = "Associated constant"
+info = "An _associated constant_ that all implementing types can define."
+keyword = "const"
+
+[ItemConst]
+title = "Constant"
+info = "A _constant_ item is basically a value that gets inlined wherever it is used."
+keyword = "const"
+
+[ConstPtr]
+title = "Raw pointer"
+info = "A `const` pointer is a raw pointer without the safety guarantees of the borrow checker."
+keyword = "const"
+book = "ch19-01-unsafe-rust.html#dereferencing-a-raw-pointer"
+
+[MutPtr]
+title = "Mutable raw pointer"
+info = "A `mut` pointer is a raw pointer without the safety guarantees of the borrow checker."
+keyword = "mut"
+book = "ch19-01-unsafe-rust.html#dereferencing-a-raw-pointer"
+
+[ConstParam]
+info = "A `const` generic parameter."
+keyword = "const"
+
+[ConstFn]
+title = "`const` function"
+info = "A `const` function can be used to compute constants at compile time."
+keyword = "const"
+
+[ExprContinue]
+title = "`continue` expression"
+info = "A `continue` expression interrupts the current iteration of a loop and resumes from its beginning."
+pattern = "{ .. }"
+keyword = "continue"
+book = "ch03-05-control-flow.html"
+
+[VisPublic]
+title = "`pub` visibility"
+info = "An item declared `pub` is accessible from the parent module."
+book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
+
+[VisCrate]
+title = "`crate` visibility"
+info = "Equivalent to `pub(crate)`, this item is accessible in the current crate."
+keyword = "crate"
+
+[VisRestricted]
+title = "Restricted visibility"
+info = "This item is can be only accessed in some modules."
+keyword = "pub"
+
+[Dyn]
+title = "Trait object"
+info = "A `dyn Trait` object is an _unsized_ type that implements `Trait` through dynamic dispatch."
+keyword = "dyn"
+book = "ch17-02-trait-objects.html"
+
+[Else]
+title = "`else`"
+info = "`else` denotes the alternative branch of a `if` block, like in many other languages."
+keyword = "else"
+book = "ch03-05-control-flow.html"
+
+[ItemEnum]
+title = "`enum` declaration"
+info = "An `enum` declaration."
+keyword = "enum"
+book = "ch06-00-enums.html"
+
+[ItemForeignModAbi]
+info = "ItemForeignModAbi"
+keyword = "extern"
+
+[FnAbi]
+info = "FnAbi"
+keyword = "extern"
+
+[TypeBareFnAbi]
+info = "TypeBareFnAbi"
+keyword = "extern"
+
+[True]
+title = "`true` boolean value"
+info = "The `true` boolean value."
+keyword = "true"
+
+[False]
+title = "`false` boolean value"
+info = "The `false` boolean value."
+keyword = "false"
+
+[FnTypeToken]
+info = "The type of a free standing function."
+keyword = "fn"
+
+[ItemImplForTrait]
+title = "Trait implementation"
+info = "The `for` keyword indicates the type for which a trait is being implemented."
+keyword = "for"
+book = "ch10-02-traits.html"
+
+[ExprForLoopToken]
+title = "`for` - `in` loop"
+info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
+keyword = "for"
+book = "ch03-05-control-flow.html"
+
+[BoundLifetimes]
+info = "The `for` keyword indicates a generic bound over an infinite set of lifetimes."
+keyword = "for"
+
+[IfLet]
+title = "`if-let`"
+info = "An `if-let` expression enters its body only if the given pattern matches."
+book = "ch06-03-if-let.html"
+keyword = "let"
+
+[If]
+title = "`if`"
+info = "An `if` expression."
+book = "ch03-05-control-flow.html"
+keyword = "if"
+
+[ItemImpl]
+title = "Implementation block"
+info = "An `impl` block declares _intrinsic_ methods and other items for a given type."
+book = "ch05-03-method-syntax.html"
+keyword = "impl"
+
+[TypeImplTrait]
+title = "`impl Trait` return type"
+info = "The `impl` keyword represents an anonymous (but fixed) type that implements the specified trait."
+book = "ch10-02-traits.html#returning-types-that-implement-traits"
+keyword = "impl"
+
+[WhileLet]
+title = "`while-let`"
+info = "A `while let` loop continues its execution while the provided pattern matches."
+keyword = "while"
+book = "ch18-01-all-the-places-for-patterns.html#while-let-conditional-loops"
+
+[While]
+title = "While loop"
+info = "A `while` loop that iterates while its test condition is `true`."
+keyword = "while"
+book = "ch03-05-control-flow.html"
+
+
+[Local]
+title = "Variable binding"
+info = "A `let` statement introduces a local variable."
+keyword = "let"
+book = "ch02-00-guessing-game-tutorial.html#storing-values-with-variables"
+
+[LocalMut]
+title = "Mutable variable binding"
+info = "A `let mut` statement introduces a _mutable_ local variable which can be reassigned and for which mutable borrows can be taken."
+keyword = "mut"
+book = "ch03-01-variables-and-mutability.html"
+
+[Label]
+info = "A label can be used in `break` and `continue` expressions to indicate which precise loop should be affected."
+
+[ExprLoopToken]
+title = "Infinite loop"
+info = "The `loop` keyword introduces an infinite loop."
+keyword = "loop"
+book = "ch03-05-control-flow.html"
+
+[ExprMatchToken]
+title = "`match` expression"
+info = "A `match` expression enumerate a list of patterns to match against a given expression."
+book = "ch06-02-match.html"
+keyword = "match"
+
+[ArmIfGuard]
+title = "`if` guard"
+info = """The `if` keyword can be used to introduce _match guards_, that add extra conditions to a case
+within a `match` expression before matching."""
+book = "ch18-03-pattern-syntax.html#extra-conditionals-with-match-guards"
+keyword = "if"
+
+[Move]
+title = "`move` closure"
+info = "The `move` keyword specifies that a closure should take ownership over the ambient variables it refers to in its body."
+keyword = "move"
+book = "ch13-01-closures.html"
+
+[FnArgMut]
+title = "Mutable argument"
+info = "A `mut` argument to a function acts as a `let mut` declaration: it can be reassigned and mutable borrows can be taken."
+keyword = "mut"
+
+[MutSelf]
+title = "Mutably borrowed `self`"
+info = "This method takes `self` as a mutable (exclusive) reference."
+book = "ch05-03-method-syntax.html"
+keyword = "self"
+
+[ValueSelf]
+title = "Owned `self`"
+info = "This method consumes `self` as a value."
+book = "ch05-03-method-syntax.html"
+keyword = "self"
+
+[RefSelf]
+title = "Borrowed `self`"
+info = "This method takes an immutable (shared) references to `self`."
+book = "ch05-03-method-syntax.html"
+keyword = "self"
+
+[PatIdentRef]
+info = "PatIdentRef"
+
+[PatIdentMut]
+info = "PatIdentMut"
+
+[PatIdentRefMut]
+info = "PatIdentRefMut"
+
+[StaticMut]
+info = "A `static mut` item is a value that is embedded in the memory of the final executable _and_ that can be mutated (though it is highly unsafe to do so)."
+
+[Static]
+title = "Static item"
+info = "A `static` item is a value that is embedded in the memory of the final executable."
+keyword = "static"
+
+[TypeReference]
+info = "This type represents an immutable (shared) borrow over the value of another type."
+pattern = "{ .. }"
+
+["ExprReference.immutable"]
+title = "Immutable reference"
+variant = "ExprReference"
+info = "An immutable (shared) borrow of another value."
+pattern = "{ mutable: false }"
+
+["ExprReference.mutable"]
+title = "Mutable reference"
+variant = "ExprReference"
+info = "A mutable (exclusive) borrow of another value."
+pattern = "{ mutable: true }"
+
+[ExprReturn]
+title = "`return` expression"
+info = "The `return` keyword stops the execution of the current function with the provided value."
+keyword = "return"
+
+[PathSegmentSelf]
+info = "PathSegmentSelf"
+
+[ExprUnsafe]
+title = "Unsafe block"
+info = "An `unsafe` block, that allows to dereference raw pointers and call `unsafe` functions, among other things."
+keyword = "unsafe"
+
+[ForeignItemType]
+info = "ForeignItemType"
+keyword = "type"
+
+[ImplItemType]
+title = "Associated type"
+info = "The `type` keyword introduces an _associated type_ that implementors can specify."
+keyword = "type"
+
+[ItemUnsafeImpl]
+title = "Unsafe trait implementation"
+info = "An `unsafe` trait implementation must be marked as such when the trait being implemented is `unsafe`."
+keyword = "unsafe"
+
+[ItemStruct]
+title = "`struct`"
+info = "A `struct` is a data type defined by a list of fields."
+keyword = "struct"
+book = "ch05-01-defining-structs.html"
+
+[ItemUnsafeTrait]
+title = "Unsafe trait"
+info = """An `unsafe` trait is one for which there are extra guarantees that must be uphold before implementing it
+for a given type, and such that those guarantees cannot be ensured by the compiler."""
+keyword ="unsafe"
+
+[ItemTrait]
+title = "Trait Definition"
+info = "A trait declaration."
+keyword = "trait"
+
+[ItemType]
+title = "Type Alias"
+info = "A type alias works as a synonym of the aliased type."
+keyword = "type"
+
+[ItemUnion]
+title = "Union"
+info = "A `union` is an \"unsafe enum\", that allows interoperation with C enums. Reading fields from a union is unsafe."
+keyword = "union"
+
+[PathSegmentSuper]
+info = "PathSegmentSuper"
+
+[UnsafeFn]
+title = "Unsafe function"
+info = "An `unsafe` function might contain unsafe operations within its body, as if all its statements where surrounded in an `unsafe` block."
+keyword = "unsafe"
+
+[TraitItemType]
+info = "TraitItemType"
+keyword = "type"
+
+[WhereClause]
+info = "WhereClause"
+keyword = "where"
+
+[TypeBareUnsafeFn]
+info = "TypeBareUnsafeFn"
+keyword = "unsafe"
+
+[ItemTraitAlias]
+info = "ItemTraitAlias"
+keyword = "trait"
+
+["Field.named"]
+variant = "Field"
+pattern = "{ named: true }"
+title = "Named field"
+info = "A field declaration in a struct or enum variant."
+
+["Field.unnamed"]
+variant = "Field"
+pattern = "{ named: false }"
+title = "Unnamed field"
+info = "A unnamed field in a tuple struct or enum variant."
+
+[FatArrow]
+info = "Each branch of a `match` expression has a fat arrow `=>` that links a pattern on the left with an expression to be evaluated on the right when said pattern is a match."
+
+["DocBlock.outer"]
+variant = "DocBlock"
+title = "Doc comments"
+info = "Comments that start with three slashes (`///`) are _doc comments_, and they generate documentation."
+pattern = "{outer: true}"
+
+["DocBlock.inner"]
+variant = "DocBlock"
+title = "Doc comments"
+info = "Comments that start with `//!` are _inner doc comments_, and they generate documentation for the item that contains them."
+pattern = "{outer: false}"
+
+[RArrow]
+title = "Right arrow `->`"
+info = "The right arrow token `->` is used to signify the return type of a function."
+
+[ExprRangeHalfOpen]
+title = "Half-open range"
+pattern = "{ .. }"
+info = "A half open range expression `(..)`, that generates a range of elements with an inclusive lower bound and an exclusive upper bound."
+
+[ExprRangeClosed]
+title = "Closed range"
+pattern = "{ .. }"
+info = "A closed range expression `(..=)`, that generates a range of elements with inclusive lower and upper bounds."
+
+[StaticLifetime]
+title = "`'static` lifetime"
+info = "The `'static` lifetime is a special, constant lifetime that represents a value that can potentially live indefinitely."
+
+[TraitBound]
+title = "Trait bounds"
+info = "The plus sign `+` joins several bounds that a given type must fulfill."

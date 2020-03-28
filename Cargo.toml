@@ -1,0 +1,31 @@
+[package]
+name = "explainers"
+version = "0.1.0"
+authors = ["Roberto Vidal <vidal.roberto.j@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+dev = ["syn/extra-traits", "console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = { version = "0.1.1", optional = true }
+syn = { version = "1.0.17", default-features = false }
+proc-macro2 = { version = "1.0.9", features = ["span-locations"] }
+
+[build-dependencies]
+toml = "0.5.6"
+serde = { version = "1.0.105", features = ["derive"] }
+comrak = "0.7.0"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.2"
+
+[profile.release]
+opt-level = "s"
+
+[workspace]
+members = ["hints"]
