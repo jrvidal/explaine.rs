@@ -6,21 +6,21 @@
   <link
     rel="stylesheet"
     type="text/css"
-    href="style-f93d028f96d67b102ae4.css"
+    href="style-8d2f177a6633d074eee2.css"
   >
 </head>
 <body>
-
-
   <div class="container main">
     <div class="error">
       <h3>Oops</h3>
       <p>Your Rust code does not look valid... :(</p>
     </div>
+
     <h1>explaine.rs</h1>
 
     <div id="code">
 
+      <div class="CodeMirror-fake"></div>
       <textarea id="editor" style="display: none">// From https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
 #![allow(unused_variables)]
 use std::sync::mpsc;
@@ -128,17 +128,31 @@ impl Worker {
     </div>
 
     <div id="explanation">
+      <button class="toggle-edit">Enable editing</button>
       <button class="show-all" disabled="disabled" autocomplete="off">Show all elements</button>
       <div class="item-container">
-        <h3 class="item-title">Hover!</h3>
-        <div class="item">
-            Hover over the code to see an explanation of the relevant syntax.
-            <p>You can also find a syntax glossary in <a target="_blank" href="https://doc.rust-lang.org/book/appendix-02-operators.html">the Rust Book</a>.</p>
+        <div class="loading">
+            <h3>Processing... &nbsp;
+            <div class="spinner">
+              <div class="rect1"></div>
+              <div class="rect2"></div>
+              <div class="rect3"></div>
+              <div class="rect4"></div>
+              <div class="rect5"></div>
+            </div>
+            </h3>
         </div>
-        <div class="more-info">
-            <h4>More info</h4>
-            <div class="book-row"><a target="_blank" href="">The Rust Book</a></div>
-            <div class="keyword-row"><a target="_blank"  href="">Keyword documentation</a></div>
+        <div class="loaded">
+            <h3 class="item-title">Hover!</h3>
+            <div class="item">
+                Hover over the code to see an explanation of the relevant syntax.
+                <p>You can also find a syntax glossary in <a target="_blank" href="https://doc.rust-lang.org/book/appendix-02-operators.html">the Rust Book</a>.</p>
+            </div>
+            <div class="more-info">
+                <h4>More info</h4>
+                <div class="book-row"><a target="_blank" href="">The Rust Book</a></div>
+                <div class="keyword-row"><a target="_blank"  href="">Keyword documentation</a></div>
+            </div>
         </div>
       </div>
     </div>
@@ -155,10 +169,10 @@ impl Worker {
   </div>
 
   <script type="text/javascript">
-    /* @worker */ window.workerMain = "worker-cd948d2a4ea09cfaacc5058fe691c417.js";
+    /* @worker */ window.workerMain = "worker-7c76662363bd3839da2b8509bec85887.js";
     window.workerBundle = "explainers-34bfd82168823bedb34a81ba4fec8fd7.js";
     window.workerWasm = "explainers_bg-be6adade1dbd874cf693e8b05a6afd41.wasm";
   </script>
-  <!-- @main --> <script type="module" src="index-6a871fc5429f32d5f28c.js"></script>
+  <!-- @main --> <script type="module" src="index-150006f9ec4407721cb9.js"></script>
 </body>
 </html>
