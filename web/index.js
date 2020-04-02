@@ -29,8 +29,8 @@
     const document = window.document;
     const querySelector = (selector) => document.querySelector(selector);
 
-    if (window.ANALYTICS_URL) {
-      fetch(window.ANALYTICS_URL, { method: "POST" });
+    if (typeof __ANALYTICS_URL__ === "string") {
+      fetch(__ANALYTICS_URL__, { method: "POST" });
     }
 
     const IS_TOUCH_DEVICE = "ontouchstart" in window;
@@ -572,7 +572,7 @@
       node.style.display = display;
     }
 
-    if (!window.PRODUCTION) {
+    if (typeof __PRODUCTION__ == "string") {
       window.cm = cm;
     }
   }

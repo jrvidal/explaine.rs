@@ -29,13 +29,13 @@ module.exports = {
     }),
     new webpack.DefinePlugin({
       "self.SKIP_LOGGING": JSON.stringify(true),
-      "window.ANALYTICS_URL": JSON.stringify(
+      __ANALYTICS_URL__: JSON.stringify(
         env.analyticsUrl ||
           (() => {
             throw new Error("No analyticsUrl");
           })()
       ),
-      "window.PRODUCTION": JSON.stringify(true),
+      __PRODUCTION__: JSON.stringify(true),
       "self.IS_WORKER": JSON.stringify(false),
     }),
   ],
