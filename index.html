@@ -3,25 +3,104 @@
 <head>
   <title>explaine.rs</title>
   <meta charset="utf-8">
-  <link
-    rel="stylesheet"
-    type="text/css"
-    href="style-8d2f177a6633d074eee2.css"
-  >
+  <link rel="stylesheet"type="text/css" href="style-d67bc5b70e016d44e976.css">
+  <script></script>
 </head>
 <body>
-  <div class="container main">
-    <div class="error">
-      <h3>Oops</h3>
-      <p>Your Rust code does not look valid... :(</p>
+
+  <header class="container">
+    <h1>
+      explaine.rs
+      &emsp;
+      <small class="subtitle">No more "What is this syntax?"</small>
+    </h1>
+    <div class="left-container">
+      <button class="whats-this"><b>?</b></button>
+      <button class="toggle-edit">Enable editing</button>
+      <button class="show-all" disabled="disabled" autocomplete="off">
+        <span class="show-all-text">Show all elements</span>
+        <div class="spinner">
+          <div class="rect1"></div>
+          <div class="rect2"></div>
+          <div class="rect3"></div>
+          <div class="rect4"></div>
+          <div class="rect5"></div>
+        </div>
+      </button>
+      <button class="generate">Generate link</button>
+      <a class="link hidden" target="_blank">Link 🗒️</a>
     </div>
 
-    <h1>explaine.rs</h1>
+    <div class="overlay"></div>
+    <div class="modal">
+      <h2>explaine.rs</h2>
+      <p>
+        <b>explaine.rs</b> is an interactive playground to explore the syntax of the <a target="_blank" href="https://www.rust-lang.org/">Rust Programming Language</a>.
+      </p>
+      <p>
+        You can write any Rust code in the editor and the analyzer will allow you to click/tap on different keywords, punctuation elements and other bits of code and help you understand what they mean.
+      </p>
+      <p>
+        This is a <em>work in progress</em>! Please submit your feedback in the <a target="_blank" href="https://github.com/jrvidal/explaine.rs">repository.</a>
+      </p>
+      <div class="close-modal-container">
+        <button class="close-modal">Got it</button>
+      </div>
+    </div>
+  </header>
 
-    <div id="code">
+  <div class="container main">
 
-      <div class="CodeMirror-fake"></div>
-      <textarea id="editor" style="display: none">// From https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
+    <div class="left-container">
+      <div class="codemirror-placeholder"></div>
+      <textarea class="codemirror-anchor"></textarea>
+    </div>
+
+    <div class="explanation">
+      <div class="item-container">
+        <div class="loading">
+          <h3>Processing... &nbsp;
+            <div class="spinner">
+              <div class="rect1"></div>
+              <div class="rect2"></div>
+              <div class="rect3"></div>
+              <div class="rect4"></div>
+              <div class="rect5"></div>
+            </div>
+          </h3>
+        </div>
+        <div class="loaded">
+          <h3 class="item-title"><span class="desktop-help">Hover!</span><span class="mobile-help">Click!</span></h3>
+          <div class="item">
+              <span class="desktop-help">Hover over the code to see an explanation of the relevant syntax.</span><span class="mobile-help">Click on the code to see an explanation of the relevant syntax.</span>
+              <p>You can also find a syntax glossary in <a target="_blank" href="https://doc.rust-lang.org/book/appendix-02-operators.html">the Rust Book</a>.</p>
+          </div>
+          <div class="error-message-container"><code class="error-message"></code></div>
+          <div class="more-info">
+            <h4>More info</h4>
+            <div class="info-wip">Work in progress! <a target="_blank" href="https://github.com/jrvidal/explaine.rs/issues/new">File a Bug</a></div>
+            <div class="book-row"><a target="_blank" href="">The Rust Book</a></div>
+            <div class="keyword-row"><a target="_blank"  href="">Keyword documentation</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container credits">
+    <a target="_blank" href="https://github.com/jrvidal/explaine.rs">Code on GitHub</a> &middot;
+    <a target="_blank" href="https://github.com/jrvidal/explaine.rs/issues/new">File a Bug</a>
+  </div>
+
+  <script type="text/javascript">
+    window.workerMain = "worker-c3385f9037caf8a9e19bcc8114589bec.js";
+    window.workerBundle = "explainers-c11aeaf8a0fb0739212f8d1c780016ef.js";
+    window.workerWasm = "explainers_bg-eacac9271a783acd79ede173f18f4535.wasm";
+  </script>
+  <script type="module" src="index-b45dd5654149580f6332.js"></script>
+
+
+  <textarea class="default-code">//! From https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
 #![allow(unused_variables)]
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -125,54 +204,5 @@ impl Worker {
     }
 }
 </textarea>
-    </div>
-
-    <div id="explanation">
-      <button class="toggle-edit">Enable editing</button>
-      <button class="show-all" disabled="disabled" autocomplete="off">Show all elements</button>
-      <div class="item-container">
-        <div class="loading">
-            <h3>Processing... &nbsp;
-            <div class="spinner">
-              <div class="rect1"></div>
-              <div class="rect2"></div>
-              <div class="rect3"></div>
-              <div class="rect4"></div>
-              <div class="rect5"></div>
-            </div>
-            </h3>
-        </div>
-        <div class="loaded">
-            <h3 class="item-title">Hover!</h3>
-            <div class="item">
-                Hover over the code to see an explanation of the relevant syntax.
-                <p>You can also find a syntax glossary in <a target="_blank" href="https://doc.rust-lang.org/book/appendix-02-operators.html">the Rust Book</a>.</p>
-            </div>
-            <div class="more-info">
-                <h4>More info</h4>
-                <div class="book-row"><a target="_blank" href="">The Rust Book</a></div>
-                <div class="keyword-row"><a target="_blank"  href="">Keyword documentation</a></div>
-            </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="container secondary">
-    <button class="generate">Generate link</button>
-    <a class="link hidden" target="_blank">Link 🗒️</a>
-  </div>
-
-  <div class="container credits">
-    <a href="https://github.com/jrvidal/explaine.rs">Code</a> &middot;
-    <a href="https://github.com/jrvidal/explaine.rs/issues/new">Bugs</a>
-  </div>
-
-  <script type="text/javascript">
-    /* @worker */ window.workerMain = "worker-7c76662363bd3839da2b8509bec85887.js";
-    window.workerBundle = "explainers-34bfd82168823bedb34a81ba4fec8fd7.js";
-    window.workerWasm = "explainers_bg-be6adade1dbd874cf693e8b05a6afd41.wasm";
-  </script>
-  <!-- @main --> <script type="module" src="index-150006f9ec4407721cb9.js"></script>
 </body>
 </html>
