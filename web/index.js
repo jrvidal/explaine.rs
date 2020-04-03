@@ -193,11 +193,13 @@
     const overlay = querySelector(".overlay");
 
     generateButton.addEventListener("click", () => {
-      let address = `${
-        window.location.origin
-      }/?code=${window.encodeURIComponent(cm.getValue())}`;
+      let address = new window.URL(window.location.href);
+      let params = new window.URLSearchParams();
+      params.append("code", cm.getValue());
+      address.search = `?${params.toString()}`;
+
       setState(({ compilation }) => ({
-        compilation: { ...compilation, address },
+        compilation: { ...compilation, address: address.toString() },
       }));
     });
 
