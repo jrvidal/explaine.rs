@@ -96,17 +96,21 @@ info = "This marks an async closure."
 keyword ="async"
 
 [ExprClosureStatic]
+title = "Static Closure"
 info = "???"
 
 [AsyncExpression]
+title = "Async Expression"
 info = "AsyncExpression"
 keyword ="async"
 
 [AsyncFn]
+title = "Async Function"
 info = "An async function."
 keyword ="async"
 
 [AwaitExpression]
+title = "`await` Expression"
 info = "An `.await` expression suspends the computation of an `async` function until the awaited future is ready."
 keyword ="await"
 
@@ -145,6 +149,7 @@ keyword = "mut"
 book = "ch19-01-unsafe-rust.html#dereferencing-a-raw-pointer"
 
 [ConstParam]
+title = "`const` parameter"
 info = "A `const` generic parameter."
 keyword = "const"
 
@@ -194,14 +199,17 @@ keyword = "enum"
 book = "ch06-00-enums.html"
 
 [ItemForeignModAbi]
+title = "TODO"
 info = "ItemForeignModAbi"
 keyword = "extern"
 
 [FnAbi]
+title = "Function ABI"
 info = "FnAbi"
 keyword = "extern"
 
 [TypeBareFnAbi]
+title = "TODO"
 info = "TypeBareFnAbi"
 keyword = "extern"
 
@@ -216,6 +224,7 @@ info = "The `false` boolean value."
 keyword = "false"
 
 [FnTypeToken]
+title = "Function Type"
 info = "The type of a free standing function."
 keyword = "fn"
 
@@ -232,6 +241,7 @@ keyword = "for"
 book = "ch03-05-control-flow.html"
 
 [BoundLifetimes]
+title = "Higher-rank lifetime bounds"
 info = "The `for` keyword indicates a generic bound over an infinite set of lifetimes."
 keyword = "for"
 
@@ -285,6 +295,7 @@ keyword = "mut"
 book = "ch03-01-variables-and-mutability.html"
 
 [Label]
+title = "Label"
 info = "A label can be used in `break` and `continue` expressions to indicate which precise loop should be affected."
 
 [ExprLoopToken]
@@ -336,23 +347,28 @@ book = "ch05-03-method-syntax.html"
 keyword = "self"
 
 [PatIdentRef]
+title = "TODO"
 info = "PatIdentRef"
 
 [PatIdentMut]
+title = "TODO"
 info = "PatIdentMut"
 
 [PatIdentRefMut]
+title = "TODO"
 info = "PatIdentRefMut"
 
 [StaticMut]
+title = "Mutable Static"
 info = "A `static mut` item is a value that is embedded in the memory of the final executable _and_ that can be mutated (though it is highly unsafe to do so)."
 
 [Static]
-title = "Static item"
+title = "Static Item"
 info = "A `static` item is a value that is embedded in the memory of the final executable."
 keyword = "static"
 
 [TypeReference]
+title = "Immutable Reference"
 info = "This type represents an immutable (shared) borrow over the value of another type."
 pattern = "{ .. }"
 
@@ -374,6 +390,7 @@ info = "The `return` keyword stops the execution of the current function with th
 keyword = "return"
 
 [PathSegmentSelf]
+title = "TODO"
 info = "PathSegmentSelf"
 
 [ExprUnsafe]
@@ -382,6 +399,7 @@ info = "An `unsafe` block, that allows to dereference raw pointers and call `uns
 keyword = "unsafe"
 
 [ForeignItemType]
+title = "TODO"
 info = "ForeignItemType"
 keyword = "type"
 
@@ -423,6 +441,7 @@ info = "A `union` is an \"unsafe enum\", that allows interoperation with C enums
 keyword = "union"
 
 [PathSegmentSuper]
+title = "`super`"
 info = "PathSegmentSuper"
 
 [UnsafeFn]
@@ -431,18 +450,22 @@ info = "An `unsafe` function might contain unsafe operations within its body, as
 keyword = "unsafe"
 
 [TraitItemType]
+title = "TODO"
 info = "TraitItemType"
 keyword = "type"
 
 [WhereClause]
+title = "TODO"
 info = "WhereClause"
 keyword = "where"
 
 [TypeBareUnsafeFn]
+title = "TODO"
 info = "TypeBareUnsafeFn"
 keyword = "unsafe"
 
 [ItemTraitAlias]
+title = "Trait Alias"
 info = "ItemTraitAlias"
 keyword = "trait"
 
@@ -459,6 +482,7 @@ title = "Unnamed field"
 info = "A unnamed field in a tuple struct or enum variant."
 
 [FatArrow]
+title = "Fat Arrow"
 info = "Each branch of a `match` expression has a fat arrow `=>` that links a pattern on the left with an expression to be evaluated on the right when said pattern is a match."
 
 ["DocBlock.outer"]
