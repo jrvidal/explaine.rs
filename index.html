@@ -3,11 +3,13 @@
 <head>
   <title>explaine.rs</title>
   <meta charset="utf-8">
-  <link rel="stylesheet"type="text/css" href="style-d67bc5b70e016d44e976.css">
-  <script></script>
+  <link rel="stylesheet"type="text/css" href="style-c0861978b04eefeb07a8.css">
 </head>
 <body>
-
+  <div class="container noscript">
+    <h1>💥 Everything is broken!</h1>
+    <h3>This playground requires a <a href="https://caniuse.com/#feat=wasm">WebAssembly-compatible browser</a> 😔</h3>
+  </div>
   <header class="container">
     <h1>
       explaine.rs
@@ -76,6 +78,10 @@
               <p>You can also find a syntax glossary in <a target="_blank" href="https://doc.rust-lang.org/book/appendix-02-operators.html">the Rust Book</a>.</p>
           </div>
           <div class="error-message-container"><code class="error-message"></code></div>
+          <div class="can-be-block">
+            <p>It looks like your code just needs to be wrapped in a declaration.</p>
+            <button class="wrap-in-block">Wrap</button>
+          </div>
           <div class="more-info">
             <h4>More info</h4>
             <div class="info-wip">Work in progress! <a target="_blank" href="https://github.com/jrvidal/explaine.rs/issues/new">File a Bug</a></div>
@@ -92,12 +98,17 @@
     <a target="_blank" href="https://github.com/jrvidal/explaine.rs/issues/new">File a Bug</a>
   </div>
 
-  <script type="text/javascript">
-    window.workerMain = "worker-c3385f9037caf8a9e19bcc8114589bec.js";
-    window.workerBundle = "explainers-c11aeaf8a0fb0739212f8d1c780016ef.js";
-    window.workerWasm = "explainers_bg-eacac9271a783acd79ede173f18f4535.wasm";
+  <script>
+    if (window.WebAssembly == null) {
+      document.querySelector(".noscript").style.display = "block";
+    }
   </script>
-  <script type="module" src="index-a16e28fab1491241fdc5.js"></script>
+  <script type="text/javascript">
+    window.workerMain = "worker-8a6539889f95ad1405cfc29f046ef00d.js";
+    window.workerBundle = "explainers-551c06a1dfaf7b5b719e47aaa554c7f3.js";
+    window.workerWasm = "explainers_bg-9b650578bd413452c8efcf38d83b823b.wasm";
+  </script>
+  <script type="module" src="index-b27b728d23343a2d0513.js"></script>
 
 
   <textarea class="default-code">//! From https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
