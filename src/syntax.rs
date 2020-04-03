@@ -7,8 +7,6 @@ std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
 #[cfg(feature = "dev")]
 use super::log;
 
-use super::RustCode;
-
 #[derive(Debug, Clone, Copy)]
 pub enum HelpItem {
     Use,
@@ -185,11 +183,8 @@ impl<'ast> IntersectionVisitor<'ast> {
         }
     }
 
-    pub fn visit(mut self, code: &'ast RustCode) -> VisitorResult {
-        match code {
-            RustCode::File(file) => self.visit_file(file),
-            RustCode::Block(block) => self.visit_block(block),
-        };
+    pub fn visit(mut self, file: &'ast syn::File) -> VisitorResult {
+        self.visit_file(file);
 
         VisitorResult {
             help: self.help,
@@ -201,16 +196,16 @@ impl<'ast> IntersectionVisitor<'ast> {
 
     fn within<S: Spanned>(&self, item: S) -> bool {
         let span = item.span();
-        self.within_spans(span.start(), span.end())
+        self.within_spans(span, span)
     }
 
-    fn between<S: Spanned + ?Sized, T: Spanned + ?Sized>(&self, start: &S, end: &T) -> bool {
-        self.within_spans(start.span().start(), end.span().end())
+    fn between<S: Spanned, T: Spanned>(&self, start: &S, end: &T) -> bool {
+        self.within_spans(start.span(), end.span())
     }
 
-    fn within_spans(&self, start: LineColumn, end: LineColumn) -> bool {
+    fn within_spans(&self, start: Span, end: Span) -> bool {
         let loc = self.location;
-        super::within_spans(loc, start, end)
+        super::within_locations(loc, start.start(), end.end())
     }
 
     fn set_help<S: Spanned + ?Sized>(&mut self, item: &S, help: HelpItem) {
@@ -446,7 +441,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_expr_group(self, node: syn::ExprGroup)];
     method![visit_expr_if(self, node: syn::ExprIf) {
         if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
-            if self.within_spans(node.if_token.span().start(), let_token.span().end()) {
+            if self.within_spans(node.if_token.span(), let_token.span()) {
                 return self.set_help_between(node.if_token.span(), let_token.span(), HelpItem::IfLet);
             }
         } else {
@@ -481,7 +476,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let last_span = node.mutability.map(|t| t.span())
             .unwrap_or_else(|| node.and_token.span());
 
-        if self.within_spans(node.and_token.span().start(), last_span.end()) {
+        if self.within_spans(node.and_token.span(), last_span) {
             return self.set_help(&node, HelpItem::ExprReference {
                 mutable: node.mutability.is_some()
             });
@@ -532,7 +527,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let end = node.mutability.as_ref().map(Spanned::span)
             .unwrap_or_else(|| node.static_token.span());
 
-        if self.within_spans(node.static_token.span().start(), end.end()) {
+        if self.within_spans(node.static_token.span(), end) {
             return self.set_help_between(node.static_token.span(), end, if node.mutability.is_some() {
                 HelpItem::StaticMut
             } else {
@@ -608,7 +603,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let end = node.mutability.as_ref().map(Spanned::span)
             .unwrap_or_else(|| node.static_token.span());
 
-        if self.within_spans(node.static_token.span().start(), end.end()) {
+        if self.within_spans(node.static_token.span(), end) {
             return self.set_help_between(node.static_token.span(), end, if node.mutability.is_some() {
                 HelpItem::StaticMut
             } else {
@@ -661,7 +656,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             let end = mutability.map(|m| m.span())
                 .unwrap_or_else(|| node.let_token.span());
 
-            if mutability.is_some() && self.within_spans(start.start(), end.end()) {
+            if mutability.is_some() && self.within_spans(start, end) {
                 return self.set_help_between(start, end, HelpItem::LocalMut);
             }
         }
@@ -669,7 +664,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.let_token, Local];
     }];
     method![visit_macro(self, node: syn::Macro) {
-        if self.within_spans(node.path.span().start(), node.bang_token.span().end()) {
+        if self.within_spans(node.path.span(), node.bang_token.span()) {
             return self.set_help_between(node.path.span(), node.bang_token.span(), HelpItem::Macro);
         }
     }];
@@ -688,14 +683,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_pat_box(self, node: syn::PatBox)];
     method![visit_pat_ident(self, node: syn::PatIdent) {
         let result = match (&node.by_ref, &node.mutability) {
-            (Some(by_ref), Some(..)) => Some((by_ref as &dyn Spanned, HelpItem::PatIdentRefMut)),
-            (Some(by_ref), None) => Some((by_ref as &dyn Spanned, HelpItem::PatIdentRef)),
-            (None, Some(mutability)) => Some((mutability as &dyn Spanned, HelpItem::PatIdentMut)),
+            (Some(by_ref), Some(..)) => Some((by_ref.span(), HelpItem::PatIdentRefMut)),
+            (Some(by_ref), None) => Some((by_ref.span(), HelpItem::PatIdentRef)),
+            (None, Some(mutability)) => Some((mutability.span(), HelpItem::PatIdentMut)),
             (None, None) => None
         };
 
         if let Some((start, item)) = result {
-            if self.between(start, &node.ident) {
+            if self.within_spans(start.span(), node.ident.span()) {
                 self.set_help_between(start.span(), node.ident.span(), item);
             }
         }
@@ -813,7 +808,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
             .unwrap_or_else(|| node.and_token.span());
 
-        if self.within_spans(node.and_token.span().start(), last_span.end()) {
+        if self.within_spans(node.and_token.span(), last_span) {
             return self.set_help(&node, HelpItem::TypeReference {
                 lifetime: node.lifetime.is_some(),
                 mutable: node.mutability.is_some()

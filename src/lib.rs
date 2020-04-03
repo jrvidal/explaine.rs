@@ -16,18 +16,20 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub struct SessionResult(syn::Result<Session>);
+pub struct SessionResult {
+    result: Result<Session, (syn::Error, bool)>,
+}
 
 #[wasm_bindgen]
 impl SessionResult {
     #[wasm_bindgen]
     pub fn session(self) -> Option<Session> {
-        self.0.ok()
+        self.result.ok()
     }
 
     #[wasm_bindgen]
     pub fn error_location(&self) -> Option<Box<[u32]>> {
-        self.0.as_ref().err().map(|err| {
+        self.result.as_ref().err().map(|(err, _)| {
             let span = err.span();
             vec![
                 span.start().line as u32,
@@ -41,19 +43,27 @@ impl SessionResult {
 
     #[wasm_bindgen]
     pub fn error_message(&self) -> JsValue {
-        self.0.as_ref().err().map(|err| format!("{}", err)).into()
+        self.result
+            .as_ref()
+            .err()
+            .map(|(err, _)| format!("{}", err))
+            .into()
+    }
+
+    #[wasm_bindgen]
+    pub fn is_block(&self) -> bool {
+        self.result
+            .as_ref()
+            .err()
+            .map(|&(_, is_block)| is_block)
+            .unwrap_or(false)
     }
 }
 
 #[wasm_bindgen]
 pub struct Session {
-    code: RustCode,
+    code: syn::File,
     positions: IntoIter<(usize, usize)>,
-}
-
-enum RustCode {
-    File(syn::File),
-    Block(syn::Block),
 }
 
 #[wasm_bindgen]
@@ -62,8 +72,6 @@ impl Session {
     pub fn new(source: &str) -> SessionResult {
         utils::set_panic_hook();
         let result = syn::parse_file(source)
-            .map(RustCode::File)
-            // .or_else(|_| syn::parse_str(&format!("{{\n{}}}", source)).map(RustCode::Block))
             .map(|code| {
                 let positions = source
                     .lines()
@@ -73,8 +81,12 @@ impl Session {
                     .into_iter();
 
                 Session { code, positions }
+            })
+            .map_err(|err| {
+                let block_result = syn::parse_str::<syn::Block>(&format!("{{{}}}", source));
+                (err, block_result.is_ok())
             });
-        SessionResult(result)
+        SessionResult { result }
     }
 
     #[wasm_bindgen]
@@ -87,7 +99,7 @@ impl Session {
             while let Some((line, column)) = self.positions.next() {
                 if let Some(last_position) = last {
                     let loc = LineColumn { line, column };
-                    if within_spans(loc, last_position.0, last_position.1) {
+                    if within_locations(loc, last_position.0, last_position.1) {
                         continue;
                     } else {
                         last = None;
@@ -135,10 +147,8 @@ impl Session {
 
     #[wasm_bindgen]
     pub fn explain(&self, line: usize, ch: usize) -> Option<Explanation> {
-        let offset = self.offset() as usize;
-
         let location = LineColumn {
-            line: line + offset,
+            line: line,
             column: ch,
         };
         let visitor = IntersectionVisitor::new(location);
@@ -148,19 +158,11 @@ impl Session {
         } else {
             Some(Explanation {
                 item: result.help,
-                start_line: result.item_location.0.line - offset,
+                start_line: result.item_location.0.line,
                 start_column: result.item_location.0.column,
-                end_line: result.item_location.1.line - offset,
+                end_line: result.item_location.1.line,
                 end_column: result.item_location.1.column,
             })
-        }
-    }
-
-    fn offset(&self) -> u32 {
-        if let RustCode::Block(..) = self.code {
-            1
-        } else {
-            0
         }
     }
 }
@@ -201,7 +203,7 @@ extern "C" {
     fn log(s: &str);
 }
 
-fn within_spans(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
+fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
     (start.line < loc.line || (start.line == loc.line && start.column <= loc.column))
         && (loc.line < end.line || (loc.line == end.line && loc.column <= end.column))
 }

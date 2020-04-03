@@ -28,6 +28,7 @@
 
     const document = window.document;
     const querySelector = (selector) => document.querySelector(selector);
+    const createElement = (el) => document.createElement(el);
 
     if (typeof __ANALYTICS_URL__ === "string") {
       fetch(__ANALYTICS_URL__, { method: "POST" });
@@ -40,55 +41,23 @@
       IS_TOUCH_DEVICE ? "touch-device" : "non-touch-device"
     );
 
-    const mainContainer = querySelector(".main");
-    const explanationEl = querySelector(".explanation");
-    const loadingContainer = explanationEl.querySelector(".loading");
-    const loadedContainer = explanationEl.querySelector(".loaded");
-    const itemContainer = explanationEl.querySelector(".item-container");
-    const itemTitle = itemContainer.querySelector(".item-title");
-    const itemEl = itemContainer.querySelector(".item");
-    const errorMessageContainer = itemContainer.querySelector(
-      ".error-message-container"
-    );
-    const errorMessageEl = itemContainer.querySelector(".error-message");
-    const generateButton = querySelector(".generate");
-    const generatedLink = querySelector(".link");
-    const toggleEditEButton = querySelector(".toggle-edit");
-    const showAllButton = querySelector(".show-all");
-    const showAllText = querySelector(".show-all-text");
-    const showAllSpinner = querySelector(".show-all > .spinner");
-
-    const moreInfoHeader = explanationEl.querySelector(".more-info");
-    const bookRow = moreInfoHeader.querySelector(".book-row");
-    const bookLink = bookRow.querySelector("a");
-    const keywordRow = moreInfoHeader.querySelector(".keyword-row");
-    const keywordLink = keywordRow.querySelector("a");
-    const infoWipEl = querySelector(".info-wip");
-
-    const modal = querySelector(".modal");
-    const overlay = querySelector(".overlay");
-
-    const styleSheet = (() => {
-      const styleEl = document.createElement("style");
-      document.head.appendChild(styleEl);
-      return styleEl.sheet;
-    })();
-
-    const initialItem = itemEl.innerHTML;
-    const initialItemTitle = itemTitle.innerHTML;
-    const initialShowAll = showAllText.textContent;
+    /* CODEMIRROR INIT */
 
     const cm = CodeMirror.fromTextArea(querySelector(".codemirror-anchor"), {
       mode: "rust",
       lineNumbers: true,
       theme: "solarized",
       readOnly: IS_TOUCH_DEVICE ? "nocursor" : false,
+      indentUnit: 4,
     });
 
     const codemirrorEl = cm.getWrapperElement();
 
     addClass(document.body, "codemirror-rendered");
 
+    initialCodeRender(cm);
+
+    /* "REACT" */
     let state = {
       compilation: { state: "pending" },
       editable: false,
@@ -160,6 +129,8 @@
       }
     });
 
+    /* WORKER */
+
     const worker = new Worker(window.workerMain, {
       name: "explainer",
     });
@@ -210,6 +181,17 @@
       wasmUrl: window.workerWasm,
     });
 
+    /* HEADER */
+    const generateButton = querySelector(".generate");
+    const generatedLink = querySelector(".link");
+    const toggleEditEButton = querySelector(".toggle-edit");
+    const showAllButton = querySelector(".show-all");
+    const showAllText = querySelector(".show-all-text");
+    const showAllSpinner = querySelector(".show-all > .spinner");
+
+    const modal = querySelector(".modal");
+    const overlay = querySelector(".overlay");
+
     generateButton.addEventListener("click", () => {
       let address = `${
         window.location.origin
@@ -223,6 +205,15 @@
       const newEditable = !state.editable;
       setState({ editable: newEditable });
       cm.setOption("readOnly", newEditable ? false : "nocursor");
+    });
+
+    showAllButton.addEventListener("click", () => {
+      setState(({ compilation }) => ({
+        compilation: {
+          ...compilation,
+          showAll: !compilation.showAll,
+        },
+      }));
     });
 
     querySelector(".whats-this").addEventListener("click", () => {
@@ -250,64 +241,79 @@
       }
     }
 
-    const codeParam = [...new window.URLSearchParams(location.search)].find(
-      ([key, value]) => key === "code"
-    );
-    const code =
-      codeParam != null ? window.decodeURIComponent(codeParam[1]) : null;
+    function renderShowAll(prevState) {
+      const { compilation: prevCompilation } = prevState;
+      const { compilation } = state;
 
-    if (code != null && code.trim() !== "") {
-      cm.setValue(code);
-    } else {
-      const local = window.localStorage.getItem("code");
-      if (local != null) {
-        cm.setValue(local);
+      if (
+        compilation.state === prevCompilation.state &&
+        compilation.showAll === prevCompilation.showAll &&
+        compilation.exploration === prevCompilation.exploration &&
+        compilation.empty === prevCompilation.empty
+      ) {
+        return;
+      }
+
+      const canShow = compilation.exploration != null;
+      showAllButton.disabled = !canShow;
+
+      const isLoaded =
+        canShow || compilation.state === "error" || compilation.empty;
+      (isLoaded ? addClass : removeClass)(showAllButton, "show-all-loaded");
+
+      if (compilation.showAll) {
+        addClass(codemirrorEl, "show-all-computed");
+        setText(showAllText, "Hide elements");
       } else {
-        cm.setValue(querySelector(".default-code").value);
+        removeClass(codemirrorEl, "show-all-computed");
+        setText(showAllText, initialShowAll);
       }
     }
 
-    function renderSessionState() {
-      const { state: compilationState, error } = state.compilation;
-      loadingContainer.style.display =
-        compilationState === "pending" ? "initial" : "none";
-      loadedContainer.style.display =
-        compilationState !== "pending" ? "initial" : "none";
+    function renderModal() {
+      const { showModal } = state;
 
-      if (compilationState === "error") {
-        setHtml(itemTitle, "Oops! 💥");
-        setHtml(itemEl, "There is a syntax error in your code:");
-        setDisplay(errorMessageContainer, "block");
-        setText(errorMessageEl, error.msg);
-        nonUiState.errorMark = getMark(error, "compilation-error");
-        nonUiState.errorContextMark = getMark(
-          {
-            start: {
-              ...error.start,
-              ch: 0,
-            },
-            end: {
-              ...error.end,
-              ch: cm.getLine(error.end.line).length,
-            },
-          },
-          "compilation-error"
-        );
+      if (showModal) {
+        addClass(modal, "show-modal");
+        addClass(overlay, "show-modal");
       } else {
-        nonUiState.errorMark && nonUiState.errorMark.clear();
-        nonUiState.errorContextMark && nonUiState.errorContextMark.clear();
-        setHtml(itemTitle, initialItemTitle);
-        setHtml(itemEl, initialItem);
-        setDisplay(errorMessageContainer, "none");
+        removeClass(modal, "show-modal");
+        removeClass(overlay, "show-modal");
       }
     }
 
-    function wait(fn) {
-      requestAnimationFrame(() => requestAnimationFrame(() => fn()));
+    function renderEditable() {
+      setText(
+        toggleEditEButton,
+        state.editable ? "Disable editing" : "Enable editing"
+      );
     }
 
-    function isFailedCompilation(compilation) {
-      return compilation != null && compilation.state === "error";
+    /* CODE */
+
+    const styleSheet = (() => {
+      const styleEl = document.createElement("style");
+      document.head.appendChild(styleEl);
+      return styleEl.sheet;
+    })();
+
+    function initialCodeRender(cm) {
+      const codeParam = [...new window.URLSearchParams(location.search)].find(
+        ([key, value]) => key === "code"
+      );
+      const code =
+        codeParam != null ? window.decodeURIComponent(codeParam[1]) : null;
+
+      if (code != null && code.trim() !== "") {
+        cm.setValue(code);
+      } else {
+        const local = window.localStorage.getItem("code");
+        if (local != null) {
+          cm.setValue(local);
+        } else {
+          cm.setValue(querySelector(".default-code").value);
+        }
+      }
     }
 
     cm.on("change", () => {
@@ -338,71 +344,17 @@
       explain(clientX, clientY);
     });
 
-    showAllButton.addEventListener("click", () => {
-      setState(({ compilation }) => ({
-        compilation: {
-          ...compilation,
-          showAll: !compilation.showAll,
-        },
-      }));
+    codemirrorEl.addEventListener("click", () => {
+      elaborate(cm.getCursor("from"));
     });
 
-    const debounce = (fn, delay) => {
-      let enqueued = null;
-      let lastArg = null;
-      const wrapped = () => fn(lastArg);
-
-      return (arg) => {
-        lastArg = arg;
-        if (enqueued != null) {
-          window.clearTimeout(enqueued);
-        }
-        enqueued = setTimeout(wrapped, delay);
-      };
-    };
-
-    const debouncedCompile = debounce(
-      (source) =>
-        worker.postMessage({
-          type: COMPILE,
-          source,
-        }),
-      128
-    );
-
-    function compileSession() {
-      const code = cm.getValue();
-      window.localStorage.setItem("code", code);
-
-      if (code.trim() === "") {
-        setState({ compilation: { state: "success" } });
-      } else {
-        debouncedCompile(cm.getValue());
-      }
-
-      const { computedMarks } = nonUiState;
-      nonUiState.computedMarks = null;
-      computedMarks &&
-        requestAnimationFrame(() =>
-          computedMarks.forEach((mark) => mark.clear())
-        );
-    }
-
-    function computeExploration(exploration) {
-      nonUiState.computedMarks = exploration.map(({ start, end }, i) => {
-        return getMark({ start, end }, `computed-${i}`);
+    function elaborate(location) {
+      if (state.compilation.state !== "success" || state.compilation.empty)
+        return;
+      worker.postMessage({
+        type: ELABORATE,
+        location,
       });
-
-      for (let i = nonUiState.lastRule + 1; i < exploration.length; i++) {
-        styleSheet.insertRule(
-          `.hover-${i} .computed-${i} { background: #eee8d5 }`,
-          styleSheet.cssRules.length
-        );
-      }
-
-      nonUiState.lastRule = Math.max(exploration.length, nonUiState.lastRule);
-
-      nonUiState.hoverMark && nonUiState.hoverMark.clear();
     }
 
     function explain(left, top) {
@@ -436,29 +388,150 @@
       }
     }
 
+    function computeExploration(exploration) {
+      nonUiState.computedMarks = exploration.map(({ start, end }, i) => {
+        return getMark({ start, end }, `computed-${i}`);
+      });
+
+      for (let i = nonUiState.lastRule + 1; i < exploration.length; i++) {
+        styleSheet.insertRule(
+          `.hover-${i} .computed-${i} { background: #eee8d5 }`,
+          styleSheet.cssRules.length
+        );
+      }
+
+      nonUiState.lastRule = Math.max(exploration.length, nonUiState.lastRule);
+
+      nonUiState.hoverMark && nonUiState.hoverMark.clear();
+    }
+
+    const debouncedCompile = debounce(
+      (source) =>
+        worker.postMessage({
+          type: COMPILE,
+          source,
+        }),
+      128
+    );
+
+    function compileSession() {
+      const code = cm.getValue();
+      window.localStorage.setItem("code", code);
+
+      if (code.trim() === "") {
+        setState({ compilation: { state: "success", empty: true } });
+      } else {
+        debouncedCompile(cm.getValue());
+      }
+
+      const { computedMarks } = nonUiState;
+      nonUiState.computedMarks = null;
+      computedMarks &&
+        requestAnimationFrame(() =>
+          computedMarks.forEach((mark) => mark.clear())
+        );
+    }
+
+    function renderHover() {
+      const { hoverEl } = state.compilation;
+
+      const klass =
+        hoverEl &&
+        [...hoverEl.classList].find((klass) => klass.startsWith("computed-"));
+      const newIndex = klass && Number(klass.replace("computed-", ""));
+
+      if (nonUiState.hoverIndex != null && newIndex !== nonUiState.hoverIndex) {
+        removeClass(codemirrorEl, `hover-${nonUiState.hoverIndex}`);
+      }
+
+      if (newIndex != null) {
+        addClass(codemirrorEl, `hover-${newIndex}`);
+      }
+
+      nonUiState.hoverIndex = newIndex;
+    }
+
+    /* EXPLANATION ASIDE */
+
+    const explanationEl = querySelector(".explanation");
+    const loadingContainer = explanationEl.querySelector(".loading");
+    const loadedContainer = explanationEl.querySelector(".loaded");
+    const itemContainer = explanationEl.querySelector(".item-container");
+    const itemTitle = itemContainer.querySelector(".item-title");
+    const itemEl = itemContainer.querySelector(".item");
+    const errorMessageContainer = itemContainer.querySelector(
+      ".error-message-container"
+    );
+    const errorMessageEl = itemContainer.querySelector(".error-message");
+    const moreInfoHeader = explanationEl.querySelector(".more-info");
+    const bookRow = moreInfoHeader.querySelector(".book-row");
+    const bookLink = bookRow.querySelector("a");
+    const keywordRow = moreInfoHeader.querySelector(".keyword-row");
+    const keywordLink = keywordRow.querySelector("a");
+    const infoWipEl = querySelector(".info-wip");
+    const canBeBlockEl = querySelector(".can-be-block");
+
+    const initialItem = itemEl.innerHTML;
+    const initialItemTitle = itemTitle.innerHTML;
+    const initialShowAll = showAllText.textContent;
+
+    querySelector(".wrap-in-block").addEventListener("click", () => {
+      const lines = cm.lineCount();
+      for (let i = 0; i < lines; i++) {
+        cm.indentLine(i, "add");
+      }
+      cm.replaceRange("fn main() {\n", { line: 0, ch: 0 });
+      cm.replaceRange("\n}", {
+        line: lines,
+        ch: cm.getLineHandle(lines).text.length,
+      });
+    });
+
+    function renderSessionState() {
+      const { state: compilationState, error } = state.compilation;
+      loadingContainer.style.display =
+        compilationState === "pending" ? "initial" : "none";
+      loadedContainer.style.display =
+        compilationState !== "pending" ? "initial" : "none";
+
+      if (compilationState === "error") {
+        setHtml(itemTitle, "Oops! 💥");
+        setHtml(itemEl, "There is a syntax error in your code:");
+
+        setDisplay(errorMessageContainer, "block");
+        setText(errorMessageEl, error.msg);
+
+        setDisplay(canBeBlockEl, error.isBlock ? "block" : "none");
+
+        nonUiState.errorMark = getMark(error, "compilation-error");
+        nonUiState.errorContextMark = getMark(
+          {
+            start: {
+              ...error.start,
+              ch: 0,
+            },
+            end: {
+              ...error.end,
+              ch: cm.getLine(error.end.line).length,
+            },
+          },
+          "compilation-error"
+        );
+      } else {
+        nonUiState.errorMark && nonUiState.errorMark.clear();
+        nonUiState.errorContextMark && nonUiState.errorContextMark.clear();
+        setHtml(itemTitle, initialItemTitle);
+        setHtml(itemEl, initialItem);
+        setDisplay(errorMessageContainer, "none");
+        setDisplay(canBeBlockEl, "none");
+      }
+    }
+
     function renderExplanation() {
       const location = state.compilation.explanation;
       nonUiState.hoverMark && nonUiState.hoverMark.clear();
       if (location == null || nonUiState.computedMarks != null) return;
       nonUiState.hoverMark = getMark(location);
-    }
-
-    function getMark(location, className = "highlighted") {
-      return cm.markText(location.start, location.end, {
-        className,
-      });
-    }
-
-    codemirrorEl.addEventListener("click", () => {
-      elaborate(cm.getCursor("from"));
-    });
-
-    function elaborate(location) {
-      if (state.compilation.state !== "success") return;
-      worker.postMessage({
-        type: ELABORATE,
-        location,
-      });
     }
 
     function renderElaboration() {
@@ -486,70 +559,26 @@
       }
     }
 
-    function renderHover() {
-      const { hoverEl } = state.compilation;
+    /* HELPERS */
 
-      const klass =
-        hoverEl &&
-        [...hoverEl.classList].find((klass) => klass.startsWith("computed-"));
-      const newIndex = klass && Number(klass.replace("computed-", ""));
-
-      if (nonUiState.hoverIndex != null && newIndex !== nonUiState.hoverIndex) {
-        removeClass(codemirrorEl, `hover-${nonUiState.hoverIndex}`);
-      }
-
-      if (newIndex != null) {
-        addClass(codemirrorEl, `hover-${newIndex}`);
-      }
-
-      nonUiState.hoverIndex = newIndex;
+    function getMark(location, className = "highlighted") {
+      return cm.markText(location.start, location.end, {
+        className,
+      });
     }
 
-    function renderShowAll(prevState) {
-      const { compilation: prevCompilation } = prevState;
-      const { compilation } = state;
+    function debounce(fn, delay) {
+      let enqueued = null;
+      let lastArg = null;
+      const wrapped = () => fn(lastArg);
 
-      if (
-        compilation.state === prevCompilation.state &&
-        compilation.showAll === prevCompilation.showAll &&
-        compilation.exploration === prevCompilation.exploration
-      ) {
-        return;
-      }
-
-      console.warn("renderShowAll");
-      const canShow = compilation.exploration != null;
-      showAllButton.disabled = !canShow;
-
-      const isLoaded = canShow || compilation.state === "error";
-      (isLoaded ? addClass : removeClass)(showAllButton, "show-all-loaded");
-
-      if (compilation.showAll) {
-        addClass(codemirrorEl, "show-all-computed");
-        setText(showAllText, "Hide elements");
-      } else {
-        removeClass(codemirrorEl, "show-all-computed");
-        setText(showAllText, initialShowAll);
-      }
-    }
-
-    function renderModal() {
-      const { showModal } = state;
-
-      if (showModal) {
-        addClass(modal, "show-modal");
-        addClass(overlay, "show-modal");
-      } else {
-        removeClass(modal, "show-modal");
-        removeClass(overlay, "show-modal");
-      }
-    }
-
-    function renderEditable() {
-      setText(
-        toggleEditEButton,
-        state.editable ? "Disable editing" : "Enable editing"
-      );
+      return (arg) => {
+        lastArg = arg;
+        if (enqueued != null) {
+          window.clearTimeout(enqueued);
+        }
+        enqueued = setTimeout(wrapped, delay);
+      };
     }
 
     function addClass(node, klass) {
@@ -572,7 +601,7 @@
       node.style.display = display;
     }
 
-    if (typeof __PRODUCTION__ == "string") {
+    if (typeof __PRODUCTION__ != "boolean") {
       window.cm = cm;
     }
   }
@@ -639,6 +668,7 @@
                 line: location[2] - 1,
                 ch: location[3],
               },
+              isBlock: result.is_block(),
             }
           : null;
 
