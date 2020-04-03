@@ -1,4 +1,5 @@
-use proc_macro2::LineColumn;
+use proc_macro2::{token_stream::IntoIter as TreeIter, LineColumn, Span, TokenStream, TokenTree};
+use quote::ToTokens;
 use std::vec::IntoIter;
 
 use syntax::{HelpItem, IntersectionVisitor};
@@ -7,6 +8,68 @@ mod syntax;
 mod utils;
 
 use wasm_bindgen::prelude::*;
+
+struct TokenIterator {
+    elements: Vec<TokenIteratorElement>,
+}
+
+enum TokenIteratorElement {
+    Span(Span),
+    Tree(TreeIter),
+}
+
+impl Iterator for TokenIterator {
+    type Item = Span;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(element) = self.elements.pop() {
+            let mut tree_iter = match element {
+                TokenIteratorElement::Tree(iter) => iter,
+                TokenIteratorElement::Span(span) => {
+                    return Some(span);
+                }
+            };
+
+            let tree = if let Some(tree) = tree_iter.next() {
+                self.elements.push(TokenIteratorElement::Tree(tree_iter));
+                tree
+            } else {
+                continue;
+            };
+
+            let group = match tree {
+                TokenTree::Ident(ident) => {
+                    return Some(ident.span());
+                }
+                TokenTree::Punct(punct) => {
+                    return Some(punct.span());
+                }
+                TokenTree::Literal(lit) => {
+                    return Some(lit.span());
+                }
+                TokenTree::Group(group) => group,
+            };
+
+            let span_open = group.span_open();
+            let span_close = group.span_close();
+
+            self.elements.push(TokenIteratorElement::Span(span_close));
+            self.elements
+                .push(TokenIteratorElement::Tree(group.stream().into_iter()));
+            return Some(span_open);
+        }
+
+        return None;
+    }
+}
+
+impl From<TokenStream> for TokenIterator {
+    fn from(stream: TokenStream) -> Self {
+        TokenIterator {
+            elements: vec![TokenIteratorElement::Tree(stream.into_iter())],
+        }
+    }
+}
 
 #[cfg(feature = "dev")]
 #[wasm_bindgen]
@@ -63,7 +126,15 @@ impl SessionResult {
 #[wasm_bindgen]
 pub struct Session {
     code: syn::File,
-    positions: IntoIter<(usize, usize)>,
+    tokens: TokenIterator,
+    top_level: IntoIter<TopLevelElement>,
+    element: TopLevelElement,
+}
+
+#[derive(Clone)]
+enum TopLevelElement {
+    Attr(usize),
+    Item(usize),
 }
 
 #[wasm_bindgen]
@@ -73,14 +144,28 @@ impl Session {
         utils::set_panic_hook();
         let result = syn::parse_file(source)
             .map(|code| {
-                let positions = source
-                    .lines()
-                    .enumerate()
-                    .flat_map(|(i, line)| line.chars().enumerate().map(move |(j, _)| (i + 1, j)))
-                    .collect::<Vec<_>>()
-                    .into_iter();
+                let tokens = TokenStream::new().into();
+                let mut top_level_elements = vec![];
 
-                Session { code, positions }
+                top_level_elements.extend(
+                    code.attrs
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| TopLevelElement::Attr(i)),
+                );
+                top_level_elements.extend(
+                    code.items
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| TopLevelElement::Item(i)),
+                );
+
+                Session {
+                    code,
+                    tokens,
+                    top_level: top_level_elements.into_iter(),
+                    element: TopLevelElement::Attr(0),
+                }
             })
             .map_err(|err| {
                 let block_result = syn::parse_str::<syn::Block>(&format!("{{{}}}", source));
@@ -90,54 +175,70 @@ impl Session {
     }
 
     #[wasm_bindgen]
-    pub fn explore(&mut self, dest: &mut [usize], max: usize) -> usize {
-        let mut last: Option<(_, _)> = None;
+    pub fn explore(&mut self, dest: &mut [usize]) -> usize {
+        let max = dest.len() / 4;
         let mut count = 0;
+        let mut idx = 0;
 
-        for i in (0..dest.len()).step_by(4) {
-            let mut found = false;
-            while let Some((line, column)) = self.positions.next() {
-                if let Some(last_position) = last {
-                    let loc = LineColumn { line, column };
-                    if within_locations(loc, last_position.0, last_position.1) {
+        loop {
+            let span = match self.tokens.next() {
+                Some(span) => span,
+                None => match self.top_level.next() {
+                    Some(el) => {
+                        self.element = el.clone();
+                        self.tokens = match el {
+                            TopLevelElement::Attr(i) => {
+                                self.code.attrs[i].clone().to_token_stream().into()
+                            }
+                            TopLevelElement::Item(i) => {
+                                self.code.items[i].clone().to_token_stream().into()
+                            }
+                        };
                         continue;
-                    } else {
-                        last = None;
                     }
-                }
+                    None => break,
+                },
+            };
 
-                let explanation = if let Some(explanation) = self.explain(line, column) {
-                    explanation
-                } else {
-                    continue;
+            let location = span.start();
+
+            let explanation = if let Some(explanation) = {
+                let visitor = IntersectionVisitor::new(location);
+                let result = match self.element {
+                    TopLevelElement::Attr(i) => visitor.visit_attr(&self.code, i),
+                    TopLevelElement::Item(i) => visitor.visit_item(&self.code.items[i]),
                 };
-
-                #[cfg(feature = "dev")]
-                {
-                    log(&format!("{:?}", explanation));
+                if let HelpItem::Unknown = result.help {
+                    None
+                } else {
+                    Some(Explanation {
+                        item: result.help,
+                        start_line: result.item_location.0.line,
+                        start_column: result.item_location.0.column,
+                        end_line: result.item_location.1.line,
+                        end_column: result.item_location.1.column,
+                    })
                 }
+            } {
+                explanation
+            } else {
+                continue;
+            };
 
-                last = Some((
-                    LineColumn {
-                        line: explanation.start_line,
-                        column: explanation.start_column,
-                    },
-                    LineColumn {
-                        line: explanation.end_line,
-                        column: explanation.end_column,
-                    },
-                ));
-
-                dest[i] = explanation.start_line;
-                dest[i + 1] = explanation.start_column;
-                dest[i + 2] = explanation.end_line;
-                dest[i + 3] = explanation.end_column;
-                count += 1;
-                found = true;
-                break;
+            #[cfg(feature = "dev")]
+            {
+                log(&format!("{:?}", explanation));
             }
 
-            if count == max || !found {
+            dest[idx] = explanation.start_line;
+            dest[idx + 1] = explanation.start_column;
+            dest[idx + 2] = explanation.end_line;
+            dest[idx + 3] = explanation.end_column;
+
+            idx += 4;
+            count += 1;
+
+            if count == max {
                 break;
             }
         }
@@ -194,13 +295,6 @@ impl Explanation {
     pub fn book(&self) -> JsValue {
         self.item.book().into()
     }
-}
-
-#[cfg(features = "dev")]
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
 }
 
 fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {

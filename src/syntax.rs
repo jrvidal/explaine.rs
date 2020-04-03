@@ -1,22 +1,44 @@
 use proc_macro2::{LineColumn, Span};
+use serde::Serialize;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
+
+std::thread_local! {
+    static TEMPLATE: tinytemplate::TinyTemplate<'static> = init_template();
+}
 
 std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
 
 #[cfg(feature = "dev")]
 use super::log;
 
-#[derive(Debug, Clone, Copy)]
+struct HelpData {
+    template: &'static str,
+    title: &'static str,
+    book: Option<&'static str>,
+    keyword: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
 pub enum HelpItem {
-    Use,
+    ItemUse,
+    ItemUseCrate,
+    ItemUseLeadingColon,
     Macro,
-    Attribute { outer: bool },
+    MacroTokens,
+    Attribute {
+        outer: bool,
+    },
     ItemExternCrate,
+    ItemFn,
     ItemInlineMod,
     ItemExternMod,
     Unknown,
-    FnToken,
+    FnToken {
+        of: &'static str,
+        name: String,
+    },
     TraitItemMethod,
     ImplItemMethod,
     AsRename,
@@ -29,18 +51,24 @@ pub enum HelpItem {
     AsyncExpression,
     AsyncFn,
     AwaitExpression,
-    Break { label: bool, expr: bool },
+    Break {
+        label: bool,
+        expr: bool,
+    },
     ImplItemConst,
     TraitItemConst,
     ItemConst,
-    ConstPtr,
-    MutPtr,
     ConstParam,
     ConstFn,
-    ExprContinue { label: bool },
+    ExprContinue {
+        label: bool,
+    },
     VisPublic,
     VisCrate,
     VisRestricted,
+    Variant {
+        name: String,
+    },
     Dyn,
     Else,
     ItemEnum,
@@ -49,6 +77,8 @@ pub enum HelpItem {
     TypeBareFnAbi,
     True,
     False,
+    LitByteStr,
+    LitStr,
     FnTypeToken,
     ItemImplForTrait,
     ExprForLoopToken,
@@ -75,15 +105,24 @@ pub enum HelpItem {
     PatIdentRefMut,
     StaticMut,
     Static,
-    TypeReference { mutable: bool, lifetime: bool },
-    ExprReference { mutable: bool },
+    TypeReference {
+        mutable: bool,
+        lifetime: bool,
+    },
+    UseGlob,
+    ExprReference {
+        mutable: bool,
+    },
     ExprReturn,
     PathSegmentSelf,
     ExprUnsafe,
     ForeignItemType,
     ImplItemType,
     ItemUnsafeImpl,
-    ItemStruct,
+    ItemStruct {
+        unit: bool,
+        name: String,
+    },
     ItemUnsafeTrait,
     ItemTrait,
     ItemType,
@@ -91,35 +130,54 @@ pub enum HelpItem {
     PathSegmentSuper,
     UnsafeFn,
     TraitItemType,
+    TypeArray,
+    TypeInfer,
+    TypeNever,
+    TypeParamBoundAdd,
+    TypeConstPtr,
+    TypeMutPtr,
     WhereClause,
     TypeBareUnsafeFn,
     ItemTraitAlias,
-    Field { named: bool },
+    Field {
+        name: Option<String>,
+        of: &'static str,
+    },
     FatArrow,
-    DocBlock { outer: bool },
+    DocBlock {
+        outer: bool,
+    },
     RArrow,
-    ExprRangeHalfOpen { from: bool, to: bool },
-    ExprRangeClosed { from: bool, to: bool },
+    ExprRangeHalfOpen {
+        from: bool,
+        to: bool,
+    },
+    ExprRangeClosed {
+        from: bool,
+        to: bool,
+    },
     StaticLifetime,
-    TraitBound,
-    TypeInfer,
 }
 
 impl HelpItem {
-    pub fn message(&self) -> &'static str {
-        help_to_message(*self).0
+    pub fn message(&self) -> String {
+        TEMPLATE.with(|tt| tt.render(self.data().template, &self).unwrap())
     }
 
     pub fn title(&self) -> &'static str {
-        help_to_message(*self).1
+        self.data().title
     }
 
     pub fn keyword(&self) -> Option<&'static str> {
-        help_to_message(*self).3
+        self.data().keyword
     }
 
     pub fn book(&self) -> Option<&'static str> {
-        help_to_message(*self).2
+        self.data().book
+    }
+
+    fn data(&self) -> HelpData {
+        help_to_template_data(self)
     }
 }
 
@@ -161,31 +219,53 @@ pub struct VisitorResult {
 
 impl<'ast> IntersectionVisitor<'ast> {
     pub fn new(location: LineColumn) -> Self {
-        #[cfg(feature = "dev")]
-        {
-            Self {
-                location,
-                item_location: (location, location),
-                help: HelpItem::Unknown,
-                ancestors: vec![],
-                next_ancestor: Ancestor::new(),
-                debug: "".to_string(),
-            }
+        Self {
+            location,
+            item_location: (location, location),
+            help: HelpItem::Unknown,
+            ancestors: vec![],
+            next_ancestor: Ancestor::new(),
+            #[cfg(feature = "dev")]
+            debug: "".to_string(),
         }
-        #[cfg(not(feature = "dev"))]
-        {
-            Self {
-                location,
-                item_location: (location, location),
-                help: HelpItem::Unknown,
-                ancestors: vec![],
-                next_ancestor: Ancestor::new(),
-            }
+    }
+
+    fn settled(&self) -> bool {
+        match self.help {
+            HelpItem::Unknown => false,
+            _ => true,
         }
     }
 
     pub fn visit(mut self, file: &'ast syn::File) -> VisitorResult {
         self.visit_file(file);
+
+        VisitorResult {
+            help: self.help,
+            item_location: self.item_location,
+            #[cfg(feature = "dev")]
+            debug: self.debug,
+        }
+    }
+
+    pub fn visit_item(mut self, item: &'ast syn::Item) -> VisitorResult {
+        Visit::visit_item(&mut self, item);
+
+        VisitorResult {
+            help: self.help,
+            item_location: self.item_location,
+            #[cfg(feature = "dev")]
+            debug: self.debug,
+        }
+    }
+
+    pub fn visit_attr(mut self, file: &'ast syn::File, idx: usize) -> VisitorResult {
+        let mut ancestor = Ancestor::new();
+        ancestor.attributes = &file.attrs[..];
+        ancestor.span = file.span();
+        self.ancestors.push(ancestor);
+
+        self.visit_attribute(&file.attrs[idx]);
 
         VisitorResult {
             help: self.help,
@@ -205,8 +285,12 @@ impl<'ast> IntersectionVisitor<'ast> {
     }
 
     fn between_spans(&self, start: Span, end: Span) -> bool {
+        self.between_locations(start.start(), end.end())
+    }
+
+    fn between_locations(&self, start: LineColumn, end: LineColumn) -> bool {
         let loc = self.location;
-        super::within_locations(loc, start.start(), end.end())
+        super::within_locations(loc, start, end)
     }
 
     fn set_help<S: Spanned + ?Sized>(&mut self, item: &S, help: HelpItem) {
@@ -243,7 +327,7 @@ macro_rules! method {
     (@_debug, $name:ident, $self:ident, $node:ident) => {{
         #[cfg(feature = "dev")]
         {
-            log(stringify!($name));
+            // log(stringify!($name));
         }
     }};
     (@_attrs, $self:ident, $node:ident, $body:expr) => {{
@@ -262,19 +346,27 @@ macro_rules! method {
             $body
         }
     }};
-    (@_ancestor @_spancheck, $self:ident) => {
+    (@_set_ancestor @_spancheck, $self:ident) => {
         let mut next_ancestor = Ancestor::new();
         std::mem::swap(&mut $self.next_ancestor, &mut next_ancestor);
         $self.ancestors.push(next_ancestor);
     };
-    (@_ancestor @_nospancheck, $self:ident) => {};
-    (@_impl, $name:ident, $self:ident, $node:ident, $ty:path, @_body $body:expr, @ $spancheck:ident) => {
+    (@_set_ancestor @_nospancheck, $self:ident) => {};
+    (@_terminal, @_reachable) => {
+        #[allow(unreachable_code)]
+    };
+    (@_terminal, $name:ident, $body:expr) => {
+        $body;
+        unreachable!(stringify!($name));
+    };
+    (@_impl, $name:ident, $self:ident, $node:ident, $ty:path, @_body $body:expr => $after:expr, @ $spancheck:ident) => {
         fn $name(&mut $self, $node: &'ast $ty) {
             method![@_debug, $name, $self, $node];
             method![@$spancheck, $self, $node, $ty];
             $body;
-            method![@_ancestor @$spancheck, $self];
+            method![@_set_ancestor @$spancheck, $self];
             syn::visit::$name($self, $node);
+            $after;
         }
     };
     (@_impl, $name:ident, $self:ident, $node:ident, $ty:path, @_body @terminal $body:expr, @ $spancheck:ident) => {
@@ -293,23 +385,32 @@ macro_rules! method {
         method![@_impl, $name, $self, $node, $ty, @_body @terminal $body];
     };
     // "Public"
-    ($name:ident($self:ident, $node:ident: $ty:path) $body:expr) => {
-        method![@_impl, $name, $self, $node, $ty, @_body $body, @_spancheck];
+    ($name:ident($self:ident, $node:ident: $ty:path)) => {
+        method![$name($self, $node: $ty) { () }];
     };
-    (@attrs $name:ident($self:ident, $node:ident: $ty:path) $body:expr) => {
-        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, $body], @_spancheck];
+    ($name:ident($self:ident, $node:ident: $ty:path) => $after:expr) => {
+        method![@_impl, $name, $self, $node, $ty, @_body () => $after, @_spancheck];
+    };
+    ($name:ident($self:ident, $node:ident: $ty:path) $body:expr) => {
+        method![@_impl, $name, $self, $node, $ty, @_body $body => (), @_spancheck];
     };
     (@attrs $name:ident($self:ident, $node:ident: $ty:path)) => {
-        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, { () }], @_spancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, { () }] => (), @_spancheck];
+    };
+    (@attrs $name:ident($self:ident, $node:ident: $ty:path) $body:expr) => {
+        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, $body] => (), @_spancheck];
+    };
+    (@attrs $name:ident($self:ident, $node:ident: $ty:path) $body:expr => $after:expr) => {
+        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, $body] => $after, @_spancheck];
+    };
+    (@attrs $name:ident($self:ident, $node:ident: $ty:path) => $after:expr) => {
+        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, ()] => $after, @_spancheck];
     };
     ($name:ident($self:ident, $node:ident: $ty:path) @terminal $body:expr) => {
         method![@_impl, $name, $self, $node, $ty, @_body @terminal $body, @_spancheck];
     };
-    ($name:ident($self:ident, $node:ident: $ty:path)) => {
-        method![@_impl, $name, $self, $node, $ty, @_body { () }, @_spancheck];
-    };
     (@nospancheck $name:ident($self:ident, $node:ident: $ty:path)) => {
-        method![@_impl, $name, $self, $node, $ty, @_body { () }, @_nospancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body { () } => (), @_nospancheck];
     };
 }
 
@@ -510,10 +611,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.while_token, * while_token];
     }];
     method![visit_expr_yield(self, node: syn::ExprYield)];
-    method![@attrs visit_field(self, node: syn::Field) {
-        // TODO: attrs + terminal
+    method![@attrs visit_field(self, node: syn::Field) => {
+        if self.settled() {
+            return;
+        }
         if self.within(node) {
-            return self.set_help(node, HelpItem::Field { named: node.ident.is_some() });
+            return self.set_help(node, HelpItem::Field {
+                name: node.ident.as_ref().map(|id| id.to_string()),
+                of: "struct"
+            });
         }
     }];
     method![visit_field_pat(self, node: syn::FieldPat)];
@@ -521,7 +627,27 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_fields(self, node: syn::Fields)];
     method![visit_fields_named(self, node: syn::FieldsNamed)];
     method![visit_fields_unnamed(self, node: syn::FieldsUnnamed)];
-    method![@attrs visit_file(self, node: syn::File)];
+    method![visit_file(self, node: syn::File) {
+        // TODO: shebang
+        let mut ancestor = Ancestor::new();
+        ancestor.attributes = &node.attrs[..];
+        ancestor.span = node.span();
+        self.ancestors.push(ancestor);
+
+        for attr in &node.attrs {
+            if self.within(attr) {
+                syn::visit::visit_attribute(self, attr);
+                return;
+            }
+        }
+
+        for item in &node.items {
+            if self.within(item) {
+                syn::visit::visit_item(self, item);
+                return;
+            }
+        }
+    }];
     method![visit_fn_arg(self, node: syn::FnArg)];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
     method![visit_foreign_item_fn(self, node: syn::ForeignItemFn)];
@@ -559,7 +685,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_impl_item_macro(self, node: syn::ImplItemMacro)];
     method![@attrs visit_impl_item_method(self, node: syn::ImplItemMethod) {
         token![self, node.sig.ident, ImplItemMethod];
-        token![self, node.sig.fn_token, FnToken];
+        token![self, node.sig.fn_token, * HelpItem::FnToken { of: "method", name: node.sig.ident.to_string() }];
     }];
     method![visit_impl_item_type(self, node: syn::ImplItemType) {
         token![self, node.type_token, ImplItemType];
@@ -569,7 +695,21 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_item_const(self, node: syn::ItemConst) {
         token![self, node.const_token, ItemConst];
     }];
-    method![visit_item_enum(self, node: syn::ItemEnum) {
+    method![@attrs visit_item_enum(self, node: syn::ItemEnum) => {
+        match self.help {
+            HelpItem::Field { ref mut of, .. } => {
+                *of = "enum";
+                return;
+            },
+            HelpItem::Variant { ref mut name, .. } => {
+                *name = node.ident.to_string();
+                return;
+            }
+            _ if self.settled() => {
+                return;
+            }
+            _ => {}
+        }
         token![self, node.enum_token => node.ident, ItemEnum];
     }];
     method![@attrs visit_item_extern_crate(self, node: syn::ItemExternCrate) {
@@ -580,17 +720,30 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help_between(start, node.span(), HelpItem::ItemExternCrate);
     }];
     method![visit_item_fn(self, node: syn::ItemFn) {
-        token![self, node.sig.fn_token, FnToken];
+        token![self, node.sig.ident, ItemFn];
+        token![self, node.sig.fn_token, * HelpItem::FnToken { of: "function", name: node.sig.ident.to_string() }];
     }];
     method![visit_item_foreign_mod(self, node: syn::ItemForeignMod) {
         token![self, node.abi, ItemForeignModAbi];
     }];
-    method![visit_item_impl(self, node: syn::ItemImpl) {
+    method![@attrs visit_item_impl(self, node: syn::ItemImpl) {
         token![self, some node.unsafety, ItemUnsafeImpl];
         if let Some((_, _, for_token)) = node.trait_ {
             token![self, for_token, ItemImplForTrait];
         }
         token![self, node.impl_token, ItemImpl];
+    } => {
+        match self.help {
+            HelpItem::FnToken { ref mut of, ..} => {
+                // TODO: associated functions
+                *of = if node.trait_.is_some() {
+                    "trait method"
+                } else {
+                    "method"
+                };
+            },
+            _ => {}
+        }
     }];
     method![visit_item_macro(self, node: syn::ItemMacro)];
     method![visit_item_macro2(self, node: syn::ItemMacro2)];
@@ -617,8 +770,25 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             });
         }
     }];
-    method![visit_item_struct(self, node: syn::ItemStruct) {
-        token![self, node.struct_token => node.ident, ItemStruct];
+    method![@attrs visit_item_struct(self, node: syn::ItemStruct) => {
+        match self.help {
+            HelpItem::Field { ref mut of, .. } => {
+                *of = "struct";
+            },
+            _ if !self.settled() => {
+                let unit = match node.fields {
+                    syn::Fields::Unit => true,
+                    _ => false
+                };
+                if self.between_spans(node.struct_token.span(), node.ident.span()) {
+                    return self.set_help_between(node.struct_token.span(), node.ident.span(), HelpItem::ItemStruct {
+                        unit,
+                        name: node.ident.to_string()
+                    });
+                }
+            }
+            _ => {}
+        }
     }];
     method![visit_item_trait(self, node: syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
@@ -630,12 +800,37 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_item_type(self, node: syn::ItemType) {
         token![self, node.type_token => node.ident, ItemType];
     }];
-    method![visit_item_union(self, node: syn::ItemUnion) {
+    method![@attrs visit_item_union(self, node: syn::ItemUnion) => {
+        match self.help {
+            HelpItem::Field { ref mut of, .. } => {
+                *of = "union";
+                return;
+            },
+            _ if self.settled() => return,
+            _ => {}
+        }
         token![self, node.union_token, ItemUnion];
     }];
     method![@attrs visit_item_use(self, node: syn::ItemUse) {
+        token![self, some node.leading_colon, ItemUseLeadingColon];
+
+        let mut queue = vec![&node.tree];
+
+        while let Some(use_tree) = queue.pop() {
+            match use_tree {
+                syn::UseTree::Path(use_path) => if use_path.ident == "crate" && self.between(&use_path.ident, &use_path.ident) {
+                    return self.set_help(&use_path.ident, HelpItem::ItemUseCrate);
+                },
+                syn::UseTree::Group(use_group) => queue.extend(use_group.items.iter()),
+                _ => {}
+            }
+        }
+    } => {
+        if self.settled() {
+            return;
+        }
         let start = vis_span(&node.vis).unwrap_or_else(|| node.use_token.span());
-        return self.set_help_between(start, node.span(), HelpItem::Use);
+        return self.set_help_between(start, node.span(), HelpItem::ItemUse);
     }];
     method![visit_label(self, node: syn::Label) @terminal {
         return self.set_help(&node, HelpItem::Label);
@@ -651,11 +846,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help(node, if node.value { HelpItem::True } else { HelpItem:: False });
     }];
     method![visit_lit_byte(self, node: syn::LitByte)];
-    method![visit_lit_byte_str(self, node: syn::LitByteStr)];
+    method![visit_lit_byte_str(self, node: syn::LitByteStr) @terminal {
+        return self.set_help(node, HelpItem::LitByteStr);
+    }];
     method![visit_lit_char(self, node: syn::LitChar)];
     method![visit_lit_float(self, node: syn::LitFloat)];
     method![visit_lit_int(self, node: syn::LitInt)];
-    method![visit_lit_str(self, node: syn::LitStr)];
+    method![visit_lit_str(self, node: syn::LitStr) @terminal {
+        return self.set_help(node, HelpItem::LitStr);
+    }];
     method![visit_local(self, node: syn::Local) {
         if let syn::Pat::Ident(syn::PatIdent { mutability, ..}) = node.pat {
             let start = node.let_token.span();
@@ -673,6 +872,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if self.between_spans(node.path.span(), node.bang_token.span()) {
             return self.set_help_between(node.path.span(), node.bang_token.span(), HelpItem::Macro);
         }
+        token![self, node.tokens, MacroTokens];
     }];
     // method![visit_macro_delimiter(self, node: syn::MacroDelimiter)];
     method![visit_member(self, node: syn::Member)];
@@ -777,14 +977,19 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![visit_trait_item_macro(self, node: syn::TraitItemMacro)];
     method![visit_trait_item_method(self, node: syn::TraitItemMethod) {
-        token![self, node.sig.fn_token, FnToken];
+        token![self, node.sig.fn_token, * HelpItem::FnToken { of: "trait method", name: node.sig.ident.to_string() }];
         token![self, node.sig.ident, TraitItemMethod];
     }];
     method![visit_trait_item_type(self, node: syn::TraitItemType) {
         token![self, node.type_token, TraitItemType];
     }];
     method![visit_type(self, node: syn::Type)];
-    method![visit_type_array(self, node: syn::TypeArray)];
+    method![visit_type_array(self, node: syn::TypeArray) {
+        if self.between_locations(node.span().start(), node.elem.span().start()) ||
+            self.between_spans(node.semi_token.span(), node.span()) {
+            return self.set_help(node, HelpItem::TypeArray);
+        }
+    }];
     method![visit_type_bare_fn(self, node: syn::TypeBareFn) @terminal {
         token![self, some node.abi, TypeBareFnAbi];
         token![self, some node.unsafety, TypeBareUnsafeFn];
@@ -794,21 +999,28 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_type_impl_trait(self, node: syn::TypeImplTrait) {
         token![self, node.impl_token, TypeImplTrait];
     }];
-    method![visit_type_infer(self, node: syn::TypeInfer) {
-        token![self, node.underscore_token, TypeInfer];
+    method![visit_type_infer(self, node: syn::TypeInfer) @terminal {
+        return self.set_help(node, HelpItem::TypeInfer);
     }];
     method![visit_type_macro(self, node: syn::TypeMacro)];
-    method![visit_type_never(self, node: syn::TypeNever)];
+    method![visit_type_never(self, node: syn::TypeNever) @terminal {
+        return self.set_help(node, HelpItem::TypeNever);
+    }];
     method![visit_type_param(self, node: syn::TypeParam)];
     method![visit_type_param_bound(self, node: syn::TypeParamBound)];
     method![visit_type_paren(self, node: syn::TypeParen)];
     method![visit_type_path(self, node: syn::TypePath)];
     method![visit_type_ptr(self, node: syn::TypePtr) {
-        if let Some(const_token) = node.const_token {
-            token![self, const_token, ConstPtr];
-        }
-        if let Some(mutability) = node.mutability {
-            token![self, mutability, MutPtr];
+        let end = node.const_token
+            .map(|t| t.span())
+            .or_else(|| node.mutability.map(|t| t.span()));
+
+        if let Some(end) = end {
+            return self.set_help_between(node.span(), end, if node.const_token.is_some() {
+                HelpItem::TypeConstPtr
+            } else {
+                HelpItem::TypeMutPtr
+            });
         }
     }];
     method![visit_type_reference(self, node: syn::TypeReference) {
@@ -832,12 +1044,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             .filter_map(|pair| pair.punct().cloned())
             .find(|punct| self.within(punct))
         {
-            return self.set_help(&plus_token, HelpItem::TraitBound);
+            return self.set_help(&plus_token, HelpItem::TypeParamBoundAdd);
         }
     }];
     method![visit_type_tuple(self, node: syn::TypeTuple)];
     method![visit_un_op(self, node: syn::UnOp)];
-    method![visit_use_glob(self, node: syn::UseGlob)];
+    method![visit_use_glob(self, node: syn::UseGlob) @terminal {
+        return self.set_help(node, HelpItem::UseGlob);
+    }];
     method![visit_use_group(self, node: syn::UseGroup)];
     method![visit_use_name(self, node: syn::UseName)];
     method![visit_use_path(self, node: syn::UsePath)];
@@ -846,7 +1060,11 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![visit_use_tree(self, node: syn::UseTree)];
     method![visit_variadic(self, node: syn::Variadic)];
-    method![visit_variant(self, node: syn::Variant)];
+    method![@attrs visit_variant(self, node: syn::Variant) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::Variant { name: "".to_string() });
+        }
+    }];
     method![visit_vis_crate(self, node: syn::VisCrate)];
     method![visit_vis_public(self, node: syn::VisPublic)];
     method![visit_vis_restricted(self, node: syn::VisRestricted)];

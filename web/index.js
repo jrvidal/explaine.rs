@@ -605,6 +605,7 @@
 
     if (typeof __PRODUCTION__ != "boolean") {
       window.cm = cm;
+      window.nonUiState = nonUiState;
     }
   }
 
@@ -676,8 +677,8 @@
 
       state.session = result.session();
       state.error = error;
-      exploreLoop(state.session, true);
       notifySession();
+      exploreLoop(state.session, true);
     }
 
     function notifySession() {
@@ -692,7 +693,8 @@
         return;
       }
 
-      const LENGTH = 10;
+      const LENGTH = 5;
+      const DELAY = 16;
 
       if (init) {
         state.exploration = {
@@ -701,10 +703,18 @@
         };
       }
 
-      const { buffer, result } = state.exploration;
-      const written = state.session.explore(buffer, LENGTH);
+      const { buffer } = state.exploration;
+      const now = Date.now();
+      const written = state.session.explore(buffer);
 
-      if (written === 0) {
+      for (let i = 0; i < written; i++) {
+        state.exploration.result.push([
+          [buffer[4 * i] - 1, buffer[4 * i + 1]],
+          [buffer[4 * i + 2] - 1, buffer[4 * i + 3]],
+        ]);
+      }
+
+      if (written < LENGTH) {
         logInfo("Exploration finished...");
         postMessage({
           type: EXPLORATION,
@@ -725,14 +735,7 @@
         return;
       }
 
-      for (let i = 0; i < written; i++) {
-        state.exploration.result.push([
-          [buffer[4 * i] - 1, buffer[4 * i + 1]],
-          [buffer[4 * i + 2] - 1, buffer[4 * i + 3]],
-        ]);
-      }
-
-      setTimeout(() => exploreLoop(session));
+      setTimeout(() => exploreLoop(session), DELAY);
     }
 
     function explain(location) {
