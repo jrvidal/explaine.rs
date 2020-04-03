@@ -494,3 +494,8 @@ info = "The `'static` lifetime is a special, constant lifetime that represents a
 [TraitBound]
 title = "Trait bounds"
 info = "The plus sign `+` joins several bounds that a given type must fulfill."
+
+[TypeInfer]
+title = "Inferred Type"
+info = "The `_` type is a placeholder that requests the compiler to try to infer what the correct type should go in there."
+book = "ch08-03-hash-maps.html#creating-a-new-hash-map"

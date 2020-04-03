@@ -102,6 +102,7 @@ pub enum HelpItem {
     ExprRangeClosed { from: bool, to: bool },
     StaticLifetime,
     TraitBound,
+    TypeInfer,
 }
 
 impl HelpItem {
@@ -196,14 +197,14 @@ impl<'ast> IntersectionVisitor<'ast> {
 
     fn within<S: Spanned>(&self, item: S) -> bool {
         let span = item.span();
-        self.within_spans(span, span)
+        self.between_spans(span, span)
     }
 
     fn between<S: Spanned, T: Spanned>(&self, start: &S, end: &T) -> bool {
-        self.within_spans(start.span(), end.span())
+        self.between_spans(start.span(), end.span())
     }
 
-    fn within_spans(&self, start: Span, end: Span) -> bool {
+    fn between_spans(&self, start: Span, end: Span) -> bool {
         let loc = self.location;
         super::within_locations(loc, start.start(), end.end())
     }
@@ -315,6 +316,11 @@ macro_rules! method {
 macro_rules! token {
     ($self:expr, $token:expr, $item:ident) => {
         token![$self, $token, *HelpItem::$item];
+    };
+    ($self:expr, $start:expr => $end:expr, $item:ident) => {
+        if $self.between(&$start, &$end) {
+            return $self.set_help_between($start.span(), $end.span(), HelpItem::$item);
+        }
     };
     ($self:expr, $token:expr, * $item:expr) => {
         if $self.within(&$token) {
@@ -441,7 +447,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_expr_group(self, node: syn::ExprGroup)];
     method![visit_expr_if(self, node: syn::ExprIf) {
         if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
-            if self.within_spans(node.if_token.span(), let_token.span()) {
+            if self.between_spans(node.if_token.span(), let_token.span()) {
                 return self.set_help_between(node.if_token.span(), let_token.span(), HelpItem::IfLet);
             }
         } else {
@@ -476,7 +482,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let last_span = node.mutability.map(|t| t.span())
             .unwrap_or_else(|| node.and_token.span());
 
-        if self.within_spans(node.and_token.span(), last_span) {
+        if self.between_spans(node.and_token.span(), last_span) {
             return self.set_help(&node, HelpItem::ExprReference {
                 mutable: node.mutability.is_some()
             });
@@ -527,7 +533,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let end = node.mutability.as_ref().map(Spanned::span)
             .unwrap_or_else(|| node.static_token.span());
 
-        if self.within_spans(node.static_token.span(), end) {
+        if self.between_spans(node.static_token.span(), end) {
             return self.set_help_between(node.static_token.span(), end, if node.mutability.is_some() {
                 HelpItem::StaticMut
             } else {
@@ -564,7 +570,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.const_token, ItemConst];
     }];
     method![visit_item_enum(self, node: syn::ItemEnum) {
-        token![self, node.enum_token, ItemEnum];
+        token![self, node.enum_token => node.ident, ItemEnum];
     }];
     method![@attrs visit_item_extern_crate(self, node: syn::ItemExternCrate) {
         if let Some((as_token, _)) = node.rename {
@@ -603,7 +609,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let end = node.mutability.as_ref().map(Spanned::span)
             .unwrap_or_else(|| node.static_token.span());
 
-        if self.within_spans(node.static_token.span(), end) {
+        if self.between_spans(node.static_token.span(), end) {
             return self.set_help_between(node.static_token.span(), end, if node.mutability.is_some() {
                 HelpItem::StaticMut
             } else {
@@ -612,7 +618,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
     }];
     method![visit_item_struct(self, node: syn::ItemStruct) {
-        token![self, node.struct_token, ItemStruct];
+        token![self, node.struct_token => node.ident, ItemStruct];
     }];
     method![visit_item_trait(self, node: syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
@@ -622,7 +628,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.trait_token, ItemTraitAlias];
     }];
     method![visit_item_type(self, node: syn::ItemType) {
-        token![self, node.type_token, ItemType];
+        token![self, node.type_token => node.ident, ItemType];
     }];
     method![visit_item_union(self, node: syn::ItemUnion) {
         token![self, node.union_token, ItemUnion];
@@ -656,7 +662,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             let end = mutability.map(|m| m.span())
                 .unwrap_or_else(|| node.let_token.span());
 
-            if mutability.is_some() && self.within_spans(start, end) {
+            if mutability.is_some() && self.between_spans(start, end) {
                 return self.set_help_between(start, end, HelpItem::LocalMut);
             }
         }
@@ -664,7 +670,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.let_token, Local];
     }];
     method![visit_macro(self, node: syn::Macro) {
-        if self.within_spans(node.path.span(), node.bang_token.span()) {
+        if self.between_spans(node.path.span(), node.bang_token.span()) {
             return self.set_help_between(node.path.span(), node.bang_token.span(), HelpItem::Macro);
         }
     }];
@@ -690,7 +696,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         };
 
         if let Some((start, item)) = result {
-            if self.within_spans(start.span(), node.ident.span()) {
+            if self.between_spans(start.span(), node.ident.span()) {
                 self.set_help_between(start.span(), node.ident.span(), item);
             }
         }
@@ -788,7 +794,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_type_impl_trait(self, node: syn::TypeImplTrait) {
         token![self, node.impl_token, TypeImplTrait];
     }];
-    method![visit_type_infer(self, node: syn::TypeInfer)];
+    method![visit_type_infer(self, node: syn::TypeInfer) {
+        token![self, node.underscore_token, TypeInfer];
+    }];
     method![visit_type_macro(self, node: syn::TypeMacro)];
     method![visit_type_never(self, node: syn::TypeNever)];
     method![visit_type_param(self, node: syn::TypeParam)];
@@ -808,7 +816,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
             .unwrap_or_else(|| node.and_token.span());
 
-        if self.within_spans(node.and_token.span(), last_span) {
+        if self.between_spans(node.and_token.span(), last_span) {
             return self.set_help(&node, HelpItem::TypeReference {
                 lifetime: node.lifetime.is_some(),
                 mutable: node.mutability.is_some()
