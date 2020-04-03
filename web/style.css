@@ -64,6 +64,10 @@ button:active {
   margin-right: 2%;
 }
 
+.noscript {
+  display: none;
+}
+
 
 /* HEADER */
 

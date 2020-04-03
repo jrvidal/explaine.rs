@@ -4,10 +4,12 @@
   <title>explaine.rs</title>
   <meta charset="utf-8">
   <link rel="stylesheet"type="text/css" href="web/style.css">
-  <script></script>
 </head>
 <body>
-
+  <div class="container noscript">
+    <h1>💥 Everything is broken!</h1>
+    <h3>This playground requires a <a href="https://caniuse.com/#feat=wasm">WebAssembly-compatible browser</a> 😔</h3>
+  </div>
   <header class="container">
     <h1>
       explaine.rs
@@ -92,6 +94,11 @@
     <a target="_blank" href="https://github.com/jrvidal/explaine.rs/issues/new">File a Bug</a>
   </div>
 
+  <script>
+    if (window.WebAssembly == null) {
+      document.querySelector(".noscript").style.display = "block";
+    }
+  </script>
   <script type="text/javascript">
     window.workerMain = "web/index.js";
     window.workerBundle = "/pkg/explainers.js";
