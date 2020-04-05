@@ -3,13 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "webpack-dev-server --config web/webpack.config.dev.js",
+    "build": "./build.sh"
   },
   "author": "",
+  "private": true,
   "license": "UNLICENSED",
   "dependencies": {
     "codemirror": "^5.52.2",
@@ -17,10 +16,15 @@
   },
   "devDependencies": {
     "css-loader": "^3.4.2",
+    "exports-loader": "^0.7.0",
+    "file-loader": "^6.0.0",
     "mini-css-extract-plugin": "^0.9.0",
     "optimize-css-assets-webpack-plugin": "^5.0.3",
+    "parcel-bundler": "^1.12.4",
     "terser": "^4.6.10",
     "webpack": "^4.42.1",
-    "webpack-cli": "^3.3.11"
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.3",
+    "worker-loader": "^2.0.0"
   }
 }

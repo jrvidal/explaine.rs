@@ -103,13 +103,7 @@
       document.querySelector(".noscript").style.display = "block";
     }
   </script>
-  <script type="text/javascript">
-    window.workerMain = "web/index.js";
-    window.workerBundle = "/pkg/explainers.js";
-    window.workerWasm = "/pkg/explainers_bg.wasm";
-  </script>
-  <script type="module" src="web/index.js"></script>
-
+  <script src="main.js"></script>
 
   <textarea class="default-code">//! From https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
 #![allow(unused_variables)]
