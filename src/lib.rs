@@ -74,7 +74,7 @@ impl From<TokenStream> for TokenIterator {
 #[cfg(feature = "dev")]
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
+    #[wasm_bindgen(js_name = "logWasm")]
     fn log(s: &str);
 }
 

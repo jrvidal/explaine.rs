@@ -1,11 +1,20 @@
 import * as messages from "./messages";
-import Worker from "worker-loader!./worker.js";
 import { logInfo } from "./logging";
-import renderer from "./renderer";
+import renderer, { pure } from "./renderer";
+import { addClass, removeClass, setText, setHtml, setDisplay } from "./util";
+import worker from "./worker-client";
+
+import { header, generateLink, whatsThis, toggleEdit, showAll } from "./header";
+import { aside } from "./explanation-aside";
+import codemirror from "./codemirror";
 
 const document = window.document;
 const querySelector = (selector) => document.querySelector(selector);
 const createElement = (el) => document.createElement(el);
+
+export const PENDING = 0;
+export const SUCCESS = 1;
+export const ERROR = 2;
 
 if (typeof __ANALYTICS_URL__ === "string") {
   fetch(__ANALYTICS_URL__, { method: "POST" });
@@ -19,34 +28,80 @@ addClass(document.body, IS_TOUCH_DEVICE ? "touch-device" : "non-touch-device");
 let cm;
 let codemirrorEl;
 
-let cmPromise = Promise.all([
-  import("codemirror"),
-  import("codemirror/addon/mode/simple"),
-  import("codemirror/mode/rust/rust"),
-]);
+codemirror({
+  isTouchDevice: IS_TOUCH_DEVICE,
+  anchor: querySelector(".codemirror-anchor"),
+  onClick() {
+    onCmClick();
+  },
+  onMouseMove(_cm, e) {
+    onCmMouseMove(e);
+  },
+  onChange() {
+    onCmChange();
+  },
+})
+  .then(({ cm: instance, codemirrorEl: el }) => {
+    cm = instance;
+    codemirrorEl = el;
 
-cmPromise
-  .then(([{ default: CodeMirror }]) => {
-    cm = CodeMirror.fromTextArea(querySelector(".codemirror-anchor"), {
-      mode: "rust",
-      lineNumbers: true,
-      theme: "solarized",
-      readOnly: IS_TOUCH_DEVICE ? "nocursor" : false,
-      indentUnit: 4,
-    });
-
-    codemirrorEl = cm.getWrapperElement();
-
-    addClass(document.body, "codemirror-rendered");
-
-    setMainListeners(cm, codemirrorEl);
-    initialCodeRender(cm);
+    return initialCodeRender(cm);
   })
-  .catch((e) => console.error(e));
+  .then(() => {
+    addClass(document.body, "codemirror-rendered");
+    setState({ editorReady: true });
+  });
+
+/* HEADER */
+
+const renderGenerateLink = generateLink({
+  onAddress(address) {
+    setState({ address });
+  },
+  getValue() {
+    return cm && cm.getValue();
+  },
+});
+
+whatsThis();
+
+const renderToggleEdit = toggleEdit({
+  onToggleEdit() {
+    setState(({ editable }) => ({ editable: !editable }));
+  },
+});
+
+const renderShowAll = showAll({
+  onToggleShowAll() {
+    setState(({ compilation }) => ({
+      compilation: {
+        ...compilation,
+        showAll: !compilation.showAll,
+      },
+    }));
+  },
+});
+
+/* EXPLANATION ASIDE */
+
+const renderAside = aside({
+  onWrapInBlock() {
+    if (cm == null) return;
+    const lines = cm.lineCount();
+    for (let i = 0; i < lines; i++) {
+      cm.indentLine(i, "add");
+    }
+    cm.replaceRange("fn main() {\n", { line: 0, ch: 0 });
+    cm.replaceRange("\n}", {
+      line: lines,
+      ch: cm.getLineHandle(lines).text.length,
+    });
+  },
+});
 
 /* "REACT" */
 let state = {
-  compilation: { state: "pending" },
+  compilation: { state: PENDING },
   editable: false,
 };
 
@@ -57,37 +112,39 @@ let nonUiState = {
 const setState = renderer(
   (prevState) => {
     const { compilation } = state;
-    const { compilation: prevCompilation } = prevState;
 
-    if (prevCompilation.state !== compilation.state) {
-      renderSessionState();
-    }
+    // EDITOR
+    renderHover({ hoverEl: compilation.hoverEl });
+    renderErrorMarks({ error: compilation.error });
+    renderElaborationMark({ elaboration: compilation.elaboration });
+    renderExplanationMark({ explanation: compilation.explanation });
+    renderCodeEditor({
+      showAll: compilation.showAll,
+      editable: state.editable,
+    });
 
-    if (prevCompilation.explanation !== compilation.explanation) {
-      renderExplanation();
-    }
+    // ASIDE
+    renderAside({
+      elaboration: compilation.elaboration,
+      error: compilation.error,
+      compilationState: compilation.state,
+    });
 
-    if (prevCompilation.elaboration !== compilation.elaboration) {
-      renderElaboration();
-    }
-
-    if (prevCompilation.hoverEl !== compilation.hoverEl) {
-      renderHover();
-    }
-
-    if (prevCompilation.address !== compilation.address) {
-      renderGeneratedLink();
-    }
-
-    renderShowAll(prevState);
-
-    if (prevState.editable !== state.editable) {
-      renderEditable();
-    }
-
-    if (prevState.showModal !== state.showModal) {
-      renderModal();
-    }
+    // HEADER
+    renderGenerateLink({
+      address: state.address,
+      enabled: state.editorReady,
+    });
+    renderToggleEdit({
+      editable: state.editable,
+      enabled: state.editorReady,
+    });
+    renderShowAll({
+      showAll: compilation.showAll,
+      empty: state.empty,
+      canShow: compilation.exploration != null,
+      failedCompilation: compilation.state === ERROR,
+    });
   },
   {
     get() {
@@ -95,40 +152,23 @@ const setState = renderer(
     },
     set(nextState) {
       state = nextState;
+      if (!self.__PRODUCTION__) {
+        window.state = state;
+      }
     },
   }
 );
 
 /* WORKER */
 
-let workerIsReady = false;
-let workerIsReadyPromise;
-let postToWorker;
-
-{
-  const worker = new Worker();
-
-  let workerIsReady = false;
-  let resolveWorkerIsReady,
-    workerIsReadyPromise = new Promise((res) => {
-      resolveWorkerIsReady = res;
-    });
-
-  worker.onerror = (e) => console.error(e);
-
-  worker.onmessage = (e) => {
-    const { data } = e;
-    logInfo("Window received", data.type);
+let { postMessage: postToWorker, ready: workerIsReadyPromise } = worker({
+  onMessage(data) {
     switch (data.type) {
-      case messages.READY:
-        resolveWorkerIsReady();
-        compileSession();
-        break;
       case messages.COMPILED:
-        setState({ compilation: { state: "success" } });
+        setState({ compilation: { state: SUCCESS } });
         break;
       case messages.COMPILATION_ERROR:
-        setState({ compilation: { state: "error", error: data.error } });
+        setState({ compilation: { state: ERROR, error: data.error } });
         break;
       case messages.EXPLANATION:
         setState(({ compilation }) => ({
@@ -153,124 +193,8 @@ let postToWorker;
       default:
         console.error("Unexpected message in window", data);
     }
-  };
-
-  postToWorker = singleExecutionUntilReady(
-    (data) => worker.postMessage(data),
-    () => workerIsReady,
-    workerIsReadyPromise
-  );
-}
-
-/* HEADER */
-const generateButton = querySelector(".generate");
-const generatedLink = querySelector(".link");
-const toggleEditEButton = querySelector(".toggle-edit");
-const showAllButton = querySelector(".show-all");
-const showAllText = querySelector(".show-all-text");
-const showAllSpinner = querySelector(".show-all > .spinner");
-
-const modal = querySelector(".modal");
-const overlay = querySelector(".overlay");
-
-generateButton.addEventListener("click", () => {
-  let address = new window.URL(window.location.href);
-  let params = new window.URLSearchParams();
-  params.append("code", cm.getValue());
-  address.search = `?${params.toString()}`;
-
-  setState(({ compilation }) => ({
-    compilation: { ...compilation, address: address.toString() },
-  }));
+  },
 });
-
-toggleEditEButton.addEventListener("click", () => {
-  const newEditable = !state.editable;
-  setState({ editable: newEditable });
-  cm.setOption("readOnly", newEditable ? false : "nocursor");
-});
-
-showAllButton.addEventListener("click", () => {
-  setState(({ compilation }) => ({
-    compilation: {
-      ...compilation,
-      showAll: !compilation.showAll,
-    },
-  }));
-});
-
-querySelector(".whats-this").addEventListener("click", () => {
-  setState({ showModal: !state.showModal });
-});
-
-overlay.addEventListener("click", () => {
-  setState({ showModal: false });
-});
-
-querySelector(".close-modal").addEventListener("click", () => {
-  setState({ showModal: false });
-});
-
-function renderGeneratedLink() {
-  const { address } = state.compilation;
-
-  if (address) {
-    setDisplay(generateButton, "none");
-    removeClass(generatedLink, "hidden");
-    generatedLink.href = address;
-  } else {
-    addClass(generatedLink, "hidden");
-    setDisplay(generateButton, null);
-  }
-}
-
-function renderShowAll(prevState) {
-  const { compilation: prevCompilation } = prevState;
-  const { compilation } = state;
-
-  if (
-    compilation.state === prevCompilation.state &&
-    compilation.showAll === prevCompilation.showAll &&
-    compilation.exploration === prevCompilation.exploration &&
-    compilation.empty === prevCompilation.empty
-  ) {
-    return;
-  }
-
-  const canShow = compilation.exploration != null;
-  showAllButton.disabled = !canShow;
-
-  const isLoaded =
-    canShow || compilation.state === "error" || compilation.empty;
-  (isLoaded ? addClass : removeClass)(showAllButton, "show-all-loaded");
-
-  if (compilation.showAll) {
-    addClass(codemirrorEl, "show-all-computed");
-    setText(showAllText, "Hide elements");
-  } else {
-    removeClass(codemirrorEl, "show-all-computed");
-    setText(showAllText, initialShowAll);
-  }
-}
-
-function renderModal() {
-  const { showModal } = state;
-
-  if (showModal) {
-    addClass(modal, "show-modal");
-    addClass(overlay, "show-modal");
-  } else {
-    removeClass(modal, "show-modal");
-    removeClass(overlay, "show-modal");
-  }
-}
-
-function renderEditable() {
-  setText(
-    toggleEditEButton,
-    state.editable ? "Disable editing" : "Enable editing"
-  );
-}
 
 /* CODE */
 
@@ -281,6 +205,8 @@ const styleSheet = (() => {
 })();
 
 function initialCodeRender(cm) {
+  let promise = Promise.resolve();
+
   const codeParam = [...new window.URLSearchParams(location.search)].find(
     ([key, value]) => key === "code"
   );
@@ -289,26 +215,60 @@ function initialCodeRender(cm) {
 
   if (code != null && code.trim() !== "") {
     cm.setValue(code);
-  } else {
-    const local = window.localStorage.getItem("code");
-    if (local != null) {
-      cm.setValue(local);
-    } else {
-      document.addEventListener("load", () => {
-        cm.setValue(querySelector(".default-code").value);
-      });
-    }
+    return promise;
   }
+
+  const local = window.localStorage.getItem("code");
+  if (local != null && local.trim() !== "") {
+    cm.setValue(local);
+    return promise;
+  }
+
+  promise =
+    document.readyState === "loading"
+      ? new Promise((resolve) => {
+          document.addEventListener("DOMContentLoaded", resolve);
+        })
+      : Promise.resolve();
+
+  promise = promise.then(() =>
+    cm.setValue(querySelector(".default-code").value)
+  );
+
+  return promise;
 }
+
+const compileOnChange = (() => {
+  let workerIsReady = false;
+  workerIsReadyPromise.then(() => {
+    workerIsReady = true;
+  });
+  let firstCompilationEnqueued = false;
+
+  return () => {
+    if (workerIsReady) {
+      doCompile();
+    } else if (!firstCompilationEnqueued) {
+      firstCompilationEnqueued = true;
+      workerIsReadyPromise.then(() => doCompile());
+    }
+  };
+})();
 
 function onCmChange() {
   setState({
-    compilation: { state: "pending" },
+    compilation: { state: PENDING },
+    address: null,
+    empty: cm.getValue() === "",
   });
-  compileSession();
+  compileOnChange();
 }
 
 function onCmMouseMove(e) {
+  if (state.compilation.state !== SUCCESS) {
+    return;
+  }
+
   if (nonUiState.computedMarks) {
     setState(({ compilation }) => ({
       compilation: { ...compilation, hoverEl: e.target },
@@ -316,73 +276,66 @@ function onCmMouseMove(e) {
     return;
   }
 
-  const { compilation } = state;
   const { clientX, clientY } = e;
 
-  if (compilation.state !== "success" || nonUiState.computing) {
-    nonUiState.next = { clientX, clientY };
-    return;
-  }
-
-  nonUiState.computing = true;
-
-  explain(clientX, clientY);
+  explain({ clientX, clientY });
 }
 
 function onCmClick() {
   elaborate(cm.getCursor("from"));
 }
 
-function setMainListeners(cm, codemirrorEl) {
-  const check = () => cm != null && codemirrorEl != null;
-  cm.on("change", singleExecutionUntilReady(onCmChange, check, cmPromise));
-  codemirrorEl.addEventListener(
-    "mousemove",
-    singleExecutionUntilReady(onCmMouseMove, check, cmPromise)
-  );
-  codemirrorEl.addEventListener(
-    "click",
-    singleExecutionUntilReady(onCmClick, check, cmPromise)
-  );
-}
-
 function elaborate(location) {
-  if (state.compilation.state !== "success" || state.compilation.empty) return;
+  if (state.compilation.state !== SUCCESS || state.empty) return;
   postToWorker({
     type: messages.ELABORATE,
     location,
   });
 }
 
-function explain(left, top) {
-  const { compilation } = state;
+const { debounced: explain, done: doneAfterExplanation } = debounceUntilDone(
+  function explain({ clientX: left, clientY: top }, done) {
+    const { compilation } = state;
 
-  if (compilation.state !== "success") return;
+    if (compilation.state !== SUCCESS) {
+      return done();
+    }
 
-  let { line, ch } = cm.coordsChar({ left, top }, "window");
+    let { line, ch } = cm.coordsChar({ left, top }, "window");
 
-  const lastLocation = nonUiState.lastLocation || {};
+    explainLocation({ line, ch });
 
-  if (line === lastLocation.line && ch === lastLocation.ch) {
-    nonUiState.computing = false;
-    return;
+    if (explainLocation.cached) {
+      done();
+    }
+  },
+  200
+);
+
+const explainLocation = memoize(
+  function explainLocation({ line, ch }) {
+    postToWorker({
+      type: messages.EXPLAIN,
+      location: { line, ch },
+    });
+  },
+  (prev, current) => {
+    if (prev.line === current.line && prev.ch === current.ch) {
+      return true;
+    }
+
+    const { explanation } = state.compilation;
+
+    return (
+      explanation != null &&
+      withinRange(current, explanation.start, explanation.end)
+    );
   }
-
-  nonUiState.lastLocation = { line, ch };
-
-  postToWorker({
-    type: messages.EXPLAIN,
-    location: { line, ch },
-  });
-}
+);
 
 function onExplanation() {
-  nonUiState.computing = false;
-  if (nonUiState.next) {
-    const { clientX, clientY } = nonUiState.next;
-    nonUiState.next = null;
-    explain(clientX, clientY);
-  }
+  if (nonUiState.computedMarks) return;
+  doneAfterExplanation();
 }
 
 function computeExploration(exploration) {
@@ -411,12 +364,12 @@ const debouncedCompile = debounce(
   128
 );
 
-function compileSession() {
+function doCompile() {
   const code = cm.getValue();
   window.localStorage.setItem("code", code);
 
   if (code.trim() === "") {
-    setState({ compilation: { state: "success", empty: true } });
+    setState({ compilation: { state: SUCCESS } });
   } else {
     debouncedCompile(cm.getValue());
   }
@@ -427,9 +380,7 @@ function compileSession() {
     requestAnimationFrame(() => computedMarks.forEach((mark) => mark.clear()));
 }
 
-function renderHover() {
-  const { hoverEl } = state.compilation;
-
+const renderHover = pure(function renderHover({ hoverEl }) {
   const klass =
     hoverEl &&
     [...hoverEl.classList].find((klass) => klass.startsWith("computed-"));
@@ -444,60 +395,13 @@ function renderHover() {
   }
 
   nonUiState.hoverIndex = newIndex;
-}
-
-/* EXPLANATION ASIDE */
-
-const explanationEl = querySelector(".explanation");
-const loadingContainer = explanationEl.querySelector(".loading");
-const loadedContainer = explanationEl.querySelector(".loaded");
-const itemContainer = explanationEl.querySelector(".item-container");
-const itemTitle = itemContainer.querySelector(".item-title");
-const itemEl = itemContainer.querySelector(".item");
-const errorMessageContainer = itemContainer.querySelector(
-  ".error-message-container"
-);
-const errorMessageEl = itemContainer.querySelector(".error-message");
-const moreInfoHeader = explanationEl.querySelector(".more-info");
-const bookRow = moreInfoHeader.querySelector(".book-row");
-const bookLink = bookRow.querySelector("a");
-const keywordRow = moreInfoHeader.querySelector(".keyword-row");
-const keywordLink = keywordRow.querySelector("a");
-const infoWipEl = querySelector(".info-wip");
-const canBeBlockEl = querySelector(".can-be-block");
-
-const initialItem = itemEl.innerHTML;
-const initialItemTitle = itemTitle.innerHTML;
-const initialShowAll = showAllText.textContent;
-
-querySelector(".wrap-in-block").addEventListener("click", () => {
-  const lines = cm.lineCount();
-  for (let i = 0; i < lines; i++) {
-    cm.indentLine(i, "add");
-  }
-  cm.replaceRange("fn main() {\n", { line: 0, ch: 0 });
-  cm.replaceRange("\n}", {
-    line: lines,
-    ch: cm.getLineHandle(lines).text.length,
-  });
 });
 
-function renderSessionState() {
-  const { state: compilationState, error } = state.compilation;
-  loadingContainer.style.display =
-    compilationState === "pending" ? "initial" : "none";
-  loadedContainer.style.display =
-    compilationState !== "pending" ? "initial" : "none";
+const renderErrorMarks = pure(function renderErrorMarks({ error }) {
+  nonUiState.errorMark && nonUiState.errorMark.clear();
+  nonUiState.errorContextMark && nonUiState.errorContextMark.clear();
 
-  if (compilationState === "error") {
-    setHtml(itemTitle, "Oops! 💥");
-    setHtml(itemEl, "There is a syntax error in your code:");
-
-    setDisplay(errorMessageContainer, "block");
-    setText(errorMessageEl, error.msg);
-
-    setDisplay(canBeBlockEl, error.isBlock ? "block" : "none");
-
+  if (error != null) {
     nonUiState.errorMark = getMark(error, "compilation-error");
     nonUiState.errorContextMark = getMark(
       {
@@ -512,47 +416,36 @@ function renderSessionState() {
       },
       "compilation-error"
     );
-  } else {
-    nonUiState.errorMark && nonUiState.errorMark.clear();
-    nonUiState.errorContextMark && nonUiState.errorContextMark.clear();
-    setHtml(itemTitle, initialItemTitle);
-    setHtml(itemEl, initialItem);
-    setDisplay(errorMessageContainer, "none");
-    setDisplay(canBeBlockEl, "none");
   }
-}
+});
 
-function renderExplanation() {
-  const location = state.compilation.explanation;
-  nonUiState.hoverMark && nonUiState.hoverMark.clear();
-  if (location == null || nonUiState.computedMarks != null) return;
-  nonUiState.hoverMark = getMark(location);
-}
-
-function renderElaboration() {
-  const { elaboration } = state.compilation;
+const renderElaborationMark = pure(function renderElaborationMark({
+  elaboration,
+}) {
   nonUiState.mark && nonUiState.mark.clear();
-  nonUiState.hoverMark && nonUiState.hoverMark.clear();
 
   if (elaboration != null) {
     nonUiState.mark = getMark(elaboration.location);
-    setHtml(itemTitle, elaboration.title);
-    setHtml(itemEl, elaboration.elaboration);
-    setDisplay(moreInfoHeader, "block");
-    setDisplay(bookRow, elaboration.book ? "block" : "none");
-    setDisplay(keywordRow, elaboration.keyword ? "block" : "none");
-    bookLink.href = elaboration.book || "";
-    keywordLink.href = elaboration.keyword || "";
-    setDisplay(
-      infoWipEl,
-      elaboration.book || elaboration.keyword ? "none" : "initial"
-    );
-  } else {
-    setHtml(itemTitle, initialItemTitle);
-    setHtml(itemEl, initialItem);
-    setDisplay(moreInfoHeader, "none");
   }
-}
+});
+
+const renderExplanationMark = pure(function renderExplanationMark({
+  explanation,
+}) {
+  nonUiState.hoverMark && nonUiState.hoverMark.clear();
+  if (explanation == null || nonUiState.computedMarks != null) return;
+  nonUiState.hoverMark = getMark(explanation);
+});
+
+const renderCodeEditor = pure(function renderCodeEditor({ showAll, editable }) {
+  cm.setOption("readOnly", editable ? false : "nocursor");
+
+  if (showAll) {
+    addClass(codemirrorEl, "show-all-computed");
+  } else {
+    removeClass(codemirrorEl, "show-all-computed");
+  }
+});
 
 /* HELPERS */
 
@@ -576,26 +469,6 @@ function debounce(fn, delay) {
   };
 }
 
-function addClass(node, klass) {
-  node.classList.add(klass);
-}
-
-function removeClass(node, klass) {
-  node.classList.remove(klass);
-}
-
-function setText(node, text) {
-  node.textContent = text;
-}
-
-function setHtml(node, html) {
-  node.innerHTML = html;
-}
-
-function setDisplay(node, display) {
-  node.style.display = display;
-}
-
 function singleExecutionUntilReady(fn, check, promise) {
   let last;
   let enqueued = false;
@@ -611,6 +484,65 @@ function singleExecutionUntilReady(fn, check, promise) {
       }
     }
   };
+}
+
+function memoize(fn, memoizer) {
+  let last = {};
+
+  let memoized = (arg) => {
+    if (memoizer(last, arg)) {
+      last = arg;
+      memoized.cached = true;
+    } else {
+      last = arg;
+      memoized.cached = false;
+      fn(arg);
+    }
+  };
+
+  return memoized;
+}
+
+function debounceUntilDone(fn, delay) {
+  let isOpen = true;
+  const sentinel = {};
+  let last = sentinel;
+  let enqueued = false;
+
+  const done = () => {
+    if (last !== sentinel) {
+      if (!enqueued) {
+        enqueued = true;
+        window.setTimeout(() => {
+          enqueued = false;
+          const arg = last;
+          last = sentinel;
+          fn(arg, done);
+        }, delay);
+      }
+    } else {
+      isOpen = true;
+    }
+  };
+
+  return {
+    done,
+    debounced(arg) {
+      if (isOpen) {
+        isOpen = false;
+        fn(arg, done);
+      } else {
+        last = arg;
+      }
+    },
+  };
+}
+
+function withinRange({ line, ch }, start, end) {
+  return (
+    (start.line < line || (start.line === line && start.ch <= ch)) &&
+    (line < end.line || (line === end.line && ch <= end.ch))
+  );
 }
 
 if (!self.__PRODUCTION__) {

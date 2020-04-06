@@ -327,7 +327,7 @@ macro_rules! method {
     (@_debug, $name:ident, $self:ident, $node:ident) => {{
         #[cfg(feature = "dev")]
         {
-            // log(stringify!($name));
+            log(stringify!($name));
         }
     }};
     (@_attrs, $self:ident, $node:ident, $body:expr) => {{
@@ -372,8 +372,8 @@ macro_rules! method {
     (@_impl, $name:ident, $self:ident, $node:ident, $ty:path, @_body @terminal $body:expr, @ $spancheck:ident) => {
         #[allow(unreachable_code)]
         fn $name(&mut $self, $node: &'ast $ty) {
-            method![@$spancheck, $self, $node, $ty];
             method![@_debug, $name, $self, $node];
+            method![@$spancheck, $self, $node, $ty];
             $body;
             unreachable!(stringify!($name));
         }
@@ -636,14 +636,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
 
         for attr in &node.attrs {
             if self.within(attr) {
-                syn::visit::visit_attribute(self, attr);
+                self.visit_attribute(attr);
                 return;
             }
         }
 
         for item in &node.items {
             if self.within(item) {
-                syn::visit::visit_item(self, item);
+                self.visit_item(item);
                 return;
             }
         }

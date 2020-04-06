@@ -18,7 +18,7 @@ wasm_bindgen(wasmUrl)
 
 self.onmessage = (e) => {
   const { data } = e;
-  logInfo("Worker received", data.type);
+  logInfo("Worker received", data.type, data);
   switch (data.type) {
     case messages.COMPILE:
       compile(data.source);

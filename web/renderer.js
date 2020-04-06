@@ -28,3 +28,17 @@ export default function renderer(renderFn, state) {
     }
   };
 }
+
+export function pure(fn) {
+  let last = { _sentinel: {} };
+
+  return (arg) => {
+    const changed = Object.keys({ ...last, ...arg }).some(
+      (key) => last[key] !== arg[key]
+    );
+    last = arg;
+    if (changed) {
+      fn(arg);
+    }
+  };
+}
