@@ -102,7 +102,7 @@ const renderAside = aside({
 /* "REACT" */
 let state = {
   compilation: { state: PENDING },
-  editable: false,
+  editable: !IS_TOUCH_DEVICE,
 };
 
 let nonUiState = {
