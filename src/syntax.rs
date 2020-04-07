@@ -1,4 +1,5 @@
 use proc_macro2::{LineColumn, Span};
+use quote::ToTokens;
 use serde::Serialize;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
@@ -42,7 +43,6 @@ pub enum HelpItem {
     TraitItemMethod,
     ImplItemMethod,
     AsRename,
-    QualifiedAs,
     AsRenameExternCrate,
     AsCast,
     ExprClosureArguments,
@@ -68,10 +68,15 @@ pub enum HelpItem {
     VisRestricted,
     Variant {
         name: String,
+        fields: Option<&'static str>,
     },
-    Dyn,
+    VariantDiscriminant {
+        name: String,
+    },
     Else,
-    ItemEnum,
+    ItemEnum {
+        empty: bool,
+    },
     ItemForeignModAbi,
     FnAbi,
     TypeBareFnAbi,
@@ -80,12 +85,22 @@ pub enum HelpItem {
     LitByteStr,
     LitStr,
     FnTypeToken,
-    ItemImplForTrait,
     ExprForLoopToken,
     BoundLifetimes,
+    BoundLifetimesTraitBound {
+        lifetime: String,
+        ty: String,
+        multiple: bool,
+    },
     IfLet,
     If,
-    ItemImpl,
+    ItemImpl {
+        trait_: bool,
+    },
+    ItemImplForTrait,
+    ItemMacroRules {
+        name: String,
+    },
     TypeImplTrait,
     WhileLet,
     While,
@@ -103,13 +118,29 @@ pub enum HelpItem {
     PatIdentRef,
     PatIdentMut,
     PatIdentRefMut,
+    PathLeadingColon,
+    QSelfAsToken,
     StaticMut,
     Static,
     TypeReference {
         mutable: bool,
         lifetime: bool,
+        ty: String,
+    },
+    TypeSlice {
+        dynamic: bool,
+        ty: String,
+    },
+    TypeTraitObject {
+        ty: String,
+        lifetime: Option<String>,
+        multiple: bool,
+        dyn_: bool,
     },
     UseGlob,
+    UseGroup {
+        parent: String,
+    },
     ExprReference {
         mutable: bool,
     },
@@ -129,11 +160,15 @@ pub enum HelpItem {
     ItemUnion,
     PathSegmentSuper,
     UnsafeFn,
+    TraitBoundModifierQuestion {
+        sized: bool,
+    },
     TraitItemType,
     TypeArray,
     TypeInfer,
     TypeNever,
     TypeParamBoundAdd,
+    TypeTuple,
     TypeConstPtr,
     TypeMutPtr,
     WhereClause,
@@ -142,6 +177,10 @@ pub enum HelpItem {
     Field {
         name: Option<String>,
         of: &'static str,
+        of_name: String,
+    },
+    FieldValueShorthand {
+        name: String,
     },
     FatArrow,
     DocBlock {
@@ -248,25 +287,17 @@ impl<'ast> IntersectionVisitor<'ast> {
         }
     }
 
-    pub fn visit_item(mut self, item: &'ast syn::Item) -> VisitorResult {
-        Visit::visit_item(&mut self, item);
-
-        VisitorResult {
-            help: self.help,
-            item_location: self.item_location,
-            #[cfg(feature = "dev")]
-            debug: self.debug,
-        }
-    }
-
-    pub fn visit_attr(mut self, file: &'ast syn::File, idx: usize) -> VisitorResult {
+    pub fn visit_element(mut self, file: &'ast syn::File, idx: usize) -> VisitorResult {
         let mut ancestor = Ancestor::new();
         ancestor.attributes = &file.attrs[..];
         ancestor.span = file.span();
         self.ancestors.push(ancestor);
 
-        self.visit_attribute(&file.attrs[idx]);
-
+        if idx < file.attrs.len() {
+            self.visit_attribute(&file.attrs[idx]);
+        } else {
+            self.visit_item(&file.items[idx - file.attrs.len()]);
+        }
         VisitorResult {
             help: self.help,
             item_location: self.item_location,
@@ -388,6 +419,9 @@ macro_rules! method {
     ($name:ident($self:ident, $node:ident: $ty:path)) => {
         method![$name($self, $node: $ty) { () }];
     };
+    ($name:ident($self:ident, $node:ident: $ty:path) $body:expr => $after:expr) => {
+        method![@_impl, $name, $self, $node, $ty, @_body $body => $after, @_spancheck];
+    };
     ($name:ident($self:ident, $node:ident: $ty:path) => $after:expr) => {
         method![@_impl, $name, $self, $node, $ty, @_body () => $after, @_spancheck];
     };
@@ -419,8 +453,11 @@ macro_rules! token {
         token![$self, $token, *HelpItem::$item];
     };
     ($self:expr, $start:expr => $end:expr, $item:ident) => {
+        token![$self, $start => $end, * HelpItem::$item];
+    };
+    ($self:expr, $start:expr => $end:expr, * $item:expr) => {
         if $self.between(&$start, &$end) {
-            return $self.set_help_between($start.span(), $end.span(), HelpItem::$item);
+            return $self.set_help_between($start.span(), $end.span(), $item);
         }
     };
     ($self:expr, $token:expr, * $item:expr) => {
@@ -436,10 +473,7 @@ macro_rules! token {
 }
 
 // TODO
-// - asterisk in glob imports
-// - => in match arms
 // - operators: question mark, <<, >>, +, -, /, %, +=, -=, *=, /=, %=, ||, &&, range operators, [..]
-// - distinguish macro_rules!
 impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_abi(self, node: syn::Abi)];
     method![visit_angle_bracketed_generic_arguments(
@@ -457,23 +491,30 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let outer = outer_attr(node);
         if node.path.is_ident("doc") {
             let bounds = if let Some(Ancestor { attributes, .. }) = self.ancestors.last() {
-                let this_idx = attributes.iter()
+                let this_idx = attributes
+                    .iter()
                     .enumerate()
                     .find(|(_, attr)| std::ptr::eq(node, *attr))
                     .expect("attr in list")
                     .0;
 
-                let last = attributes.iter()
+                let last = attributes
+                    .iter()
                     .enumerate()
-                    .filter(|&(i, attr)| i >= this_idx && attr.path.is_ident("doc") && outer_attr(attr) == outer)
+                    .filter(|&(i, attr)| {
+                        i >= this_idx && attr.path.is_ident("doc") && outer_attr(attr) == outer
+                    })
                     .last()
                     .expect("last")
                     .1;
 
-                let start = attributes.iter()
+                let start = attributes
+                    .iter()
                     .enumerate()
                     .rev()
-                    .filter(|&(i, attr)| i <= this_idx && !(attr.path.is_ident("doc") && outer_attr(attr) == outer))
+                    .filter(|&(i, attr)| {
+                        i <= this_idx && !(attr.path.is_ident("doc") && outer_attr(attr) == outer)
+                    })
                     .next()
                     .map(|(i, _)| &attributes[i - 1])
                     .unwrap_or(&attributes[0]);
@@ -486,13 +527,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
                 return self.set_help_between(start, end, HelpItem::DocBlock { outer });
             }
         }
-
         return self.set_help(&node, HelpItem::Attribute { outer });
     }];
     method![visit_bare_fn_arg(self, node: syn::BareFnArg)];
     method![visit_bin_op(self, node: syn::BinOp)];
     method![visit_binding(self, node: syn::Binding)];
     method![visit_block(self, node: syn::Block)];
+    // TODO: BoundLifetimes in function pointers
+    // TODO: BoundLifetimes in predicates, `for<'a> Foo<'a>: Bar<'a>`
     method![visit_bound_lifetimes(self, node: syn::BoundLifetimes) @terminal {
         return self.set_help(&node, HelpItem::BoundLifetimes);
     }];
@@ -615,15 +657,23 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if self.settled() {
             return;
         }
-        if self.within(node) {
-            return self.set_help(node, HelpItem::Field {
-                name: node.ident.as_ref().map(|id| id.to_string()),
-                of: "struct"
-            });
-        }
+        return self.set_help(node, HelpItem::Field {
+            name: node.ident.as_ref().map(|id| id.to_string()),
+            of: "struct",
+            of_name: "".to_string()
+        });
     }];
     method![visit_field_pat(self, node: syn::FieldPat)];
-    method![visit_field_value(self, node: syn::FieldValue)];
+    method![@attrs visit_field_value(self, node: syn::FieldValue) {
+        match (node.colon_token, &node.member) {
+            (None, syn::Member::Named(ident)) => {
+                return self.set_help(node, HelpItem::FieldValueShorthand {
+                    name: ident.to_string()
+                });
+            },
+            _ => {}
+        }
+    }];
     method![visit_fields(self, node: syn::Fields)];
     method![visit_fields_named(self, node: syn::FieldsNamed)];
     method![visit_fields_unnamed(self, node: syn::FieldsUnnamed)];
@@ -697,20 +747,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_item_enum(self, node: syn::ItemEnum) => {
         match self.help {
-            HelpItem::Field { ref mut of, .. } => {
-                *of = "enum";
-                return;
-            },
             HelpItem::Variant { ref mut name, .. } => {
                 *name = node.ident.to_string();
                 return;
             }
-            _ if self.settled() => {
-                return;
-            }
             _ => {}
         }
-        token![self, node.enum_token => node.ident, ItemEnum];
+        token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
+            empty: node.variants.is_empty()
+        }];
     }];
     method![@attrs visit_item_extern_crate(self, node: syn::ItemExternCrate) {
         if let Some((as_token, _)) = node.rename {
@@ -731,9 +776,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if let Some((_, _, for_token)) = node.trait_ {
             token![self, for_token, ItemImplForTrait];
         }
-        token![self, node.impl_token, ItemImpl];
+        token![self, node.impl_token, * HelpItem::ItemImpl {
+            trait_: node.trait_.is_some()
+        }];
     } => {
         match self.help {
+            // TODO: this is WRONG due to nested items
             HelpItem::FnToken { ref mut of, ..} => {
                 // TODO: associated functions
                 *of = if node.trait_.is_some() {
@@ -745,7 +793,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             _ => {}
         }
     }];
-    method![visit_item_macro(self, node: syn::ItemMacro)];
+    method![@attrs visit_item_macro(self, node: syn::ItemMacro) {
+        if let Some(ident) = &node.ident {
+            if node.mac.path.is_ident("macro_rules") {
+                return self.set_help(node, HelpItem::ItemMacroRules {
+                    name: ident.to_string()
+                })
+            }
+        }
+    }];
     method![visit_item_macro2(self, node: syn::ItemMacro2)];
     method![@attrs visit_item_mod(self, node: syn::ItemMod) {
         if !self.within(&node.vis) {
@@ -772,8 +828,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_item_struct(self, node: syn::ItemStruct) => {
         match self.help {
-            HelpItem::Field { ref mut of, .. } => {
+            HelpItem::Field { ref mut of, ref mut of_name, .. } => {
                 *of = "struct";
+                *of_name = node.ident.to_string();
             },
             _ if !self.settled() => {
                 let unit = match node.fields {
@@ -802,8 +859,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_item_union(self, node: syn::ItemUnion) => {
         match self.help {
-            HelpItem::Field { ref mut of, .. } => {
+            HelpItem::Field { ref mut of, ref mut of_name, .. } => {
                 *of = "union";
+                *of_name = node.ident.to_string();
                 return;
             },
             _ if self.settled() => return,
@@ -919,7 +977,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // * turbofish foo::<sfd>
     // * Fn patterns: Fn(A, B) -> C
     method![visit_path(self, node: syn::Path) {
-
+        token![self, some node.leading_colon, PathLeadingColon]
     }];
     method![visit_path_arguments(self, node: syn::PathArguments)];
     method![visit_path_segment(self, node: syn::PathSegment) {
@@ -936,7 +994,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if let Some(as_token) = node.as_token {
             if self.within(&as_token) {
                 return self
-                    .set_help_span(self.ancestors.last().unwrap().span, HelpItem::QualifiedAs);
+                    .set_help_span(self.ancestors.last().unwrap().span, HelpItem::QSelfAsToken);
             }
         }
         syn::visit::visit_qself(self, node);
@@ -966,11 +1024,31 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, some node.unsafety, UnsafeFn];
     }];
     method![visit_stmt(self, node: syn::Stmt)];
-    method![visit_trait_bound(self, node: syn::TraitBound)];
-    method![visit_trait_bound_modifier(
-        self,
-        node: syn::TraitBoundModifier
-    )];
+    method![visit_trait_bound(self, node: syn::TraitBound) {
+        if let Some((bound_lifetimes, lifetime, multiple)) = node.lifetimes
+            .as_ref()
+            .filter(|bound_lifetimes| self.within(bound_lifetimes))
+            .and_then(|bound_lifetimes| {
+                bound_lifetimes.lifetimes.first().map(|lt| (bound_lifetimes, lt, bound_lifetimes.lifetimes.len() > 1))
+            }) {
+                return self.set_help(bound_lifetimes, HelpItem::BoundLifetimesTraitBound {
+                    lifetime: format!("{}", lifetime.lifetime),
+                    multiple,
+                    ty: format!("{}", node.path.to_token_stream())
+                });
+            }
+    } => {
+        if self.settled() {
+            return;
+        }
+        if let syn::TraitBoundModifier::Maybe(..) = node.modifier {
+            return self.set_help(node, HelpItem::TraitBoundModifierQuestion {
+                sized: node.path.is_ident("Sized")
+            });
+        }
+    }];
+    // OMITTED: `visit_trait_bound` catches this
+    // method![visit_trait_bound_modifier(self, node: syn::TraitBoundModifier )];
     method![visit_trait_item(self, node: syn::TraitItem)];
     method![visit_trait_item_const(self, node: syn::TraitItemConst) {
         token![self, node.const_token, TraitItemConst];
@@ -1023,7 +1101,18 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             });
         }
     }];
-    method![visit_type_reference(self, node: syn::TypeReference) {
+    method![visit_type_reference(self, node: syn::TypeReference) => {
+
+        if self.settled() {
+            // TODO: this is WRONG due to nested types
+            return match self.help {
+                HelpItem::TypeSlice { ref mut dynamic, .. } => {
+                    *dynamic = true;
+                },
+                _ => {}
+            };
+        }
+
         let last_span = node.mutability.map(|t| t.span())
             .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
             .unwrap_or_else(|| node.and_token.span());
@@ -1031,30 +1120,84 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if self.between_spans(node.and_token.span(), last_span) {
             return self.set_help(&node, HelpItem::TypeReference {
                 lifetime: node.lifetime.is_some(),
-                mutable: node.mutability.is_some()
+                mutable: node.mutability.is_some(),
+                ty: format!("{}", node.elem.to_token_stream())
             });
         }
     }];
-    method![visit_type_slice(self, node: syn::TypeSlice)];
-    method![visit_type_trait_object(self, node: syn::TypeTraitObject) {
-        if let Some(dyn_token) = node.dyn_token {
-            token![self, dyn_token, Dyn];
+    method![visit_type_slice(self, node: syn::TypeSlice) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::TypeSlice {
+                dynamic: false,
+                ty: node.elem.to_token_stream().to_string()
+            });
         }
+    }];
+    // Fun fact: a legacy trait object without `dyn` can probably only be recognized
+    // by compiling the code.
+    method![visit_type_trait_object(self, node: syn::TypeTraitObject) {
         if let Some(plus_token) = node.bounds.pairs()
             .filter_map(|pair| pair.punct().cloned())
             .find(|punct| self.within(punct))
         {
             return self.set_help(&plus_token, HelpItem::TypeParamBoundAdd);
         }
+    } => {
+        if self.settled() {
+            return;
+        }
+
+        let ty = if let Some(syn::TypeParamBound::Trait(trait_bound)) = node.bounds.first() {
+            trait_bound
+        } else {
+            return;
+        };
+
+        let lifetime = node.bounds.iter().filter_map(|bound| match bound {
+            syn::TypeParamBound::Lifetime(lifetime) => Some(lifetime),
+            _ => None
+        })
+            .next();
+
+        let multiple = node.bounds.iter().filter(|bound| match bound {
+            syn::TypeParamBound::Trait(..) => true,
+            _ => false
+        })
+            .skip(1)
+            .next()
+            .is_some();
+
+
+        return self.set_help(node, HelpItem::TypeTraitObject {
+            lifetime: lifetime.map(|lt| format!("{}", lt)),
+            multiple,
+            dyn_: node.dyn_token.is_some(),
+            ty: format!("{}", ty.path.to_token_stream())
+        });
     }];
-    method![visit_type_tuple(self, node: syn::TypeTuple)];
+    method![visit_type_tuple(self, node: syn::TypeTuple) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::TypeTuple);
+        }
+    }];
     method![visit_un_op(self, node: syn::UnOp)];
     method![visit_use_glob(self, node: syn::UseGlob) @terminal {
         return self.set_help(node, HelpItem::UseGlob);
     }];
     method![visit_use_group(self, node: syn::UseGroup)];
     method![visit_use_name(self, node: syn::UseName)];
-    method![visit_use_path(self, node: syn::UsePath)];
+    method![visit_use_path(self, node: syn::UsePath) => {
+        match &*node.tree {
+            syn::UseTree::Group(use_group) => {
+                if self.within(use_group) {
+                    return self.set_help(use_group, HelpItem::UseGroup {
+                        parent: node.ident.to_string()
+                    });
+                }
+            },
+            _ => {}
+        }
+    }];
     method![visit_use_rename(self, node: syn::UseRename) {
         token![self, node.as_token, AsRename];
     }];
@@ -1062,7 +1205,29 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_variadic(self, node: syn::Variadic)];
     method![@attrs visit_variant(self, node: syn::Variant) => {
         if !self.settled() {
-            return self.set_help(node, HelpItem::Variant { name: "".to_string() });
+            if let Some((eq_token, discriminant)) = &node.discriminant {
+                if self.between(&eq_token, &discriminant) {
+                    return self.set_help_between(eq_token.span(), discriminant.span(), HelpItem::VariantDiscriminant {
+                        name: node.ident.to_string()
+                    });
+                }
+            }
+            return self.set_help(node, HelpItem::Variant {
+                name: "".to_string(),
+                fields: match node.fields {
+                    syn::Fields::Named(..) => Some("named"),
+                    syn::Fields::Unnamed(..) => Some("unnamed"),
+                    syn::Fields::Unit => None
+                }
+            });
+        }
+
+        match self.help {
+            HelpItem::Field { ref mut of, ref mut of_name, .. } => {
+                *of = "enum variant";
+                *of_name = node.ident.to_string();
+            },
+            _ => {}
         }
     }];
     method![visit_vis_crate(self, node: syn::VisCrate)];

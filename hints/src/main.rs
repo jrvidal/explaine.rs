@@ -59,11 +59,17 @@ fn main() {
     }
 
     let mut args = std::env::args().skip(1);
-    let ty = args.next().unwrap();
+    let maybe_ty = args.next();
     let depth = args
         .next()
         .map(|s| u8::from_str_radix(&s, 10).unwrap())
         .unwrap_or(1);
+
+    let ty = if let Some(ty) = maybe_ty {
+        ty
+    } else {
+        return print_all(to_parents, id_map, depth);
+    };
     let id = id_map.name_to_id[&ty[..]];
     let mut queue = vec![(id, 0)];
 
@@ -91,6 +97,76 @@ fn main() {
             println!("\"{}\" -> \"{}\"", name, parent_name);
         }
         queue.extend(parents.iter().map(|p| (*p, deep + 1)));
+    }
+
+    println!("}}\n");
+}
+
+fn print_all(to_parents: HashMap<usize, Vec<usize>>, id_map: IdMap, max_depth: u8) {
+    let mut to_children = HashMap::new();
+
+    for &id in id_map.id_to_name.keys() {
+        if let Some(parents) = to_parents.get(&id) {
+            for parent in parents {
+                to_children
+                    .entry(parent)
+                    .or_insert_with(HashSet::new)
+                    .insert(id);
+            }
+        } else {
+            eprintln!("no parents for {}", &id_map.id_to_name[&id]);
+        }
+    }
+
+    eprintln!(
+        "{:?}",
+        to_children[&id_map.name_to_id["syn::Macro"]]
+            .iter()
+            .map(|id| &id_map.id_to_name[id])
+            .collect::<Vec<_>>()
+    );
+
+    let mut queue = id_map
+        .id_to_name
+        .keys()
+        .cloned()
+        .filter(|id| !to_children.contains_key(&id))
+        .map(|t| (t, 0))
+        .collect::<Vec<_>>();
+
+    eprintln!(
+        "{:?}",
+        queue
+            .iter()
+            .map(|id| &id_map.id_to_name[&id.0])
+            .collect::<Vec<_>>()
+    );
+    println!("digraph Deps {{\n");
+
+    while let Some((id, depth)) = queue.pop() {
+        if depth >= max_depth {
+            continue;
+        }
+
+        if !to_parents.contains_key(&id) {
+            eprintln!("discarding {}", &id_map.id_to_name[&id]);
+            continue;
+        }
+
+        let parents = &to_parents[&id];
+
+        let name = &id_map.id_to_name[&id];
+
+        if name == "syn::Macro" {
+            panic!("{:?}", depth);
+        }
+
+        for parent in parents {
+            let parent_name = &id_map.id_to_name[parent];
+            println!("{:?} -> {:?}", name, parent_name);
+        }
+
+        queue.extend(parents.iter().map(|&p| (p, depth + 1)));
     }
 
     println!("}}\n");

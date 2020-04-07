@@ -125,52 +125,45 @@ impl SessionResult {
 
 #[wasm_bindgen]
 pub struct Session {
-    code: syn::File,
+    file: syn::File,
     tokens: TokenIterator,
-    top_level: IntoIter<TopLevelElement>,
-    element: TopLevelElement,
-}
-
-#[derive(Clone)]
-enum TopLevelElement {
-    Attr(usize),
-    Item(usize),
+    top_level: IntoIter<usize>,
+    element: usize,
 }
 
 #[wasm_bindgen]
 impl Session {
     #[wasm_bindgen]
-    pub fn new(source: &str) -> SessionResult {
+    pub fn new(source: String) -> SessionResult {
         utils::set_panic_hook();
-        let result = syn::parse_file(source)
-            .map(|code| {
+        let parse_result = syn::parse_file(&source);
+
+        let result = match parse_result {
+            Ok(file) => {
                 let tokens = TokenStream::new().into();
                 let mut top_level_elements = vec![];
 
+                top_level_elements.extend(file.attrs.iter().enumerate().map(|(i, _)| i));
                 top_level_elements.extend(
-                    code.attrs
+                    file.items
                         .iter()
                         .enumerate()
-                        .map(|(i, _)| TopLevelElement::Attr(i)),
-                );
-                top_level_elements.extend(
-                    code.items
-                        .iter()
-                        .enumerate()
-                        .map(|(i, _)| TopLevelElement::Item(i)),
+                        .map(|(i, _)| i + file.attrs.len()),
                 );
 
-                Session {
-                    code,
+                Ok(Session {
+                    file,
                     tokens,
                     top_level: top_level_elements.into_iter(),
-                    element: TopLevelElement::Attr(0),
-                }
-            })
-            .map_err(|err| {
-                let block_result = syn::parse_str::<syn::Block>(&format!("{{{}}}", source));
-                (err, block_result.is_ok())
-            });
+                    element: 0,
+                })
+            }
+            Err(err) => {
+                let block_result = syn::parse_str::<syn::Block>(&format!("{{{}}}", &source));
+                Err((err, block_result.is_ok()))
+            }
+        };
+
         SessionResult { result }
     }
 
@@ -185,18 +178,23 @@ impl Session {
                 Some(span) => span,
                 None => match self.top_level.next() {
                     Some(el) => {
-                        self.element = el.clone();
+                        self.element = el;
                         self.tokens = match el {
-                            TopLevelElement::Attr(i) => {
-                                self.code.attrs[i].clone().to_token_stream().into()
+                            _ if el < self.file.attrs.len() => {
+                                self.file.attrs[el].clone().to_token_stream().into()
                             }
-                            TopLevelElement::Item(i) => {
-                                self.code.items[i].clone().to_token_stream().into()
-                            }
+                            _ => self.file.items[el - self.file.attrs.len()]
+                                .clone()
+                                .to_token_stream()
+                                .into(),
                         };
                         continue;
                     }
-                    None => break,
+                    None => {
+                        self.top_level = vec![].into_iter();
+                        self.tokens = TokenIterator { elements: vec![] };
+                        break;
+                    }
                 },
             };
 
@@ -204,10 +202,7 @@ impl Session {
 
             let explanation = if let Some(explanation) = {
                 let visitor = IntersectionVisitor::new(location);
-                let result = match self.element {
-                    TopLevelElement::Attr(i) => visitor.visit_attr(&self.code, i),
-                    TopLevelElement::Item(i) => visitor.visit_item(&self.code.items[i]),
-                };
+                let result = visitor.visit_element(&self.file, self.element);
                 if let HelpItem::Unknown = result.help {
                     None
                 } else {
@@ -253,7 +248,7 @@ impl Session {
             column: ch,
         };
         let visitor = IntersectionVisitor::new(location);
-        let result = visitor.visit(&self.code);
+        let result = visitor.visit(&self.file);
         if let HelpItem::Unknown = result.help {
             None
         } else {

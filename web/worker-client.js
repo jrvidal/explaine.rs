@@ -23,6 +23,10 @@ export default function worker({ onMessage }) {
     onMessage(data);
   };
 
+  if (!self.__PRODUCTION__) {
+    window.worker = worker;
+  }
+
   return {
     postMessage: (data) => worker.postMessage(data),
     ready: workerIsReadyPromise,

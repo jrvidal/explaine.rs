@@ -34,6 +34,7 @@ variant = "Attribute"
 info = """
 Attributes assign metadata to expressions, statements and other elements.
 {{if not outer}}
+
 In particular, this is an _inner_ attribute (because it has the "bang" form:
 `#![foo]` instead of `#[foo]`), which means it applies to the item that contains it.{{ endif }}
 """
@@ -78,13 +79,6 @@ book = "ch05-03-method-syntax.html"
 title = "Rename"
 info = "The `as` keyword allows renames of imported items, for instance, to avoid conflict with locally defined items."
 book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#providing-new-names-with-the-as-keyword"
-
-[help.QualifiedAs]
-title = "Fully qualified syntax for trait items"
-info = """The `as` keyword allows specifying the trait among the several that a type might implement
-for which we're trying to call a given method on a type."""
-keyword = "as"
-book = "ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name"
 
 [help.AsRenameExternCrate]
 title = "Rename"
@@ -179,14 +173,13 @@ keyword = "pub"
 
 [help.Variant]
 title = "Enum Variant"
-info = "One of the variants of the `{ name }` enum."
+info = "One of the _variants_ of the `{ name }` enum, {{if fields}}with associated data as { fields } fields{{else}}with no associated data{{endif}}."
 book = "ch06-00-enums.html"
 
-[help.Dyn]
-title = "Trait object"
-info = "A `dyn Trait` object is an _unsized_ type that implements `Trait` through dynamic dispatch."
-keyword = "dyn"
-book = "ch17-02-trait-objects.html"
+[help.VariantDiscriminant]
+title = "Variant Discriminant"
+info = "An explicit discriminant for the `{ name }` variant."
+# TODO: reference
 
 [help.Else]
 title = "`else`"
@@ -195,8 +188,13 @@ keyword = "else"
 book = "ch03-05-control-flow.html"
 
 [help.ItemEnum]
-title = "`enum` declaration"
-info = "An `enum` declaration."
+title = "`enum` Declaration"
+info = """The declaration for an `enum`, a data type specified through a list of variants.
+{{if empty}}
+
+This is an _empty enum_ without variants, which constitutes an [empty type](https://doc.rust-lang.org/nomicon/exotic-sizes.html#empty-types)
+which cannot be instantiated.
+{{endif}}"""
 keyword = "enum"
 book = "ch06-00-enums.html"
 
@@ -239,12 +237,6 @@ title = "Function Type"
 info = "The type of a free standing function."
 keyword = "fn"
 
-[help.ItemImplForTrait]
-title = "Trait implementation"
-info = "The `for` keyword indicates the type for which a trait is being implemented."
-keyword = "for"
-book = "ch10-02-traits.html"
-
 [help.ExprForLoopToken]
 title = "`for` - `in` loop"
 info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
@@ -252,8 +244,14 @@ keyword = "for"
 book = "ch03-05-control-flow.html"
 
 [help.BoundLifetimes]
-title = "Higher-rank lifetime bounds"
+title = "Higher-Rank Lifetime Bound"
 info = "The `for` keyword indicates a generic bound over an infinite set of lifetimes."
+keyword = "for"
+
+[help.BoundLifetimesTraitBound]
+title = "Higher-Rank Lifetime Bound"
+info = """The `for<..>` construct indicates that the trait bound `{ ty }` is in fact an _infinite_ collection of
+bounds, for every value of `{ lifetime }`{{if multiple}} and the rest of the lifetimes within `<..>`{{endif}}."""
 keyword = "for"
 
 [help.IfLet]
@@ -268,11 +266,31 @@ info = "An `if` expression."
 book = "ch03-05-control-flow.html"
 keyword = "if"
 
-[help.ItemImpl]
-title = "Implementation block"
-info = "An `impl` block declares _intrinsic_ methods and other items for a given type."
+[help.ItemImpl-intrinsic]
+title = "Implementation Block"
+info = "An `impl` block that declares _intrinsic_ methods and other items for a given type."
 book = "ch05-03-method-syntax.html"
 keyword = "impl"
+variant = "ItemImpl"
+pattern = "trait_: false"
+
+[help.ItemImpl-trait]
+title = "Trait Implementation Block"
+info = "An `impl` block that implements a trait for a given type."
+keyword = "impl"
+variant = "ItemImpl"
+pattern = "trait_: true"
+
+[help.ItemImplForTrait]
+title = "Trait implementation"
+info = "The `for` keyword indicates the type for which a trait is being implemented."
+keyword = "for"
+book = "ch10-02-traits.html"
+
+[help.ItemMacroRules]
+title = "Declarative Macro"
+info = "A declarative macro or _macro by example_ declaration that introduces the `{ name }!` macro."
+book = "ch19-06-macros.html#declarative-macros-with-macro_rules-for-general-metaprogramming"
 
 [help.TypeImplTrait]
 title = "`impl Trait` return type"
@@ -353,7 +371,7 @@ keyword = "self"
 
 [help.RefSelf]
 title = "Borrowed `self`"
-info = "This method takes an immutable (shared) references to `self`."
+info = "This method takes an immutable (shared) reference to `self`."
 book = "ch05-03-method-syntax.html"
 keyword = "self"
 
@@ -369,6 +387,17 @@ info = "PatIdentMut"
 title = "TODO"
 info = "PatIdentRefMut"
 
+[help.PathLeadingColon]
+title = "Referencing External Crates"
+info = "A leading `::` in a path means that the path refers to an external crate."
+
+[help.QSelfAsToken]
+title = "Fully Qualified Syntax for Traits"
+info = """The `as` keyword allows specifying the trait among the several that a type might implement
+for which we're trying to call a given method on a type."""
+keyword = "as"
+book = "ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name"
+
 [help.StaticMut]
 title = "Mutable Static"
 info = "A `static mut` item is a value that is embedded in the memory of the final executable _and_ that can be mutated (though it is highly unsafe to do so)."
@@ -378,14 +407,42 @@ title = "Static Item"
 info = "A `static` item is a value that is embedded in the memory of the final executable."
 keyword = "static"
 
-[help.TypeReference]
-title = "Immutable Reference"
-info = "This type represents an immutable (shared) borrow over the value of another type."
+[help.TypeReference-immutable]
+title = "Immutable Reference Type"
+info = "The type of an immutable (shared) borrow over a value of type `{ ty }`."
+variant = "TypeReference"
+pattern = "mutable: false, .."
+
+[help.TypeReference-mutable]
+title = "Mutable Reference Type"
+info = "The type of a mutable (exclusive) borrow over a value of type `{ ty }`."
+variant = "TypeReference"
+pattern = "mutable: true, .."
+
+[help.TypeSlice]
+title = "Slice Type"
+info = "The type of a slice{{if dynamic}} reference{{endif}} of elements of type `{ ty }`."
+
+[help.TypeTraitObject]
+title = "Trait Object Type"
+info = """The type of a _trait object_, an _unsized_ type that implements the trait `{ ty }` {{if multiple}}(and some others) {{endif}}through dynamic dispatch.
+{{if lifetime}}This trait object also has a lifetime bound `{ lifetime }`.{{endif}}
+{{if not dyn_}}
+
+A trait object is usually marked with the `dyn` keyword.{{endif}}
+"""
+keyword = "dyn"
+book = "ch17-02-trait-objects.html"
+
 
 [help.UseGlob]
 title = "Glob Operator"
 info = "The glob operator `*` will bring all public items of a given module into scope."
 book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#the-glob-operator"
+
+[help.UseGroup]
+title = "Group Import"
+info = "A group of several items imported from `{ parent }`, grouped together in a single import."
 
 [help.ExprReference-immutable]
 title = "Immutable reference"
@@ -419,18 +476,18 @@ info = "ForeignItemType"
 keyword = "type"
 
 [help.ImplItemType]
-title = "Associated type"
+title = "Associated Type"
 info = "The `type` keyword introduces an _associated type_ that implementors can specify."
 keyword = "type"
 
 [help.ItemUnsafeImpl]
-title = "Unsafe trait implementation"
+title = "Unsafe Trait Implementation"
 info = "An `unsafe` trait implementation must be marked as such when the trait being implemented is `unsafe`."
 keyword = "unsafe"
 
 [help.ItemStruct]
-title = "`struct`"
-info = """A `struct` is a data type{{if unit}} (usually){{endif}} defined by a list of fields.{{if unit}}
+title = "`struct` Declaration"
+info = """The declaration for a `struct`, a data type{{if unit}} (usually){{endif}} defined by a list of fields.{{if unit}}
 
 In this case, `{ name }` is a _unit_ struct, with no fields.{{endif}}"""
 keyword = "struct"
@@ -467,6 +524,20 @@ title = "Unsafe function"
 info = "An `unsafe` function might contain unsafe operations within its body, as if all its statements where surrounded in an `unsafe` block."
 keyword = "unsafe"
 
+[help.TraitBoundModifierQuestion-sized]
+title = "`?Sized` Trait Bound"
+info = "A bound that expresses that the `Sized` trait may not be implemented for a given type parameter."
+variant = "TraitBoundModifierQuestion"
+book = "ch19-04-advanced-types.html#dynamically-sized-types-and-the-sized-trait"
+pattern = "sized: true"
+
+[help.TraitBoundModifierQuestion-other]
+title = "Implicit Bound"
+info = """The `?` modifier in a trait bound indicates that the trait is an _implicit bound_ in every type parameter,
+except when marked with this modifier. It is currently only valid for the `Sized` trait."""
+variant = "TraitBoundModifierQuestion"
+pattern = "sized: false"
+
 [help.TraitItemType]
 title = "TODO"
 info = "TraitItemType"
@@ -489,6 +560,11 @@ info = "The type `!` represents computations that never resolve to any value at 
 [help.TypeParamBoundAdd]
 title = "Trait Bounds"
 info = "The plus sign `+` joins several bounds that a given type must fulfill."
+
+[help.TypeTuple]
+title = "Tuple Type"
+info = "The type of a _tuple_, an heterogeneous, finite list of types."
+book = "ch03-02-data-types.html#the-tuple-type"
 
 [help.TypeConstPtr]
 title = "Raw Pointer"
@@ -517,17 +593,15 @@ title = "Trait Alias"
 info = "ItemTraitAlias"
 keyword = "trait"
 
-[help.Field-named]
+[help.Field]
 variant = "Field"
-title = "Named field"
-info = "A declaration of a field named `{ name }` in a { of }."
-pattern = "name: Some(..), .."
+title = "Named Field"
+info = "{{ if name }}The field `{name}`{{ else }}An unnamed field{{endif}} in the `{ of_name }` { of }."
 
-[help.Field-unnamed]
-variant = "Field"
-title = "Unnamed field"
-info = "A unnamed field in a { of }."
-pattern = "name: None, .."
+[help.FieldValueShorthand]
+title = "Field Init Shorthand"
+info = "Shorthand expression equivalent to `{ name }: { name }`."
+
 
 [help.FatArrow]
 title = "Fat Arrow"

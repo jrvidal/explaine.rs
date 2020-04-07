@@ -5,4 +5,3 @@ An interactive playground to explore the syntax of the [Rust programming languag
 ## TODO
 * Cover more syntax.
 * Cover all punctuation.
-* Give contextual info.
