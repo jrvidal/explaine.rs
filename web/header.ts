@@ -3,6 +3,30 @@ import renderer, { pure } from "./renderer";
 
 const querySelector = (selector: string) => document.querySelector(selector)!!;
 
+export function openInPlayground({
+  getValue,
+}: {
+  getValue: () => string | null;
+}) {
+  const openInPlaygroundButton = querySelector(
+    ".playground"
+  ) as HTMLButtonElement;
+
+  openInPlaygroundButton.addEventListener("click", () => {
+    const value = getValue();
+    if (value == null) return;
+    window.open(codeAsSearchUrl("https://play.rust-lang.org", value), "_blank");
+  });
+
+  return pure(function renderOpenInPlayground({
+    enabled,
+  }: {
+    enabled: boolean;
+  }) {
+    openInPlaygroundButton.disabled = !enabled;
+  });
+}
+
 export function generateLink({
   onAddress,
   getValue,
@@ -14,18 +38,10 @@ export function generateLink({
   const generatedLink = querySelector(".link") as HTMLAnchorElement;
 
   generateButton.addEventListener("click", () => {
-    if (getValue() == null) return;
-    let address = new window.URL(window.location.href);
-    let params = new window.URLSearchParams();
     const value = getValue();
-    if (value != null) {
-      params.append("code", value);
-    } else {
-      return;
-    }
-    address.search = `?${params.toString()}`;
+    if (value == null) return;
 
-    onAddress(address.toString());
+    onAddress(codeAsSearchUrl(window.location.href, value));
   });
 
   return pure(function renderGeneratedLink({
@@ -138,4 +154,12 @@ export function showAll({ onToggleShowAll }: { onToggleShowAll: () => void }) {
       setText(showAllText, initialShowAll);
     }
   });
+}
+
+function codeAsSearchUrl(url: string, code: string) {
+  let address = new window.URL(url);
+  let params = new window.URLSearchParams();
+  params.append("code", code);
+  address.search = `?${params.toString()}`;
+  return address.toString();
 }

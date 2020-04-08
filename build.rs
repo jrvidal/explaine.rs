@@ -34,22 +34,40 @@ fn main() {
             })
             .unwrap_or("None".to_string());
 
-        let pattern = explanation.pattern.as_ref().map(|s| &s[..]).unwrap_or("..");
-
         let variant = explanation
             .variant
             .as_ref()
             .map(|s| &s[..])
             .unwrap_or(&name);
 
+        let pattern = match (explanation.patterns, explanation.pattern) {
+            (None, None) => format!("{} {{..}}", variant),
+            (None, Some(pattern)) => format!("{} {{{}}}", variant, pattern),
+            (Some(patterns), _) => patterns
+                .into_iter()
+                .map(|pat| format!("{} {{{}}}", variant, pat))
+                .fold(String::new(), |mut acc, pat| {
+                    acc.push_str("| ");
+                    acc.push_str(&pat);
+                    acc
+                }),
+        };
+
+        let std = format!(
+            "{:?}",
+            explanation
+                .std
+                .map(|std| format!("https://doc.rust-lang.org/std/{}", std))
+        );
+
         data.push(format!(
-            "  HelpItem::{variant} {{{pattern}}} => HelpData {{ template: {template:?}, title: {title:?}, book: {book}, keyword: {keyword} }},\n",
-            variant = variant,
+            "  {pattern} => HelpData {{ template: {template:?}, title: {title:?}, book: {book}, keyword: {keyword}, std: {std} }},\n",
             pattern = pattern,
             template = name,
             title = stripped_title,
             book = book,
-            keyword = keyword
+            keyword = keyword,
+            std = std
         ));
 
         init.push(format!(
@@ -63,8 +81,9 @@ fn main() {
 
     source.push_str("
         fn help_to_template_data(item: &HelpItem) -> HelpData {
+            use HelpItem::*;
             match item {
-                HelpItem::Unknown => HelpData { template: \"\", book: None, keyword: None, title: \"\"},
+                HelpItem::Unknown => HelpData { template: \"\", book: None, keyword: None, title: \"\", std: None },
     ");
 
     data.into_iter().for_each(|case| {
@@ -99,7 +118,9 @@ struct Explanation {
     info: String,
     title: String,
     pattern: Option<String>,
+    patterns: Option<Vec<String>>,
     variant: Option<String>,
     book: Option<String>,
     keyword: Option<String>,
+    std: Option<String>,
 }

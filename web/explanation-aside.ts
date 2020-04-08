@@ -233,6 +233,8 @@ export function aside({ onWrapInBlock }: { onWrapInBlock: () => void }) {
   const bookLink = bookRow.querySelector("a")!!;
   const keywordRow = moreInfoHeader.querySelector(".keyword-row")!!;
   const keywordLink = keywordRow.querySelector("a")!!;
+  const stdRow = moreInfoHeader.querySelector(".std-row")!!;
+  const stdLink = stdRow.querySelector("a")!!;
   const infoWipEl = querySelector(".info-wip");
 
   const renderWrapInBlock = wrapInBlock({ onWrapInBlock });
@@ -248,11 +250,15 @@ export function aside({ onWrapInBlock }: { onWrapInBlock: () => void }) {
       setDisplay(moreInfoHeader, "block");
       setDisplay(bookRow, elaboration.book ? "block" : "none");
       setDisplay(keywordRow, elaboration.keyword ? "block" : "none");
+      setDisplay(stdRow, elaboration.std ? "block" : "none");
       bookLink.href = elaboration.book || "";
       keywordLink.href = elaboration.keyword || "";
+      stdLink.href = elaboration.std || "";
       setDisplay(
         infoWipEl,
-        elaboration.book || elaboration.keyword ? "none" : "initial"
+        elaboration.book || elaboration.keyword || elaboration.std
+          ? "none"
+          : "initial"
       );
     } else {
       setDisplay(moreInfoHeader, "none");

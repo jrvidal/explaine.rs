@@ -28,6 +28,71 @@ title = "Macro Input"
 info = "The input of a macro is a bunch of (almost) arbitrary tokens, and its interpretation depends on the particular macro."
 book = "ch19-06-macros.html"
 
+[help.PatBox]
+title = "Box Pattern"
+info = "A pattern that matches a `Box<..>`. This is an [experimental feature](https://doc.rust-lang.org/unstable-book/language-features/box-patterns.html)."
+
+[help.PatIdent-value]
+variant = "PatIdent"
+pattern = "mutability: true, by_ref: false, .."
+title = "Mutable Pattern Binding"
+info = "The `{ ident }` binding this pattern introduces is mutable, as if introduced with a `let mut` declaration."
+
+[help.PatIdent-ref]
+variant = "PatIdent"
+patterns = ["by_ref: true, ..", "by_ref: false, mutability: false, .."]
+title = "By Ref Pattern"
+info = """A by-reference pattern, that ensures that given the value that matches,
+`{ ident }` is just a {{if mutability}}(mutable) {{endif}} borrow of it."""
+keyword = "ref"
+
+[help.PatIdentSubPat]
+title = "`@` Binding"
+info = "A pattern that matches the subpattern to the right of the `@` symbol, while simultaneously binding the value to `{ ident }`."
+book = "ch18-03-pattern-syntax.html#-bindings"
+
+[help.PatIdentMutableArg]
+title = "Mutable Function Argument"
+info = "A mutable function argument, that behaves as if `{ ident }` had been introduced by a `let mut`: it can be reassigned and mutable borrows can be taken."
+keyword = "mut"
+
+[help.PatOrLeading]
+title = "Leading Pattern Separator"
+info = "All patterns can be preceded by a leading `|` which has no further effect."
+
+[help.PatOr]
+title = "Pattern 'or' Operator"
+info = "The `|` syntax allows to test several patterns in one case, from left to right."
+book = "ch18-03-pattern-syntax.html#multiple-patterns"
+
+[help.PatRange]
+title = "Range Patter"
+info = "A {{if closed}}closed{{else}}half-open{{endif}} range pattern that matches any value within its bounds ({{if closed}}including{{else}}excluding{{endif}} the upper bound)."
+
+[help.PatRest]
+title = "Rest Pattern"
+info = "The rest pattern `..`, which ignores the rest of the fields of this { of }."
+book = "ch18-03-pattern-syntax.html#ignoring-remaining-parts-of-a-value-with-"
+
+[help.PatStruct]
+title = "Struct Pattern"
+info = """A struct pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches struct values or struct enum variants.{{if emtpy}}
+
+An struct pattern that ignores all its fields with `..` can even match non-struct enum variants.{{endif}}{{endif}}"""
+
+[help.PatTuple]
+title = "Tuple Pattern"
+info = "A tuple pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is a tuple of the same length.{{endif}}"
+
+[help.PatTupleStruct]
+title = "Tuple Struct Pattern"
+info = "A pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is of a particular tuple struct type, and that can bind individual fields.{{endif}}"
+
+[help.PatWild]
+title = "Wildcard Pattern"
+info = "The wildcard pattern `_`, that matches any value and discards it."
+book = "ch18-03-pattern-syntax.html#ignoring-an-entire-value-with-_"
+
 [help.Attribute]
 title = "Attribute"
 variant = "Attribute"
@@ -365,11 +430,6 @@ info = "The `move` keyword specifies that a closure should take ownership over t
 keyword = "move"
 book = "ch13-01-closures.html"
 
-[help.FnArgMut]
-title = "Mutable argument"
-info = "A `mut` argument to a function acts as a `let mut` declaration: it can be reassigned and mutable borrows can be taken."
-keyword = "mut"
-
 [help.MutSelf]
 title = "Mutably borrowed `self`"
 info = "This method takes `self` as a mutable (exclusive) reference."
@@ -387,18 +447,6 @@ title = "Borrowed `self`"
 info = "This method takes an immutable (shared) reference to `self`."
 book = "ch05-03-method-syntax.html"
 keyword = "self"
-
-[help.PatIdentRef]
-title = "TODO"
-info = "PatIdentRef"
-
-[help.PatIdentMut]
-title = "TODO"
-info = "PatIdentMut"
-
-[help.PatIdentRefMut]
-title = "TODO"
-info = "PatIdentRefMut"
 
 [help.PathLeadingColon]
 title = "Referencing External Crates"
@@ -435,6 +483,7 @@ pattern = "mutable: true, .."
 [help.TypeSlice]
 title = "Slice Type"
 info = "The type of a slice{{if dynamic}} reference{{endif}} of elements of type `{ ty }`."
+std = "primitive.slice.html"
 
 [help.TypeTraitObject]
 title = "Trait Object Type"
@@ -446,7 +495,6 @@ A trait object is usually marked with the `dyn` keyword.{{endif}}
 """
 keyword = "dyn"
 book = "ch17-02-trait-objects.html"
-
 
 [help.UseGlob]
 title = "Glob Operator"
@@ -568,7 +616,7 @@ book = "ch08-03-hash-maps.html#creating-a-new-hash-map"
 [help.TypeNever]
 title = "Never Type"
 info = "The type `!` represents computations that never resolve to any value at all."
-# TODO: std link
+std = "primitive.never.html"
 
 [help.TypeParamBoundAdd]
 title = "Trait Bounds"
@@ -578,6 +626,12 @@ info = "The plus sign `+` joins several bounds that a given type must fulfill."
 title = "Tuple Type"
 info = "The type of a _tuple_, an heterogeneous, finite list of types."
 book = "ch03-02-data-types.html#the-tuple-type"
+
+[help.TypeTupleUnit]
+title = "Unit Type"
+info = "The `unit` type, a tuple without elements."
+book = "ch03-02-data-types.html#the-tuple-type"
+std = "primitive.unit.html"
 
 [help.TypeConstPtr]
 title = "Raw Pointer"
@@ -611,10 +665,17 @@ variant = "Field"
 title = "Named Field"
 info = "{{ if name }}The field `{name}`{{ else }}An unnamed field{{endif}} in the `{ of_name }` { of }."
 
+[help.FieldPatUnnamed]
+title = "Tuple Struct Explicit Field Pattern"
+info = "This is a pattern for a _tuple_ struct, where instead of positional patterns, explicit indices are being used."
+
+[help.FieldPatShorthand]
+title = "Field Pattern Shorthand"
+info = "Shorthand pattern equivalent to `{ ident }: { ident }`."
+
 [help.FieldValueShorthand]
 title = "Field Init Shorthand"
 info = "Shorthand expression equivalent to `{ name }: { name }`."
-
 
 [help.FatArrow]
 title = "Fat Arrow"

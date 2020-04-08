@@ -164,6 +164,7 @@ function notifyElaboration() {
     title: state.explanation && state.explanation.title(),
     book: state.explanation && state.explanation.book(),
     keyword: state.explanation && state.explanation.keyword(),
+    std: state.explanation && state.explanation.std(),
   });
 }
 

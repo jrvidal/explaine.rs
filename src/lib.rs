@@ -290,6 +290,10 @@ impl Explanation {
     pub fn book(&self) -> JsValue {
         self.item.book().into()
     }
+
+    pub fn std(&self) -> JsValue {
+        self.item.std().into()
+    }
 }
 
 fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {

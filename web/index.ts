@@ -6,7 +6,13 @@ import { reportHit } from "./logging";
 
 import { TextMarker, Editor } from "codemirror";
 
-import { generateLink, whatsThis, toggleEdit, showAll } from "./header";
+import {
+  generateLink,
+  whatsThis,
+  toggleEdit,
+  showAll,
+  openInPlayground,
+} from "./header";
 import { aside } from "./explanation-aside";
 import codemirror from "./editor";
 import {
@@ -94,6 +100,12 @@ const renderShowAll = showAll({
   },
 });
 
+const renderOpenInPlayground = openInPlayground({
+  getValue() {
+    return cm && cm.getValue();
+  },
+});
+
 /* EXPLANATION ASIDE */
 
 const renderAside = aside({
@@ -119,6 +131,7 @@ export type Elaboration = {
   elaboration: string;
   book: string | null;
   keyword: string | null;
+  std: string | null;
 };
 
 type State = {
@@ -227,6 +240,9 @@ const setState = renderer<State>(
       empty: state.empty,
       canShow: compilation.exploration != null,
       failedCompilation: compilation.state === ERROR,
+    });
+    renderOpenInPlayground({
+      enabled: !state.empty && compilation.state === SUCCESS,
     });
   },
   {
