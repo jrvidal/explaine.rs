@@ -429,48 +429,10 @@ function onExplanation() {
 function onElaboration(elaboration: Elaboration | { location: null }) {
   if (nonUiState.compilationIndex !== nonUiState.elaborationIndex) return;
 
-  let missing: MissingHint | null = null;
-
-  if (elaboration.location == null) {
-    const MARGIN = 5;
-    const { line, ch } = nonUiState.lastElaborationRequest!!;
-    const minLine = Math.max(0, line - MARGIN);
-    const maxLine = Math.min(cm.lineCount() - 1, line + MARGIN);
-    let lines = [...new Array(maxLine - minLine)].map((_, i) =>
-      cm.getLine(minLine + i)
-    );
-    const emptyRe = /^ *$/;
-    const indentation = lines
-      .filter((line) => !emptyRe.test(line))
-      .reduce(
-        (acc, line) => Math.min(acc, line.match(/^ */)?.[0].length ?? 0),
-        Number.POSITIVE_INFINITY
-      );
-    if (indentation > 0) {
-      const re = new RegExp("^" + " ".repeat(indentation));
-      lines.forEach((line, i) => {
-        if (!emptyRe.test(line)) {
-          lines[i] = line.replace(re, "");
-        }
-      });
-    }
-    lines.forEach((line, i) => {
-      lines[i] = `${String(i).padStart(2, " ")} | ${line}`;
-    });
-    lines.splice(
-      line - minLine + 1,
-      0,
-      `   | ${" ".repeat(ch - indentation)}↑`
-    );
-
-    missing = {
-      code: lines.join("\n"),
-      location: {
-        line: line - minLine,
-        ch: ch - indentation,
-      },
-    };
-  }
+  const missing =
+    elaboration.location == null
+      ? computeMissingHint(nonUiState.lastElaborationRequest!!)
+      : null;
 
   setState(({ compilation }: State) => ({
     compilation: {
@@ -479,6 +441,50 @@ function onElaboration(elaboration: Elaboration | { location: null }) {
       missing,
     },
   }));
+}
+
+function computeMissingHint({ line, ch }: { line: number; ch: number }) {
+  const MARGIN = 5;
+  const EMPTY_RE = /^ *$/;
+
+  if (EMPTY_RE.test(cm.getLine(line))) return null;
+
+  const minContextLine = Math.max(0, line - MARGIN);
+  const maxContentLine = Math.min(cm.lineCount() - 1, line + MARGIN);
+
+  let lines = [...new Array(maxContentLine - minContextLine)].map((_, i) =>
+    cm.getLine(minContextLine + i)
+  );
+
+  const indentation = lines
+    .filter((line) => !EMPTY_RE.test(line))
+    .reduce(
+      (acc, line) => Math.min(acc, line.match(/^ */)?.[0].length ?? 0),
+      Number.POSITIVE_INFINITY
+    );
+  if (indentation > 0) {
+    lines.forEach((line, i) => {
+      if (!EMPTY_RE.test(line)) {
+        lines[i] = line.slice(indentation);
+      }
+    });
+  }
+  lines.forEach((line, i) => {
+    lines[i] = `${String(i).padStart(2, " ")} | ${line}`;
+  });
+  lines.splice(
+    line - minContextLine + 1,
+    0,
+    `   | ${" ".repeat(ch - indentation)}↑`
+  );
+
+  return {
+    code: lines.join("\n"),
+    location: {
+      line: line - minContextLine,
+      ch: ch - indentation,
+    },
+  };
 }
 
 function computeExploration(exploration: Span[]) {
