@@ -25,4 +25,7 @@ module.exports = {
     ],
   },
   devtool: "none",
+  devServer: {
+    host: "0.0.0.0",
+  },
 };

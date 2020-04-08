@@ -83,6 +83,16 @@ pub enum HelpItem {
     True,
     False,
     LitByteStr,
+    LitFloat {
+        suffix: Option<String>,
+        separators: bool,
+    },
+    LitInt {
+        suffix: Option<String>,
+        mode: Option<&'static str>,
+        prefix: Option<String>,
+        separators: bool,
+    },
     LitStr,
     FnTypeToken,
     ExprForLoopToken,
@@ -908,8 +918,42 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help(node, HelpItem::LitByteStr);
     }];
     method![visit_lit_char(self, node: syn::LitChar)];
-    method![visit_lit_float(self, node: syn::LitFloat)];
-    method![visit_lit_int(self, node: syn::LitInt)];
+    method![visit_lit_float(self, node: syn::LitFloat) @terminal {
+        let raw = node.to_string();
+        let suffix = Some(node.suffix())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let separators = raw.chars().any(|c| c == '_');
+
+        return self.set_help(node, HelpItem::LitFloat {
+            suffix,
+            separators
+        });
+    }];
+    method![visit_lit_int(self, node: syn::LitInt) @terminal {
+        let raw = node.to_string();
+
+        let suffix = Some(node.suffix())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let separators = raw.chars().any(|c| c == '_');
+
+        let (prefix, mode) = match raw.get(0..2) {
+            prefix @ Some("0b") => (prefix, Some("binary")),
+            prefix @ Some("0x") => (prefix, Some("hexadecimal")),
+            prefix @ Some("0o") => (prefix, Some("octal")),
+            _ => (None, None)
+        };
+
+        return self.set_help(node, HelpItem::LitInt {
+            mode,
+            separators,
+            suffix,
+            prefix: prefix.map(|s| s.to_string())
+        });
+    }];
     method![visit_lit_str(self, node: syn::LitStr) @terminal {
         return self.set_help(node, HelpItem::LitStr);
     }];

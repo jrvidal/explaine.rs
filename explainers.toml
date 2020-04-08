@@ -228,6 +228,19 @@ title = "Byte String Literal"
 info = "A literal string with a leading `b` is a _byte literal string_, of type `&'static [u8]`."
 # reference/tokens.html#byte-string-literals
 
+[help.LitFloat]
+title = "Floating-point Literal"
+info = """A floating-point number literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}.{{if separators}}
+
+The underscores `_` are merely for readability reasons.{{endif}}"""
+
+[help.LitInt]
+title = "Integer Literal"
+info = """An integer literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}{{if mode}},
+in { mode } notation (as indicated by the `{ prefix }` prefix){{endif}}.{{if separators}}
+
+The underscores `_` are merely for readability reasons.{{endif}}"""
+
 [help.LitStr]
 title = "String Literal"
 info = "A literal string, of type `&'static str`."
