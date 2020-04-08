@@ -52,6 +52,16 @@
   </header>
 
   <div class="container main">
+    <div class="missing-tooltip">
+      <h3>Missing Hint?</h3>
+      <p>Should we show a hint for this code? <br>
+        Is there some syntax we should explain?
+      </p>
+      <pre><code class="code"></code></pre>
+      <div class="submit-issue-container">
+        <button class="submit-issue">Tell us on GitHub</button>
+      </div>
+    </div>
 
     <div class="left-container">
       <div class="codemirror-placeholder"></div>
@@ -76,6 +86,9 @@
           <div class="item">
               <span class="desktop-help">Hover over the code to see an explanation of the relevant syntax.</span><span class="mobile-help">Click on the code to see an explanation of the relevant syntax.</span>
               <p>You can also find a syntax glossary in <a target="_blank" href="https://doc.rust-lang.org/book/appendix-02-operators.html">the Rust Book</a>.</p>
+          </div>
+          <div class="file-bug">
+            Missing hint? <a class="do-file-bug" href="#">File a Bug</a>
           </div>
           <div class="error-message-container"><code class="error-message"></code></div>
           <div class="can-be-block">

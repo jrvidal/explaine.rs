@@ -1,31 +1,48 @@
 import { addClass, setDisplay, removeClass, setText } from "./util";
 import renderer, { pure } from "./renderer";
 
-const querySelector = (selector) => document.querySelector(selector);
+const querySelector = (selector: string) => document.querySelector(selector)!!;
 
-export function generateLink({ onAddress, getValue }) {
-  const generateButton = querySelector(".generate");
-  const generatedLink = querySelector(".link");
+export function generateLink({
+  onAddress,
+  getValue,
+}: {
+  onAddress: (address: string) => void;
+  getValue: () => string | null;
+}) {
+  const generateButton = querySelector(".generate") as HTMLButtonElement;
+  const generatedLink = querySelector(".link") as HTMLAnchorElement;
 
   generateButton.addEventListener("click", () => {
     if (getValue() == null) return;
     let address = new window.URL(window.location.href);
     let params = new window.URLSearchParams();
-    params.append("code", getValue());
+    const value = getValue();
+    if (value != null) {
+      params.append("code", value);
+    } else {
+      return;
+    }
     address.search = `?${params.toString()}`;
 
     onAddress(address.toString());
   });
 
-  return pure(function renderGeneratedLink({ address, enabled }) {
+  return pure(function renderGeneratedLink({
+    address,
+    enabled,
+  }: {
+    address: string | null;
+    enabled: boolean;
+  }) {
     generateButton.disabled = !enabled;
     if (address) {
       setDisplay(generateButton, "none");
       removeClass(generatedLink, "hidden");
       generatedLink.href = address;
     } else {
+      setDisplay(generateButton, "initial");
       addClass(generatedLink, "hidden");
-      setDisplay(generateButton, null);
     }
   });
 }
@@ -34,11 +51,11 @@ export function whatsThis() {
   const modal = querySelector(".modal");
   const overlay = querySelector(".overlay");
 
-  let state = {
+  let state: { showModal: boolean } = {
     showModal: false,
   };
 
-  const setState = renderer(
+  const setState = renderer<{ showModal: boolean }>(
     (prevState) => {
       if (state.showModal) {
         addClass(modal, "show-modal");
@@ -71,25 +88,29 @@ export function whatsThis() {
   });
 }
 
-export function toggleEdit({ onToggleEdit }) {
-  const toggleEditButton = querySelector(".toggle-edit");
+export function toggleEdit({ onToggleEdit }: { onToggleEdit: () => void }) {
+  const toggleEditButton = querySelector(".toggle-edit") as HTMLButtonElement;
 
   toggleEditButton.addEventListener("click", () => {
     onToggleEdit();
   });
 
-  return pure(({ enabled, editable }) => {
-    toggleEditButton.disabled = !enabled;
-    setText(toggleEditButton, editable ? "Disable editing" : "Enable editing");
-  });
+  return pure(
+    ({ enabled, editable }: { enabled: boolean; editable: boolean }) => {
+      toggleEditButton.disabled = !enabled;
+      setText(
+        toggleEditButton,
+        editable ? "Disable editing" : "Enable editing"
+      );
+    }
+  );
 }
 
-export function showAll({ onToggleShowAll }) {
-  const showAllButton = querySelector(".show-all");
+export function showAll({ onToggleShowAll }: { onToggleShowAll: () => void }) {
+  const showAllButton = querySelector(".show-all") as HTMLButtonElement;
   const showAllText = querySelector(".show-all-text");
-  const showAllSpinner = querySelector(".show-all > .spinner");
 
-  const initialShowAll = showAllText.textContent;
+  const initialShowAll = showAllText.textContent!!;
 
   showAllButton.addEventListener("click", () => {
     onToggleShowAll();
@@ -100,6 +121,11 @@ export function showAll({ onToggleShowAll }) {
     empty,
     canShow,
     failedCompilation,
+  }: {
+    showAll: boolean;
+    empty: boolean;
+    canShow: boolean;
+    failedCompilation: boolean;
   }) {
     showAllButton.disabled = !canShow;
 

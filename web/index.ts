@@ -1,40 +1,48 @@
 import * as messages from "./messages";
-import { logInfo } from "./logging";
 import renderer, { pure } from "./renderer";
-import { addClass, removeClass, setText, setHtml, setDisplay } from "./util";
+import { addClass, removeClass } from "./util";
 import worker from "./worker-client";
+import { reportHit } from "./logging";
 
-import { header, generateLink, whatsThis, toggleEdit, showAll } from "./header";
+import { TextMarker, Editor } from "codemirror";
+
+import { generateLink, whatsThis, toggleEdit, showAll } from "./header";
 import { aside } from "./explanation-aside";
-import codemirror from "./codemirror";
+import codemirror from "./editor";
+import {
+  Location,
+  MissingHint,
+  PENDING,
+  CompilationState,
+  ERROR,
+  SUCCESS,
+} from "./types";
+
+declare global {
+  var __ANALYTICS_URL__: any;
+  var __PRODUCTION__: any;
+}
 
 const document = window.document;
-const querySelector = (selector) => document.querySelector(selector);
-const createElement = (el) => document.createElement(el);
+const querySelector = (selector: string) => document.querySelector(selector);
 
-export const PENDING = 0;
-export const SUCCESS = 1;
-export const ERROR = 2;
-
-if (typeof __ANALYTICS_URL__ === "string") {
-  fetch(__ANALYTICS_URL__, { method: "POST" });
-}
+reportHit();
 
 const IS_TOUCH_DEVICE = "ontouchstart" in window;
 
 addClass(document.body, IS_TOUCH_DEVICE ? "touch-device" : "non-touch-device");
 
 /* CODEMIRROR INIT */
-let cm;
-let codemirrorEl;
+let cm: Editor;
+let codemirrorEl: HTMLElement;
 
 codemirror({
   isTouchDevice: IS_TOUCH_DEVICE,
-  anchor: querySelector(".codemirror-anchor"),
+  anchor: querySelector(".codemirror-anchor") as HTMLElement,
   onClick() {
     onCmClick();
   },
-  onMouseMove(_cm, e) {
+  onMouseMove(_cm: any, e: MouseEvent) {
     onCmMouseMove(e);
   },
   onChange() {
@@ -43,6 +51,10 @@ codemirror({
 })
   .then(({ cm: instance, codemirrorEl: el }) => {
     cm = instance;
+
+    if (!self.__PRODUCTION__) {
+      (window as any).cm = cm;
+    }
     codemirrorEl = el;
 
     return initialCodeRender(cm);
@@ -55,7 +67,7 @@ codemirror({
 /* HEADER */
 
 const renderGenerateLink = generateLink({
-  onAddress(address) {
+  onAddress(address: string) {
     setState({ address });
   },
   getValue() {
@@ -67,13 +79,13 @@ whatsThis();
 
 const renderToggleEdit = toggleEdit({
   onToggleEdit() {
-    setState(({ editable }) => ({ editable: !editable }));
+    setState(({ editable }: State) => ({ editable: !editable }));
   },
 });
 
 const renderShowAll = showAll({
   onToggleShowAll() {
-    setState(({ compilation }) => ({
+    setState(({ compilation }: State) => ({
       compilation: {
         ...compilation,
         showAll: !compilation.showAll,
@@ -100,17 +112,84 @@ const renderAside = aside({
 });
 
 /* "REACT" */
-let state = {
-  compilation: { state: PENDING },
+export type CompilationError = Span & { isBlock: boolean; msg: string };
+export type Elaboration = {
+  location: Span;
+  title: string;
+  elaboration: string;
+  book: string | null;
+  keyword: string | null;
+};
+
+type State = {
+  editable: boolean;
+  compilation: {
+    state: CompilationState;
+    showAll: boolean;
+    hoverEl: EventTarget | null;
+    elaboration: Elaboration | null;
+    explanation: Span | null;
+    exploration: boolean;
+    error: CompilationError | null;
+    missing: MissingHint | null;
+  };
+  address: string | null;
+  editorReady: boolean;
+  empty: boolean;
+};
+
+type Span = {
+  start: Location;
+  end: Location;
+};
+
+let state: State = {
+  compilation: {
+    state: PENDING,
+    showAll: false,
+    hoverEl: null,
+    explanation: null,
+    elaboration: null,
+    exploration: false,
+    error: null,
+    missing: null,
+  },
   editable: !IS_TOUCH_DEVICE,
+  address: null,
+  editorReady: false,
+  empty: false,
 };
 
-let nonUiState = {
+const initialCompilation = state.compilation;
+
+type NonUIState = {
+  lastRule: number;
+  mark: TextMarker | null;
+  hoverMark: TextMarker | null;
+  computedMarks: TextMarker[] | null;
+  errorMark: TextMarker | null;
+  errorContextMark: TextMarker | null;
+  hoverIndex: number | null;
+  compilationIndex: number;
+  elaborationIndex: number | null;
+  lastElaborationRequest: Location | null;
+};
+
+let nonUiState: NonUIState = {
   lastRule: -1,
+  mark: null,
+  hoverMark: null,
+  computedMarks: null,
+  errorMark: null,
+  errorContextMark: null,
+  hoverIndex: null,
+  compilationIndex: 0,
+  elaborationIndex: null,
+  lastElaborationRequest: null,
 };
 
-const setState = renderer(
-  (prevState) => {
+const setState = renderer<State>(
+  () => {
     const { compilation } = state;
 
     // EDITOR
@@ -122,12 +201,16 @@ const setState = renderer(
       showAll: compilation.showAll,
       editable: state.editable,
     });
+    // renderMissingTooltip({
+    //   missing: compilation.missing,
+    // });
 
     // ASIDE
     renderAside({
       elaboration: compilation.elaboration,
       error: compilation.error,
       compilationState: compilation.state,
+      missing: compilation.missing,
     });
 
     // HEADER
@@ -150,10 +233,10 @@ const setState = renderer(
     get() {
       return state;
     },
-    set(nextState) {
+    set(nextState: State) {
       state = nextState;
       if (!self.__PRODUCTION__) {
-        window.state = state;
+        (window as any).state = state;
       }
     },
   }
@@ -165,28 +248,29 @@ let { postMessage: postToWorker, ready: workerIsReadyPromise } = worker({
   onMessage(data) {
     switch (data.type) {
       case messages.COMPILED:
-        setState({ compilation: { state: SUCCESS } });
+        setState({ compilation: { ...initialCompilation, state: SUCCESS } });
         break;
       case messages.COMPILATION_ERROR:
-        setState({ compilation: { state: ERROR, error: data.error } });
+        setState({
+          compilation: {
+            ...initialCompilation,
+            state: ERROR,
+            error: data.error,
+          },
+        });
         break;
       case messages.EXPLANATION:
-        setState(({ compilation }) => ({
+        setState(({ compilation }: State) => ({
           compilation: { ...compilation, explanation: data.location },
         }));
         onExplanation();
         break;
       case messages.ELABORATION:
-        setState(({ compilation }) => ({
-          compilation: {
-            ...compilation,
-            elaboration: data.location != null ? data : null,
-          },
-        }));
+        onElaboration(data);
         break;
       case messages.EXPLORATION:
         computeExploration(data.exploration);
-        setState(({ compilation }) => ({
+        setState(({ compilation }: State) => ({
           compilation: { ...compilation, exploration: true },
         }));
         break;
@@ -201,10 +285,10 @@ let { postMessage: postToWorker, ready: workerIsReadyPromise } = worker({
 const styleSheet = (() => {
   const styleEl = document.createElement("style");
   document.head.appendChild(styleEl);
-  return styleEl.sheet;
+  return styleEl.sheet as CSSStyleSheet;
 })();
 
-function initialCodeRender(cm) {
+function initialCodeRender(cm: any) {
   let promise = Promise.resolve();
 
   const codeParam = [...new window.URLSearchParams(location.search)].find(
@@ -227,12 +311,12 @@ function initialCodeRender(cm) {
   promise =
     document.readyState === "loading"
       ? new Promise((resolve) => {
-          document.addEventListener("DOMContentLoaded", resolve);
+          document.addEventListener("DOMContentLoaded", () => resolve());
         })
       : Promise.resolve();
 
   promise = promise.then(() =>
-    cm.setValue(querySelector(".default-code").value)
+    cm.setValue((querySelector(".default-code") as any).value)
   );
 
   return promise;
@@ -256,37 +340,38 @@ const compileOnChange = (() => {
 })();
 
 function onCmChange() {
+  nonUiState.compilationIndex += 1;
   setState({
-    compilation: { state: PENDING },
+    compilation: initialCompilation,
     address: null,
     empty: cm.getValue() === "",
   });
   compileOnChange();
 }
 
-function onCmMouseMove(e) {
+function onCmMouseMove(e: MouseEvent) {
   if (state.compilation.state !== SUCCESS) {
     return;
   }
 
   if (nonUiState.computedMarks) {
-    setState(({ compilation }) => ({
+    setState(({ compilation }: State) => ({
       compilation: { ...compilation, hoverEl: e.target },
     }));
     return;
   }
 
-  const { clientX, clientY } = e;
-
-  explain({ clientX, clientY });
+  explain(e);
 }
 
 function onCmClick() {
   elaborate(cm.getCursor("from"));
 }
 
-function elaborate(location) {
+function elaborate(location: Location) {
   if (state.compilation.state !== SUCCESS || state.empty) return;
+  nonUiState.elaborationIndex = nonUiState.compilationIndex;
+  nonUiState.lastElaborationRequest = location;
   postToWorker({
     type: messages.ELABORATE,
     location,
@@ -294,7 +379,10 @@ function elaborate(location) {
 }
 
 const { debounced: explain, done: doneAfterExplanation } = debounceUntilDone(
-  function explain({ clientX: left, clientY: top }, done) {
+  function explain(
+    { clientX: left, clientY: top }: MouseEvent,
+    done: () => void
+  ) {
     const { compilation } = state;
 
     if (compilation.state !== SUCCESS) {
@@ -313,13 +401,13 @@ const { debounced: explain, done: doneAfterExplanation } = debounceUntilDone(
 );
 
 const explainLocation = memoize(
-  function explainLocation({ line, ch }) {
+  function explainLocation({ line, ch }: Location) {
     postToWorker({
       type: messages.EXPLAIN,
       location: { line, ch },
     });
   },
-  (prev, current) => {
+  (prev: Location, current: Location) => {
     if (prev.line === current.line && prev.ch === current.ch) {
       return true;
     }
@@ -338,7 +426,62 @@ function onExplanation() {
   doneAfterExplanation();
 }
 
-function computeExploration(exploration) {
+function onElaboration(elaboration: Elaboration | { location: null }) {
+  if (nonUiState.compilationIndex !== nonUiState.elaborationIndex) return;
+
+  let missing: MissingHint | null = null;
+
+  if (elaboration.location == null) {
+    const MARGIN = 5;
+    const { line, ch } = nonUiState.lastElaborationRequest!!;
+    const minLine = Math.max(0, line - MARGIN);
+    const maxLine = Math.min(cm.lineCount() - 1, line + MARGIN);
+    let lines = [...new Array(maxLine - minLine)].map((_, i) =>
+      cm.getLine(minLine + i)
+    );
+    const emptyRe = /^ *$/;
+    const indentation = lines
+      .filter((line) => !emptyRe.test(line))
+      .reduce(
+        (acc, line) => Math.min(acc, line.match(/^ */)?.[0].length ?? 0),
+        Number.POSITIVE_INFINITY
+      );
+    if (indentation > 0) {
+      const re = new RegExp("^" + " ".repeat(indentation));
+      lines.forEach((line, i) => {
+        if (!emptyRe.test(line)) {
+          lines[i] = line.replace(re, "");
+        }
+      });
+    }
+    lines.forEach((line, i) => {
+      lines[i] = `${String(i).padStart(2, " ")} | ${line}`;
+    });
+    lines.splice(
+      line - minLine + 1,
+      0,
+      `   | ${" ".repeat(ch - indentation)}↑`
+    );
+
+    missing = {
+      code: lines.join("\n"),
+      location: {
+        line: line - minLine,
+        ch: ch - indentation,
+      },
+    };
+  }
+
+  setState(({ compilation }: State) => ({
+    compilation: {
+      ...compilation,
+      elaboration: elaboration.location != null ? elaboration : null,
+      missing,
+    },
+  }));
+}
+
+function computeExploration(exploration: Span[]) {
   nonUiState.computedMarks = exploration.map(({ start, end }, i) => {
     return getMark({ start, end }, `computed-${i}`);
   });
@@ -356,7 +499,7 @@ function computeExploration(exploration) {
 }
 
 const debouncedCompile = debounce(
-  (source) =>
+  (source: string) =>
     postToWorker({
       type: messages.COMPILE,
       source,
@@ -369,7 +512,7 @@ function doCompile() {
   window.localStorage.setItem("code", code);
 
   if (code.trim() === "") {
-    setState({ compilation: { state: SUCCESS } });
+    setState({ compilation: { ...initialCompilation, state: SUCCESS } });
   } else {
     debouncedCompile(cm.getValue());
   }
@@ -380,11 +523,18 @@ function doCompile() {
     requestAnimationFrame(() => computedMarks.forEach((mark) => mark.clear()));
 }
 
-const renderHover = pure(function renderHover({ hoverEl }) {
+const renderHover = pure(function renderHover({
+  hoverEl,
+}: {
+  hoverEl: EventTarget | null;
+}) {
   const klass =
     hoverEl &&
-    [...hoverEl.classList].find((klass) => klass.startsWith("computed-"));
-  const newIndex = klass && Number(klass.replace("computed-", ""));
+    [...(hoverEl as HTMLElement).classList].find((klass) =>
+      klass.startsWith("computed-")
+    );
+  const newIndex =
+    klass != null ? Number(klass.replace("computed-", "")) : null;
 
   if (nonUiState.hoverIndex != null && newIndex !== nonUiState.hoverIndex) {
     removeClass(codemirrorEl, `hover-${nonUiState.hoverIndex}`);
@@ -397,7 +547,11 @@ const renderHover = pure(function renderHover({ hoverEl }) {
   nonUiState.hoverIndex = newIndex;
 });
 
-const renderErrorMarks = pure(function renderErrorMarks({ error }) {
+const renderErrorMarks = pure(function renderErrorMarks({
+  error,
+}: {
+  error: CompilationError | null;
+}) {
   nonUiState.errorMark && nonUiState.errorMark.clear();
   nonUiState.errorContextMark && nonUiState.errorContextMark.clear();
 
@@ -421,6 +575,8 @@ const renderErrorMarks = pure(function renderErrorMarks({ error }) {
 
 const renderElaborationMark = pure(function renderElaborationMark({
   elaboration,
+}: {
+  elaboration: Elaboration | null;
 }) {
   nonUiState.mark && nonUiState.mark.clear();
 
@@ -431,13 +587,21 @@ const renderElaborationMark = pure(function renderElaborationMark({
 
 const renderExplanationMark = pure(function renderExplanationMark({
   explanation,
+}: {
+  explanation: Span | null;
 }) {
   nonUiState.hoverMark && nonUiState.hoverMark.clear();
   if (explanation == null || nonUiState.computedMarks != null) return;
   nonUiState.hoverMark = getMark(explanation);
 });
 
-const renderCodeEditor = pure(function renderCodeEditor({ showAll, editable }) {
+const renderCodeEditor = pure(function renderCodeEditor({
+  showAll,
+  editable,
+}: {
+  showAll: boolean;
+  editable: boolean;
+}) {
   cm.setOption("readOnly", editable ? false : "nocursor");
 
   if (showAll) {
@@ -449,47 +613,30 @@ const renderCodeEditor = pure(function renderCodeEditor({ showAll, editable }) {
 
 /* HELPERS */
 
-function getMark(location, className = "highlighted") {
+function getMark(location: Span, className = "highlighted") {
   return cm.markText(location.start, location.end, {
     className,
   });
 }
 
-function debounce(fn, delay) {
-  let enqueued = null;
-  let lastArg = null;
-  const wrapped = () => fn(lastArg);
+function debounce<T>(fn: (arg: T) => void, delay: number) {
+  let enqueued: number | null = null;
+  let lastArg: T | null = null;
+  const wrapped = () => fn(lastArg!!);
 
-  return (arg) => {
+  return (arg: T) => {
     lastArg = arg;
     if (enqueued != null) {
       window.clearTimeout(enqueued);
     }
-    enqueued = setTimeout(wrapped, delay);
+    enqueued = window.setTimeout(wrapped, delay);
   };
 }
 
-function singleExecutionUntilReady(fn, check, promise) {
-  let last;
-  let enqueued = false;
+function memoize<T>(fn: any, memoizer: (prev: T, next: T) => boolean) {
+  let last: any = {};
 
-  return (...args) => {
-    if (check()) {
-      fn(...args);
-    } else {
-      last = args;
-
-      if (!enqueued) {
-        promise.then(() => fn(...last));
-      }
-    }
-  };
-}
-
-function memoize(fn, memoizer) {
-  let last = {};
-
-  let memoized = (arg) => {
+  let memoized: any = (arg: T) => {
     if (memoizer(last, arg)) {
       last = arg;
       memoized.cached = true;
@@ -503,7 +650,10 @@ function memoize(fn, memoizer) {
   return memoized;
 }
 
-function debounceUntilDone(fn, delay) {
+function debounceUntilDone<T>(
+  fn: (arg: T, done: () => void) => void,
+  delay: number
+) {
   let isOpen = true;
   const sentinel = {};
   let last = sentinel;
@@ -517,7 +667,7 @@ function debounceUntilDone(fn, delay) {
           enqueued = false;
           const arg = last;
           last = sentinel;
-          fn(arg, done);
+          fn(arg as T, done);
         }, delay);
       }
     } else {
@@ -527,7 +677,7 @@ function debounceUntilDone(fn, delay) {
 
   return {
     done,
-    debounced(arg) {
+    debounced(arg: T) {
       if (isOpen) {
         isOpen = false;
         fn(arg, done);
@@ -538,7 +688,7 @@ function debounceUntilDone(fn, delay) {
   };
 }
 
-function withinRange({ line, ch }, start, end) {
+function withinRange({ line, ch }: Location, start: Location, end: Location) {
   return (
     (start.line < line || (start.line === line && start.ch <= ch)) &&
     (line < end.line || (line === end.line && ch <= end.ch))
@@ -546,6 +696,5 @@ function withinRange({ line, ch }, start, end) {
 }
 
 if (!self.__PRODUCTION__) {
-  window.cm = cm;
-  window.nonUiState = nonUiState;
+  (window as any).nonUiState = nonUiState;
 }

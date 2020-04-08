@@ -2,6 +2,7 @@ import wasm_bindgen from "../pkg/explainers";
 import * as messages from "./messages";
 import { logInfo } from "./logging";
 import wasmUrl from "../pkg/explainers_bg.wasm";
+import { reportError } from "./logging";
 
 logInfo("workerMain");
 
@@ -14,7 +15,12 @@ const state = {
 
 wasm_bindgen(wasmUrl)
   .then(() => postMessage({ type: messages.READY }))
-  .catch((e) => console.log(e));
+  .catch((e) =>
+    reportError({
+      error: e,
+      message: e && e.message,
+    })
+  );
 
 self.onmessage = (e) => {
   const { data } = e;

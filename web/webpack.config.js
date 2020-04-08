@@ -6,14 +6,16 @@ const env = require("../env.json");
 const devConfig = require("./webpack.config.dev");
 
 module.exports = {
+  mode: "production",
   entry: {
-    index: "./web/index.js",
+    index: "./web/index.ts",
     style: "./web/style.css",
   },
   output: {
     filename: "[name]-[contenthash].js",
     globalObject: "this",
   },
+  resolve: devConfig.resolve,
   module: {
     rules: [
       {
@@ -29,7 +31,7 @@ module.exports = {
     }),
     new OptimizeCSSAssetsPlugin(),
     new webpack.DefinePlugin({
-      __ANALYTICS_URL__: JSON.stringify(
+      "self.__ANALYTICS_URL__": JSON.stringify(
         env.analyticsUrl ||
           (() => {
             throw new Error("No analyticsUrl");

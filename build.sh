@@ -6,7 +6,7 @@ rm -r pkg
 set -e
 
 wasm-pack build -t no-modules
-./node_modules/.bin/webpack --config web/webpack.config.js --mode production
+./node_modules/.bin/webpack --config web/webpack.config.js
 
 cd dist
 

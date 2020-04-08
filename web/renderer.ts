@@ -1,8 +1,11 @@
 import { logInfo } from "./logging";
 
-export default function renderer(renderFn, state) {
+export default function renderer<S>(
+  renderFn: (state: S) => void,
+  state: { get: () => S; set: (state: S) => void }
+) {
   let next = {};
-  let nextRender = null;
+  let nextRender: number | null = null;
 
   const doRender = () => {
     const newState = Object.assign({}, state.get(), next);
@@ -13,7 +16,7 @@ export default function renderer(renderFn, state) {
     renderFn(prevState);
   };
 
-  return (nextState) => {
+  return (nextState: Partial<S> | ((state: S) => Partial<S>)) => {
     const trueNextState =
       typeof nextState === "function"
         ? nextState({ ...state.get(), ...next })
@@ -29,12 +32,12 @@ export default function renderer(renderFn, state) {
   };
 }
 
-export function pure(fn) {
-  let last = { _sentinel: {} };
+export function pure<S>(fn: (state: S) => void) {
+  let last: S | { _sentinel: {} } = { _sentinel: {} };
 
-  return (arg) => {
+  return (arg: S) => {
     const changed = Object.keys({ ...last, ...arg }).some(
-      (key) => last[key] !== arg[key]
+      (key) => (last as any)[key] !== (arg as any)[key]
     );
     last = arg;
     if (changed) {
