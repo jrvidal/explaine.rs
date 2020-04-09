@@ -497,7 +497,8 @@ function computeMissingHint({ line, ch }: { line: number; ch: number }) {
   lines.splice(
     line - minContextLine + 1,
     0,
-    `   | ${" ".repeat(ch - indentation)}↑`
+    // TODO: prevent this somehow
+    `   | ${" ".repeat(Math.max(0, ch - indentation))}↑`
   );
 
   return {
