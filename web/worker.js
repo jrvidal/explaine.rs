@@ -95,7 +95,6 @@ function exploreLoop(session, init = false) {
   }
 
   const { buffer } = state.exploration;
-  const now = Date.now();
   const written = state.session.explore(buffer);
 
   for (let i = 0; i < written; i++) {

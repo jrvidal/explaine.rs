@@ -1179,17 +1179,17 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             bindings: pattern_bindings(&self)
         });
     }];
-    method![@attrs visit_pat_tuple(self, node: syn::PatTuple) {
-        if self.get_ancestor::<syn::PatTupleStruct>(1).is_some() {
-            return;
-        }
-    } => {
+    method![@attrs visit_pat_tuple(self, node: syn::PatTuple) => {
         if self.settled() {
             return;
         }
 
+        if self.get_ancestor::<syn::PatTupleStruct>(1).is_some() {
+            return;
+        }
+
         if let Some(pat @ syn::Pat::Rest(..)) = node.elems.last() {
-            token![self, pat, * HelpItem::PatRest { of: "tuple struct" }];
+            token![self, pat, * HelpItem::PatRest { of: "tuple" }];
         }
 
         return self.set_help(node, HelpItem::PatTuple {
@@ -1199,6 +1199,10 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_pat_tuple_struct(self, node: syn::PatTupleStruct) => {
         if self.settled() {
             return;
+        }
+
+        if let Some(pat @ syn::Pat::Rest(..)) = node.pat.elems.last() {
+            token![self, pat, * HelpItem::PatRest { of: "tuple struct" }];
         }
 
         return self.set_help(node, HelpItem::PatTupleStruct {
