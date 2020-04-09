@@ -536,6 +536,10 @@ title = "TODO"
 info = "ForeignItemType"
 keyword = "type"
 
+[help.RawIdent]
+title = "Raw Identifier"
+info = "A raw identifier (as indicated by the `r#` prefix), that allows using keywords (like `match` or `dyn`) as variable names, field names, etc."
+
 [help.ImplItemType]
 title = "Associated Type"
 info = "The `type` keyword introduces an _associated type_ that implementors can specify."

@@ -209,6 +209,7 @@ pub enum HelpItem {
     PathSegmentSelf,
     ExprUnsafe,
     ForeignItemType,
+    RawIdent,
     ImplItemType,
     ItemUnsafeImpl,
     ItemStruct {
@@ -272,7 +273,6 @@ macro_rules! variant {
         #[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize, Copy, Clone))]
         #[cfg_attr(test, derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq))]
         #[cfg_attr(feature = "dev", derive(Serialize, Copy, Clone, Debug))]
-        #[serde(tag = "untagged")]
         #[serde(rename_all(serialize = "lowercase"))]
         $item
     };
@@ -909,7 +909,17 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     )];
     method![visit_generic_param(self, node: syn::GenericParam)];
     method![@nospancheck visit_generics(self, node: syn::Generics)];
-    // method![visit_ident(self, node: syn::Ident)];
+    method![visit_ident(self, node: syn::Ident) {
+        let raw = node.to_string();
+
+        let start = node.span().start();
+        if raw.starts_with("r#") && self.between_locations(start, LineColumn {
+            column: start.column + 2,
+            ..start
+        }) {
+            return self.set_help(node, HelpItem::RawIdent);
+        }
+    }];
     method![visit_impl_item(self, node: syn::ImplItem)];
     method![@attrs visit_impl_item_const(self, node: syn::ImplItemConst) {
         token![self, node.const_token, ImplItemConst];

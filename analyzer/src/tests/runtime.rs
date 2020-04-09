@@ -25,11 +25,11 @@ pub fn test_example(source: &str) {
                 serde_json::from_str(span_components[1].trim()).expect("span format");
             span = Some((
                 LineColumn {
-                    line: start[0] + 1,
+                    line: start[0],
                     column: start[1],
                 },
                 LineColumn {
-                    line: end[0] + 1,
+                    line: end[0],
                     column: end[1],
                 },
             ));
@@ -86,5 +86,15 @@ pub fn test_example(source: &str) {
     let result = visitor.visit(&file);
 
     assert_eq!(item, result.help);
-    assert_eq!(span, result.item_location);
+    let adjusted = (
+        LineColumn {
+            line: result.item_location.0.line - 1,
+            ..result.item_location.0
+        },
+        LineColumn {
+            line: result.item_location.1.line - 1,
+            ..result.item_location.1
+        },
+    );
+    assert_eq!(span, adjusted);
 }

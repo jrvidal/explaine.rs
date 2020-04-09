@@ -16,3 +16,5 @@ macro_rules! case {
 
 case![unit];
 case![tuple_struct_pat];
+case![struct_field];
+case![raw_ident];
