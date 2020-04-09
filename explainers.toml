@@ -712,3 +712,4 @@ info = "A closed range expression `(..=)`, that generates a range of elements wi
 [help.StaticLifetime]
 title = "`'static` lifetime"
 info = "The `'static` lifetime is a special, constant lifetime that represents a value that can potentially live indefinitely."
+book = "ch10-03-lifetime-syntax.html#the-static-lifetime"
