@@ -10,6 +10,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "analyzer"
+version = "0.1.0"
+dependencies = [
+ "comrak",
+ "proc-macro2 1.0.9",
+ "quote 1.0.3",
+ "serde",
+ "serde_json",
+ "syn",
+ "tinytemplate",
+ "toml",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -147,14 +161,11 @@ checksum = "b5320ae4c3782150d900b79807611a59a99fc9a1d61d686faafc24b93fc8d7ca"
 name = "explainers"
 version = "0.1.0"
 dependencies = [
- "comrak",
+ "analyzer",
  "console_error_panic_hook",
  "proc-macro2 1.0.9",
  "quote 1.0.3",
- "serde",
  "syn",
- "tinytemplate",
- "toml",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

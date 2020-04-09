@@ -1,5 +1,7 @@
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
+#[cfg(test)]
+use serde::Deserialize;
 use serde::Serialize;
 use std::any::Any;
 #[cfg(feature = "dev")]
@@ -13,8 +15,8 @@ std::thread_local! {
 
 std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
 
-#[cfg(feature = "dev")]
-use super::log;
+#[cfg(test)]
+mod tests;
 
 #[cfg(feature = "dev")]
 trait DynAncestor {
@@ -40,8 +42,10 @@ struct HelpData {
     std: Option<&'static str>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(untagged)]
+#[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize))]
+#[cfg_attr(test, derive(Debug, Clone, Serialize, Deserialize, PartialEq))]
+#[cfg_attr(feature = "dev", derive(Debug, Clone, Serialize))]
+#[serde(tag = "type")]
 pub enum HelpItem {
     ItemUse,
     ItemUseCrate,
@@ -66,17 +70,17 @@ pub enum HelpItem {
         closed: bool,
     },
     PatRest {
-        of: &'static str,
+        of: RestOf,
     },
     PatStruct {
         empty: bool,
-        bindings: Option<&'static str>,
+        bindings: Option<BindingOf>,
     },
     PatTuple {
-        bindings: Option<&'static str>,
+        bindings: Option<BindingOf>,
     },
     PatTupleStruct {
-        bindings: Option<&'static str>,
+        bindings: Option<BindingOf>,
     },
     PatWild,
     Attribute {
@@ -88,7 +92,7 @@ pub enum HelpItem {
     ItemExternMod,
     Unknown,
     FnToken {
-        of: &'static str,
+        of: FnOf,
         name: String,
     },
     TraitItemMethod,
@@ -119,7 +123,7 @@ pub enum HelpItem {
     VisRestricted,
     Variant {
         name: String,
-        fields: Option<&'static str>,
+        fields: Option<Fields>,
     },
     VariantDiscriminant {
         name: String,
@@ -140,7 +144,7 @@ pub enum HelpItem {
     },
     LitInt {
         suffix: Option<String>,
-        mode: Option<&'static str>,
+        mode: Option<IntMode>,
         prefix: Option<String>,
         separators: bool,
     },
@@ -234,7 +238,7 @@ pub enum HelpItem {
     ItemTraitAlias,
     Field {
         name: Option<String>,
-        of: &'static str,
+        of: FieldOf,
         of_name: String,
     },
     // TODO: we could rewrite the pattern and explain what's going on better
@@ -263,6 +267,66 @@ pub enum HelpItem {
     StaticLifetime,
 }
 
+macro_rules! variant {
+    ($item:item) => {
+        #[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize, Copy, Clone))]
+        #[cfg_attr(test, derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq))]
+        #[cfg_attr(feature = "dev", derive(Serialize, Copy, Clone, Debug))]
+        #[serde(tag = "untagged")]
+        #[serde(rename_all(serialize = "lowercase"))]
+        $item
+    };
+}
+
+variant![
+    pub enum FieldOf {
+        #[serde(rename(serialize = "enum variant"))]
+        Variant,
+        Union,
+        Struct,
+    }
+];
+
+variant![
+    pub enum BindingOf {
+        Let,
+        Arg,
+    }
+];
+
+variant![
+    pub enum IntMode {
+        Binary,
+        Hexadecimal,
+        Octal,
+    }
+];
+
+variant![
+    pub enum RestOf {
+        Struct,
+        Tuple,
+        #[serde(rename(serialize = "tuple struct"))]
+        TupleStruct,
+    }
+];
+
+variant![
+    pub enum FnOf {
+        Method,
+        Function,
+        #[serde(rename(serialize = "trait method"))]
+        TraitMethod,
+    }
+];
+
+variant![
+    pub enum Fields {
+        Named,
+        Unnamed,
+    }
+];
+
 impl HelpItem {
     pub fn message(&self) -> String {
         TEMPLATE.with(|tt| tt.render(self.data().template, &self).unwrap())
@@ -289,7 +353,7 @@ impl HelpItem {
     }
 }
 
-pub(super) struct IntersectionVisitor<'ast> {
+pub struct IntersectionVisitor<'ast> {
     location: LineColumn,
     help: HelpItem,
     item_location: (LineColumn, LineColumn),
@@ -300,7 +364,7 @@ pub(super) struct IntersectionVisitor<'ast> {
     ancestors2: Vec<&'ast dyn DynAncestor>,
     next_ancestor: Ancestor<'ast>,
     #[cfg(feature = "dev")]
-    debug: String,
+    log: fn(&str),
 }
 
 #[cfg_attr(feature = "dev", derive(Debug))]
@@ -325,12 +389,10 @@ impl<'a> Ancestor<'a> {
 pub struct VisitorResult {
     pub help: HelpItem,
     pub item_location: (LineColumn, LineColumn),
-    #[cfg(feature = "dev")]
-    pub debug: String,
 }
 
 impl<'ast> IntersectionVisitor<'ast> {
-    pub fn new(location: LineColumn) -> Self {
+    pub fn new(location: LineColumn, #[cfg(feature = "dev")] log: fn(&str)) -> Self {
         Self {
             location,
             item_location: (location, location),
@@ -339,7 +401,7 @@ impl<'ast> IntersectionVisitor<'ast> {
             ancestors2: vec![],
             next_ancestor: Ancestor::new(),
             #[cfg(feature = "dev")]
-            debug: "".to_string(),
+            log,
         }
     }
 
@@ -356,8 +418,6 @@ impl<'ast> IntersectionVisitor<'ast> {
         VisitorResult {
             help: self.help,
             item_location: self.item_location,
-            #[cfg(feature = "dev")]
-            debug: self.debug,
         }
     }
 
@@ -376,8 +436,6 @@ impl<'ast> IntersectionVisitor<'ast> {
         VisitorResult {
             help: self.help,
             item_location: self.item_location,
-            #[cfg(feature = "dev")]
-            debug: self.debug,
         }
     }
 
@@ -396,7 +454,7 @@ impl<'ast> IntersectionVisitor<'ast> {
 
     fn between_locations(&self, start: LineColumn, end: LineColumn) -> bool {
         let loc = self.location;
-        super::within_locations(loc, start, end)
+        within_locations(loc, start, end)
     }
 
     fn set_help<S: Spanned + ?Sized>(&mut self, item: &S, help: HelpItem) {
@@ -446,7 +504,7 @@ macro_rules! method {
     (@_debug, $name:ident, $self:ident, $node:ident) => {{
         #[cfg(feature = "dev")]
         {
-            log(stringify!($name));
+            ($self.log)(stringify!($name));
         }
     }};
     (@_attrs, $self:ident, $node:ident, $body:expr) => {{
@@ -760,7 +818,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
         return self.set_help(node, HelpItem::Field {
             name: node.ident.as_ref().map(|id| id.to_string()),
-            of: "struct",
+            of: FieldOf::Struct,
             of_name: "".to_string()
         });
     }];
@@ -862,7 +920,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if self.within(node.sig.fn_token) {
             if let Some(item_impl) = self.get_ancestor::<syn::ItemImpl>(2) {
                 return self.set_help(&node.sig.fn_token, HelpItem::FnToken {
-                    of: if item_impl.trait_.is_some() { "trait method" } else { "method" },
+                    of: if item_impl.trait_.is_some() { FnOf::TraitMethod } else { FnOf::Method },
                     name: node.sig.ident.to_string()
                 });
             }
@@ -897,7 +955,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_item_fn(self, node: syn::ItemFn) {
         token![self, node.sig.ident, ItemFn];
-        token![self, node.sig.fn_token, * HelpItem::FnToken { of: "function", name: node.sig.ident.to_string() }];
+        token![self, node.sig.fn_token, * HelpItem::FnToken { of: FnOf::Function, name: node.sig.ident.to_string() }];
     }];
     method![@attrs visit_item_foreign_mod(self, node: syn::ItemForeignMod) {
         token![self, node.abi, ItemForeignModAbi];
@@ -947,7 +1005,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_item_struct(self, node: syn::ItemStruct) => {
         match self.help {
             HelpItem::Field { ref mut of, ref mut of_name, .. } => {
-                *of = "struct";
+                *of = FieldOf::Struct;
                 *of_name = node.ident.to_string();
             },
             _ if !self.settled() => {
@@ -978,7 +1036,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_item_union(self, node: syn::ItemUnion) => {
         match self.help {
             HelpItem::Field { ref mut of, ref mut of_name, .. } => {
-                *of = "union";
+                *of = FieldOf::Union;
                 *of_name = node.ident.to_string();
                 return;
             },
@@ -1049,9 +1107,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let separators = raw.chars().any(|c| c == '_');
 
         let (prefix, mode) = match raw.get(0..2) {
-            prefix @ Some("0b") => (prefix, Some("binary")),
-            prefix @ Some("0x") => (prefix, Some("hexadecimal")),
-            prefix @ Some("0o") => (prefix, Some("octal")),
+            prefix @ Some("0b") => (prefix, Some(IntMode::Binary)),
+            prefix @ Some("0x") => (prefix, Some(IntMode::Hexadecimal)),
+            prefix @ Some("0o") => (prefix, Some(IntMode::Octal)),
             _ => (None, None)
         };
 
@@ -1167,7 +1225,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }];
         }
         token![self, some node.dot2_token, * HelpItem::PatRest {
-            of: "struct"
+            of: RestOf::Struct
         }];
     } => {
         if self.settled() {
@@ -1189,7 +1247,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
 
         if let Some(pat @ syn::Pat::Rest(..)) = node.elems.last() {
-            token![self, pat, * HelpItem::PatRest { of: "tuple" }];
+            token![self, pat, * HelpItem::PatRest { of: RestOf::Tuple }];
         }
 
         return self.set_help(node, HelpItem::PatTuple {
@@ -1202,7 +1260,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
 
         if let Some(pat @ syn::Pat::Rest(..)) = node.pat.elems.last() {
-            token![self, pat, * HelpItem::PatRest { of: "tuple struct" }];
+            token![self, pat, * HelpItem::PatRest { of: RestOf::TupleStruct }];
         }
 
         return self.set_help(node, HelpItem::PatTupleStruct {
@@ -1297,7 +1355,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_trait_item_macro(self, node: syn::TraitItemMacro)];
     method![@attrs visit_trait_item_method(self, node: syn::TraitItemMethod) {
-        token![self, node.sig.fn_token, * HelpItem::FnToken { of: "trait method", name: node.sig.ident.to_string() }];
+        token![self, node.sig.fn_token, * HelpItem::FnToken { of: FnOf::TraitMethod, name: node.sig.ident.to_string() }];
         token![self, node.sig.ident, TraitItemMethod];
     }];
     method![@attrs visit_trait_item_type(self, node: syn::TraitItemType) {
@@ -1449,8 +1507,8 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             return self.set_help(node, HelpItem::Variant {
                 name: "".to_string(),
                 fields: match node.fields {
-                    syn::Fields::Named(..) => Some("named"),
-                    syn::Fields::Unnamed(..) => Some("unnamed"),
+                    syn::Fields::Named(..) => Some(Fields::Named),
+                    syn::Fields::Unnamed(..) => Some(Fields::Unnamed),
                     syn::Fields::Unit => None
                 }
             });
@@ -1458,7 +1516,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
 
         match self.help {
             HelpItem::Field { ref mut of, ref mut of_name, .. } => {
-                *of = "enum variant";
+                *of = FieldOf::Variant;
                 *of_name = node.ident.to_string();
             },
             _ => {}
@@ -1496,13 +1554,18 @@ fn outer_attr(attr: &syn::Attribute) -> bool {
     }
 }
 
-fn pattern_bindings(visitor: &IntersectionVisitor) -> Option<&'static str> {
+fn pattern_bindings(visitor: &IntersectionVisitor) -> Option<BindingOf> {
     if visitor.get_ancestor::<syn::Local>(2).is_some() {
-        return Some("let");
+        return Some(BindingOf::Let);
     }
     if visitor.get_ancestor::<syn::PatType>(2).is_some() {
-        return Some("arg");
+        return Some(BindingOf::Arg);
     }
 
     return None;
+}
+
+pub fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
+    (start.line < loc.line || (start.line == loc.line && start.column <= loc.column))
+        && (loc.line < end.line || (loc.line == end.line && loc.column <= end.column))
 }

@@ -1,0 +1,7 @@
+language: rust
+cache: cargo
+script:
+  - cargo build --verbose -p analyzer
+  - cargo test --verbose -p analyzer
+notifications:
+  email: false

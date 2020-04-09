@@ -10,7 +10,7 @@ wasm-pack build -t no-modules
 
 cd dist
 
-cat ../index.html | \
+cat ../web/index.html | \
   sed -e "s;web/style.css;$(ls -1 *css);" \
       -e "s;main.js;$(ls -1 index*js);" \
   > index.html

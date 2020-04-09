@@ -1,3 +1,5 @@
+const path = require("path");
+
 module.exports = {
   entry: "./web/index.ts",
   output: {
@@ -27,5 +29,17 @@ module.exports = {
   devtool: "none",
   devServer: {
     host: "0.0.0.0",
+    contentBase: path.join(__dirname, ".."),
+    index: "",
+    proxy: {
+      "/": {
+        target: "http://0.0.0.0:8080/web",
+        bypass: (req) => {
+          if (req.path !== "/") {
+            return req.path;
+          }
+        },
+      },
+    },
   },
 };

@@ -1,10 +1,8 @@
+use analyzer::{HelpItem, IntersectionVisitor};
 use proc_macro2::{token_stream::IntoIter as TreeIter, LineColumn, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use std::vec::IntoIter;
 
-use syntax::{HelpItem, IntersectionVisitor};
-
-mod syntax;
 mod utils;
 
 use wasm_bindgen::prelude::*;
@@ -201,7 +199,11 @@ impl Session {
             let location = span.start();
 
             let explanation = if let Some(explanation) = {
-                let visitor = IntersectionVisitor::new(location);
+                let visitor = IntersectionVisitor::new(
+                    location,
+                    #[cfg(feature = "dev")]
+                    log,
+                );
                 let result = visitor.visit_element(&self.file, self.element);
                 if let HelpItem::Unknown = result.help {
                     None
@@ -243,11 +245,12 @@ impl Session {
 
     #[wasm_bindgen]
     pub fn explain(&self, line: usize, ch: usize) -> Option<Explanation> {
-        let location = LineColumn {
-            line: line,
-            column: ch,
-        };
-        let visitor = IntersectionVisitor::new(location);
+        let location = LineColumn { line, column: ch };
+        let visitor = IntersectionVisitor::new(
+            location,
+            #[cfg(feature = "dev")]
+            log,
+        );
         let result = visitor.visit(&self.file);
         if let HelpItem::Unknown = result.help {
             None
@@ -294,9 +297,4 @@ impl Explanation {
     pub fn std(&self) -> JsValue {
         self.item.std().into()
     }
-}
-
-fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
-    (start.line < loc.line || (start.line == loc.line && start.column <= loc.column))
-        && (loc.line < end.line || (loc.line == end.line && loc.column <= end.column))
 }
