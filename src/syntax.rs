@@ -578,7 +578,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         self,
         node: syn::AngleBracketedGenericArguments
     )];
-    method![visit_arm(self, node: syn::Arm) {
+    method![@attrs visit_arm(self, node: syn::Arm) {
         token![self, node.fat_arrow_token, FatArrow];
         if let Some((if_token, _)) = node.guard {
             token![self, if_token, ArmIfGuard];
@@ -627,7 +627,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
         return self.set_help(&node, HelpItem::Attribute { outer });
     }];
-    method![visit_bare_fn_arg(self, node: syn::BareFnArg)];
+    method![@attrs visit_bare_fn_arg(self, node: syn::BareFnArg)];
     method![visit_bin_op(self, node: syn::BinOp)];
     method![visit_binding(self, node: syn::Binding)];
     method![visit_block(self, node: syn::Block)];
@@ -636,57 +636,60 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_bound_lifetimes(self, node: syn::BoundLifetimes) @terminal {
         return self.set_help(&node, HelpItem::BoundLifetimes);
     }];
-    method![visit_const_param(self, node: syn::ConstParam) {
+    method![@attrs visit_const_param(self, node: syn::ConstParam) {
         token![self, node.const_token, ConstParam];
     }];
     method![visit_constraint(self, node: syn::Constraint)];
+
+    // OMITTED: unreachable from File
     // method![visit_data(self, node: syn::Data)];
     // method![visit_data_enum(self, node: syn::DataEnum)];
     // method![visit_data_struct(self, node: syn::DataStruct)];
     // method![visit_data_union(self, node: syn::DataUnion)];
-    fn visit_derive_input(&mut self, _: &'ast syn::DeriveInput) {}
+    // fn visit_derive_input(&mut self, _: &'ast syn::DeriveInput) {}
+
     method![visit_expr(self, node: syn::Expr)];
-    method![visit_expr_array(self, node: syn::ExprArray)];
-    method![visit_expr_assign(self, node: syn::ExprAssign)];
-    method![visit_expr_assign_op(self, node: syn::ExprAssignOp)];
-    method![visit_expr_async(self, node: syn::ExprAsync) {
+    method![@attrs visit_expr_array(self, node: syn::ExprArray)];
+    method![@attrs visit_expr_assign(self, node: syn::ExprAssign)];
+    method![@attrs visit_expr_assign_op(self, node: syn::ExprAssignOp)];
+    method![@attrs visit_expr_async(self, node: syn::ExprAsync) {
         token![self, node.async_token, AsyncExpression];
         if let Some(capture) = node.capture {
             token![self, capture, Move];
         }
     }];
-    method![visit_expr_await(self, node: syn::ExprAwait) {
+    method![@attrs visit_expr_await(self, node: syn::ExprAwait) {
         token![self, node.await_token, AwaitExpression];
     }];
-    method![visit_expr_binary(self, node: syn::ExprBinary)];
-    method![visit_expr_block(self, node: syn::ExprBlock)];
-    method![visit_expr_box(self, node: syn::ExprBox)];
-    method![visit_expr_break(self, node: syn::ExprBreak) {
+    method![@attrs visit_expr_binary(self, node: syn::ExprBinary)];
+    method![@attrs visit_expr_block(self, node: syn::ExprBlock)];
+    method![@attrs visit_expr_box(self, node: syn::ExprBox)];
+    method![@attrs visit_expr_break(self, node: syn::ExprBreak) {
         if self.within(node.break_token) {
             return self.set_help(&node, HelpItem::Break { expr: node.expr.is_some(), label: node.label.is_some() });
         }
     }];
-    method![visit_expr_call(self, node: syn::ExprCall)];
-    method![visit_expr_cast(self, node: syn::ExprCast) {
+    method![@attrs visit_expr_call(self, node: syn::ExprCall)];
+    method![@attrs visit_expr_cast(self, node: syn::ExprCast) {
         token![self, node.as_token, AsCast];
     }];
-    method![visit_expr_closure(self, node: syn::ExprClosure) {
+    method![@attrs visit_expr_closure(self, node: syn::ExprClosure) {
         token![self, node.or1_token, ExprClosureArguments];
         token![self, node.or2_token, ExprClosureArguments];
         token![self, some node.asyncness, ExprClosureAsync];
         token![self, some node.capture, Move];
         token![self, some node.movability, ExprClosureStatic];
     }];
-    method![visit_expr_continue(self, node: syn::ExprContinue) {
+    method![@attrs visit_expr_continue(self, node: syn::ExprContinue) {
         self.set_help(node, HelpItem::ExprContinue { label: node.label.is_some() });
     }];
-    method![visit_expr_field(self, node: syn::ExprField)];
-    method![visit_expr_for_loop(self, node: syn::ExprForLoop) {
+    method![@attrs visit_expr_field(self, node: syn::ExprField)];
+    method![@attrs visit_expr_for_loop(self, node: syn::ExprForLoop) {
         token![self, node.for_token, ExprForLoopToken];
         token![self, node.in_token, ExprForLoopToken];
     }];
-    method![visit_expr_group(self, node: syn::ExprGroup)];
-    method![visit_expr_if(self, node: syn::ExprIf) {
+    method![@attrs visit_expr_group(self, node: syn::ExprGroup)];
+    method![@attrs visit_expr_if(self, node: syn::ExprIf) {
         if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
             if self.between_spans(node.if_token.span(), let_token.span()) {
                 return self.set_help_between(node.if_token.span(), let_token.span(), HelpItem::IfLet);
@@ -698,20 +701,20 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             token![self, else_token, Else];
         }
     }];
-    method![visit_expr_index(self, node: syn::ExprIndex)];
-    method![visit_expr_let(self, node: syn::ExprLet)];
-    method![visit_expr_lit(self, node: syn::ExprLit)];
-    method![visit_expr_loop(self, node: syn::ExprLoop) {
+    method![@attrs visit_expr_index(self, node: syn::ExprIndex)];
+    method![@attrs visit_expr_let(self, node: syn::ExprLet)];
+    method![@attrs visit_expr_lit(self, node: syn::ExprLit)];
+    method![@attrs visit_expr_loop(self, node: syn::ExprLoop) {
         token![self, node.loop_token, ExprLoopToken];
     }];
-    method![visit_expr_macro(self, node: syn::ExprMacro)];
-    method![visit_expr_match(self, node: syn::ExprMatch) {
+    method![@attrs visit_expr_macro(self, node: syn::ExprMacro)];
+    method![@attrs visit_expr_match(self, node: syn::ExprMatch) {
         token![self, node.match_token, ExprMatchToken];
     }];
-    method![visit_expr_method_call(self, node: syn::ExprMethodCall)];
-    method![visit_expr_paren(self, node: syn::ExprParen)];
-    method![visit_expr_path(self, node: syn::ExprPath)];
-    method![visit_expr_range(self, node: syn::ExprRange) @terminal {
+    method![@attrs visit_expr_method_call(self, node: syn::ExprMethodCall)];
+    method![@attrs visit_expr_paren(self, node: syn::ExprParen)];
+    method![@attrs visit_expr_path(self, node: syn::ExprPath)];
+    method![@attrs visit_expr_range(self, node: syn::ExprRange) @terminal {
         let from = node.from.is_some();
         let to = node.to.is_some();
         match node.limits {
@@ -719,7 +722,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             syn::RangeLimits::Closed(..) => return self.set_help(node, HelpItem::ExprRangeClosed { from, to }),
         }
     }];
-    method![visit_expr_reference(self, node: syn::ExprReference) {
+    method![@attrs visit_expr_reference(self, node: syn::ExprReference) {
         let last_span = node.mutability.map(|t| t.span())
             .unwrap_or_else(|| node.and_token.span());
 
@@ -729,20 +732,20 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             });
         }
     }];
-    method![visit_expr_repeat(self, node: syn::ExprRepeat)];
-    method![visit_expr_return(self, node: syn::ExprReturn) {
+    method![@attrs visit_expr_repeat(self, node: syn::ExprRepeat)];
+    method![@attrs visit_expr_return(self, node: syn::ExprReturn) {
         token![self, node.return_token, ExprReturn];
     }];
-    method![visit_expr_struct(self, node: syn::ExprStruct)];
-    method![visit_expr_try(self, node: syn::ExprTry)];
-    method![visit_expr_try_block(self, node: syn::ExprTryBlock)];
-    method![visit_expr_tuple(self, node: syn::ExprTuple)];
-    method![visit_expr_type(self, node: syn::ExprType)];
-    method![visit_expr_unary(self, node: syn::ExprUnary)];
-    method![visit_expr_unsafe(self, node: syn::ExprUnsafe) {
+    method![@attrs visit_expr_struct(self, node: syn::ExprStruct)];
+    method![@attrs visit_expr_try(self, node: syn::ExprTry)];
+    method![@attrs visit_expr_try_block(self, node: syn::ExprTryBlock)];
+    method![@attrs visit_expr_tuple(self, node: syn::ExprTuple)];
+    method![@attrs visit_expr_type(self, node: syn::ExprType)];
+    method![@attrs visit_expr_unary(self, node: syn::ExprUnary)];
+    method![@attrs visit_expr_unsafe(self, node: syn::ExprUnsafe) {
         token![self, node.unsafe_token, ExprUnsafe];
     }];
-    method![visit_expr_while(self, node: syn::ExprWhile) {
+    method![@attrs visit_expr_while(self, node: syn::ExprWhile) {
         let while_token = if let syn::Expr::Let(..) = *node.cond {
             HelpItem::WhileLet
         } else {
@@ -750,7 +753,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         };
         token![self, node.while_token, * while_token];
     }];
-    method![visit_expr_yield(self, node: syn::ExprYield)];
+    method![@attrs visit_expr_yield(self, node: syn::ExprYield)];
     method![@attrs visit_field(self, node: syn::Field) => {
         if self.settled() {
             return;
@@ -821,9 +824,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![visit_fn_arg(self, node: syn::FnArg)];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
-    method![visit_foreign_item_fn(self, node: syn::ForeignItemFn)];
-    method![visit_foreign_item_macro(self, node: syn::ForeignItemMacro)];
-    method![visit_foreign_item_static(
+    method![@attrs visit_foreign_item_fn(self, node: syn::ForeignItemFn)];
+    method![@attrs visit_foreign_item_macro(self, node: syn::ForeignItemMacro)];
+    method![@attrs visit_foreign_item_static(
         self,
         node: syn::ForeignItemStatic
     ) {
@@ -838,7 +841,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             });
         }
     }];
-    method![visit_foreign_item_type(self, node: syn::ForeignItemType) {
+    method![@attrs visit_foreign_item_type(self, node: syn::ForeignItemType) {
         token![self, node.type_token, ForeignItemType];
     }];
     method![visit_generic_argument(self, node: syn::GenericArgument)];
@@ -850,10 +853,10 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@nospancheck visit_generics(self, node: syn::Generics)];
     // method![visit_ident(self, node: syn::Ident)];
     method![visit_impl_item(self, node: syn::ImplItem)];
-    method![visit_impl_item_const(self, node: syn::ImplItemConst) {
+    method![@attrs visit_impl_item_const(self, node: syn::ImplItemConst) {
         token![self, node.const_token, ImplItemConst];
     }];
-    method![visit_impl_item_macro(self, node: syn::ImplItemMacro)];
+    method![@attrs visit_impl_item_macro(self, node: syn::ImplItemMacro)];
     method![@attrs visit_impl_item_method(self, node: syn::ImplItemMethod) {
         token![self, node.sig.ident, ImplItemMethod];
         if self.within(node.sig.fn_token) {
@@ -865,12 +868,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         }
     }];
-    method![visit_impl_item_type(self, node: syn::ImplItemType) {
+    method![@attrs visit_impl_item_type(self, node: syn::ImplItemType) {
         token![self, node.type_token, ImplItemType];
     }];
     method![visit_index(self, node: syn::Index)];
     method![visit_item(self, node: syn::Item)];
-    method![visit_item_const(self, node: syn::ItemConst) {
+    method![@attrs visit_item_const(self, node: syn::ItemConst) {
         token![self, node.const_token, ItemConst];
     }];
     method![@attrs visit_item_enum(self, node: syn::ItemEnum) => {
@@ -892,11 +895,11 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let start = vis_span(&node.vis).unwrap_or_else(|| node.extern_token.span());
         return self.set_help_between(start, node.span(), HelpItem::ItemExternCrate);
     }];
-    method![visit_item_fn(self, node: syn::ItemFn) {
+    method![@attrs visit_item_fn(self, node: syn::ItemFn) {
         token![self, node.sig.ident, ItemFn];
         token![self, node.sig.fn_token, * HelpItem::FnToken { of: "function", name: node.sig.ident.to_string() }];
     }];
-    method![visit_item_foreign_mod(self, node: syn::ItemForeignMod) {
+    method![@attrs visit_item_foreign_mod(self, node: syn::ItemForeignMod) {
         token![self, node.abi, ItemForeignModAbi];
     }];
     method![@attrs visit_item_impl(self, node: syn::ItemImpl) {
@@ -917,7 +920,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         }
     }];
-    method![visit_item_macro2(self, node: syn::ItemMacro2)];
+    method![@attrs visit_item_macro2(self, node: syn::ItemMacro2)];
     method![@attrs visit_item_mod(self, node: syn::ItemMod) {
         if !self.within(&node.vis) {
             if let Some(..) = node.content {
@@ -929,7 +932,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         }
     }];
-    method![visit_item_static(self, node: syn::ItemStatic) {
+    method![@attrs visit_item_static(self, node: syn::ItemStatic) {
         let end = node.mutability.as_ref().map(Spanned::span)
             .unwrap_or_else(|| node.static_token.span());
 
@@ -962,14 +965,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             _ => {}
         }
     }];
-    method![visit_item_trait(self, node: syn::ItemTrait) {
+    method![@attrs visit_item_trait(self, node: syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
         token![self, node.trait_token, ItemTrait];
     }];
-    method![visit_item_trait_alias(self, node: syn::ItemTraitAlias) {
+    method![@attrs visit_item_trait_alias(self, node: syn::ItemTraitAlias) {
         token![self, node.trait_token, ItemTraitAlias];
     }];
-    method![visit_item_type(self, node: syn::ItemType) {
+    method![@attrs visit_item_type(self, node: syn::ItemType) {
         token![self, node.type_token => node.ident, ItemType];
     }];
     method![@attrs visit_item_union(self, node: syn::ItemUnion) => {
@@ -1013,7 +1016,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             return self.set_help(node, HelpItem::StaticLifetime);
         }
     }];
-    method![visit_lifetime_def(self, node: syn::LifetimeDef)];
+    method![@attrs visit_lifetime_def(self, node: syn::LifetimeDef)];
     method![visit_lit(self, node: syn::Lit)];
     method![visit_lit_bool(self, node: syn::LitBool) @terminal {
         return self.set_help(node, if node.value { HelpItem::True } else { HelpItem:: False });
@@ -1062,7 +1065,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_lit_str(self, node: syn::LitStr) @terminal {
         return self.set_help(node, HelpItem::LitStr);
     }];
-    method![visit_local(self, node: syn::Local) {
+    method![@attrs visit_local(self, node: syn::Local) {
         if let syn::Pat::Ident(syn::PatIdent { mutability, ..}) = node.pat {
             let start = node.let_token.span();
             let end = mutability.map(|m| m.span())
@@ -1083,11 +1086,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     // method![visit_macro_delimiter(self, node: syn::MacroDelimiter)];
     method![visit_member(self, node: syn::Member)];
-    method![visit_meta(self, node: syn::Meta)];
-    method![visit_meta_list(self, node: syn::MetaList)];
-    method![visit_meta_name_value(self, node: syn::MetaNameValue)];
+    // OMITTED: unreachable from File
+    // method![visit_meta(self, node: syn::Meta)];
+    // OMITTED: unreachable from File
+    // method![visit_meta_list(self, node: syn::MetaList)];
+    // OMITTED: unreachable from File
+    // method![visit_meta_name_value(self, node: syn::MetaNameValue)];
     method![visit_method_turbofish(self, node: syn::MethodTurbofish)];
-    method![visit_nested_meta(self, node: syn::NestedMeta)];
+    // OMITTED: unreachable from File
+    // method![visit_nested_meta(self, node: syn::NestedMeta)];
     method![visit_parenthesized_generic_arguments(
         self,
         node: syn::ParenthesizedGenericArguments
@@ -1127,15 +1134,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             _ => {}
         }
     }];
-    method![visit_pat_lit(self, node: syn::PatLit)];
-    method![visit_pat_macro(self, node: syn::PatMacro)];
+    method![@attrs visit_pat_lit(self, node: syn::PatLit)];
+    method![@attrs visit_pat_macro(self, node: syn::PatMacro)];
     method![@attrs visit_pat_or(self, node: syn::PatOr) {
         token![self, some node.leading_vert, PatOrLeading];
         for pair in node.cases.pairs() {
             token![self, some pair.punct(), PatOr];
         }
     }];
-    method![visit_pat_path(self, node: syn::PatPath)];
+    method![@attrs visit_pat_path(self, node: syn::PatPath)];
     method![@attrs visit_pat_range(self, node: syn::PatRange) => {
         if self.settled() {
             return;
@@ -1148,10 +1155,10 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         })
     }];
-    method![visit_pat_reference(self, node: syn::PatReference)];
+    method![@attrs visit_pat_reference(self, node: syn::PatReference)];
     // OMITTED: handled in the parent patterns
     // method![visit_pat_rest(self, node: syn::PatRest)];
-    method![visit_pat_slice(self, node: syn::PatSlice)];
+    method![@attrs visit_pat_slice(self, node: syn::PatSlice)];
     method![@attrs visit_pat_struct(self, node: syn::PatStruct) {
         if node.fields.is_empty() {
             token![self, some node.dot2_token, * HelpItem::PatStruct {
@@ -1198,7 +1205,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             bindings: pattern_bindings(&self)
         });
     }];
-    method![visit_pat_type(self, node: syn::PatType)];
+    method![@attrs visit_pat_type(self, node: syn::PatType)];
     method![@attrs visit_pat_wild(self, node: syn::PatWild) @terminal {
         return self.set_help(node, HelpItem::PatWild);
     }];
@@ -1281,15 +1288,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // OMITTED: `visit_trait_bound` catches this
     // method![visit_trait_bound_modifier(self, node: syn::TraitBoundModifier )];
     method![visit_trait_item(self, node: syn::TraitItem)];
-    method![visit_trait_item_const(self, node: syn::TraitItemConst) {
+    method![@attrs visit_trait_item_const(self, node: syn::TraitItemConst) {
         token![self, node.const_token, TraitItemConst];
     }];
-    method![visit_trait_item_macro(self, node: syn::TraitItemMacro)];
-    method![visit_trait_item_method(self, node: syn::TraitItemMethod) {
+    method![@attrs visit_trait_item_macro(self, node: syn::TraitItemMacro)];
+    method![@attrs visit_trait_item_method(self, node: syn::TraitItemMethod) {
         token![self, node.sig.fn_token, * HelpItem::FnToken { of: "trait method", name: node.sig.ident.to_string() }];
         token![self, node.sig.ident, TraitItemMethod];
     }];
-    method![visit_trait_item_type(self, node: syn::TraitItemType) {
+    method![@attrs visit_trait_item_type(self, node: syn::TraitItemType) {
         token![self, node.type_token, TraitItemType];
     }];
     method![visit_type(self, node: syn::Type)];
@@ -1315,7 +1322,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_type_never(self, node: syn::TypeNever) @terminal {
         return self.set_help(node, HelpItem::TypeNever);
     }];
-    method![visit_type_param(self, node: syn::TypeParam)];
+    method![@attrs visit_type_param(self, node: syn::TypeParam)];
     method![visit_type_param_bound(self, node: syn::TypeParamBound)];
     method![visit_type_paren(self, node: syn::TypeParen)];
     method![visit_type_path(self, node: syn::TypePath)];
@@ -1425,7 +1432,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.as_token, AsRename];
     }];
     method![visit_use_tree(self, node: syn::UseTree)];
-    method![visit_variadic(self, node: syn::Variadic)];
+    method![@attrs visit_variadic(self, node: syn::Variadic)];
     method![@attrs visit_variant(self, node: syn::Variant) => {
         if !self.settled() {
             if let Some((eq_token, discriminant)) = &node.discriminant {

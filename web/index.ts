@@ -94,7 +94,12 @@ const renderShowAll = showAll({
     setState(({ compilation }: State) => ({
       compilation: {
         ...compilation,
-        showAll: !compilation.showAll,
+        exploration:
+          compilation.exploration != null
+            ? {
+                showAll: !compilation.exploration.showAll,
+              }
+            : null,
       },
     }));
   },
@@ -138,11 +143,12 @@ type State = {
   editable: boolean;
   compilation: {
     state: CompilationState;
-    showAll: boolean;
     hoverEl: EventTarget | null;
     elaboration: Elaboration | null;
     explanation: Span | null;
-    exploration: boolean;
+    exploration: {
+      showAll: boolean;
+    } | null;
     error: CompilationError | null;
     missing: MissingHint | null;
   };
@@ -159,11 +165,10 @@ type Span = {
 let state: State = {
   compilation: {
     state: PENDING,
-    showAll: false,
     hoverEl: null,
     explanation: null,
     elaboration: null,
-    exploration: false,
+    exploration: null,
     error: null,
     missing: null,
   },
@@ -211,7 +216,7 @@ const setState = renderer<State>(
     renderElaborationMark({ elaboration: compilation.elaboration });
     renderExplanationMark({ explanation: compilation.explanation });
     renderCodeEditor({
-      showAll: compilation.showAll,
+      showAll: compilation.exploration?.showAll ?? false,
       editable: state.editable,
     });
     // renderMissingTooltip({
@@ -236,10 +241,11 @@ const setState = renderer<State>(
       enabled: state.editorReady,
     });
     renderShowAll({
-      showAll: compilation.showAll,
-      empty: state.empty,
-      canShow: compilation.exploration != null,
-      failedCompilation: compilation.state === ERROR,
+      showAll:
+        !state.empty &&
+        compilation.state !== ERROR &&
+        compilation.exploration?.showAll,
+      enabled: compilation.exploration != null,
     });
     renderOpenInPlayground({
       enabled: !state.empty && compilation.state === SUCCESS,
@@ -287,7 +293,7 @@ let { postMessage: postToWorker, ready: workerIsReadyPromise } = worker({
       case messages.EXPLORATION:
         computeExploration(data.exploration);
         setState(({ compilation }: State) => ({
-          compilation: { ...compilation, exploration: true },
+          compilation: { ...compilation, exploration: { showAll: false } },
         }));
         break;
       default:
@@ -360,7 +366,7 @@ function onCmChange() {
   setState({
     compilation: initialCompilation,
     address: null,
-    empty: cm.getValue() === "",
+    empty: cm.getValue().trim() === "",
   });
   compileOnChange();
 }

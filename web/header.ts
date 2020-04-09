@@ -134,21 +134,19 @@ export function showAll({ onToggleShowAll }: { onToggleShowAll: () => void }) {
 
   return pure(function renderShowAll({
     showAll,
-    empty,
-    canShow,
-    failedCompilation,
+    enabled,
   }: {
-    showAll: boolean;
-    empty: boolean;
-    canShow: boolean;
-    failedCompilation: boolean;
+    showAll: boolean | null | undefined;
+    enabled: boolean;
   }) {
-    showAllButton.disabled = !canShow;
+    showAllButton.disabled = !enabled;
 
-    const isLoaded = canShow || failedCompilation || empty;
-    (isLoaded ? addClass : removeClass)(showAllButton, "show-all-loaded");
+    (showAll != null ? addClass : removeClass)(
+      showAllButton,
+      "show-all-loaded"
+    );
 
-    if (showAll) {
+    if (showAll === true) {
       setText(showAllText, "Hide elements");
     } else {
       setText(showAllText, initialShowAll);
