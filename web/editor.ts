@@ -41,7 +41,7 @@ export default function codemirror({
   });
 
   cmPromise.catch((e) =>
-    reportError({
+    reportError("cmPromise", {
       message: e && e.message,
       error: e,
     })

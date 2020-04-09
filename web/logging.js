@@ -13,15 +13,15 @@ export const reportHit = __ANALYTICS_URL__
   : () => {};
 
 export const reportError = __ANALYTICS_URL__
-  ? (data) =>
+  ? (kind, data) =>
       fetch(__ANALYTICS_URL__, {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify({ kind, ...data }),
       })
-  : logError;
+  : (kind, data) => logError(JSON.parse(JSON.stringify({ ...data, kind })));
 
 if (!self.__PRODUCTION__) {
-  self.NATIVE_LOGGING = true;
+  self.NATIVE_LOGGING = false;
 
   self.logWasm = (arg) => {
     if (self.NATIVE_LOGGING) {
@@ -31,7 +31,7 @@ if (!self.__PRODUCTION__) {
 }
 
 self.addEventListener("error", (e) => {
-  reportError({
+  reportError(typeof window != null ? "window.onerror" : "self.onerror", {
     line: e && e.lineno,
     column: e && e.colno,
     message: e && e.message,

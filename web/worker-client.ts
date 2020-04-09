@@ -15,11 +15,10 @@ export default function worker({
     resolveWorkerIsReady = res;
   });
 
-  worker.onerror = (e) => reportError(e);
+  worker.onerror = (e) => reportError("worker.onerror", e);
 
   ((worker as any) as MessagePort).onmessageerror = (e) =>
-    reportError({
-      message: "onmessageerror",
+    reportError("onmessageerror", {
       error: e,
     });
 

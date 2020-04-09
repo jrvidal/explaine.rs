@@ -498,7 +498,7 @@ function computeMissingHint({ line, ch }: { line: number; ch: number }) {
     lines[i] = `${String(i).padStart(2, " ")} | ${line}`;
   });
   if (indentation > ch) {
-    reportError({
+    reportError("indentation", {
       message: "indentation > ch",
       indentation,
       ch,
