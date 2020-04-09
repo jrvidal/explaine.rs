@@ -2,7 +2,7 @@ import * as messages from "./messages";
 import renderer, { pure } from "./renderer";
 import { addClass, removeClass } from "./util";
 import worker from "./worker-client";
-import { reportHit } from "./logging";
+import { reportHit, reportError } from "./logging";
 
 import { TextMarker, Editor } from "codemirror";
 
@@ -474,16 +474,19 @@ function computeMissingHint({ line, ch }: { line: number; ch: number }) {
   const minContextLine = Math.max(0, line - MARGIN);
   const maxContentLine = Math.min(cm.lineCount() - 1, line + MARGIN);
 
-  let lines = [...new Array(maxContentLine - minContextLine)].map((_, i) =>
+  let lines = [...new Array(maxContentLine - minContextLine + 1)].map((_, i) =>
     cm.getLine(minContextLine + i)
   );
 
-  const indentation = lines
-    .filter((line) => !EMPTY_RE.test(line))
-    .reduce(
-      (acc, line) => Math.min(acc, line.match(/^ */)?.[0].length ?? 0),
-      Number.POSITIVE_INFINITY
-    );
+  const indentationPerLine = lines.map((line) =>
+    EMPTY_RE.test(line)
+      ? Number.POSITIVE_INFINITY
+      : line.match(/^ */)?.[0].length ?? 0
+  );
+
+  let indentation = Math.min(...indentationPerLine);
+  indentation = indentation === Number.POSITIVE_INFINITY ? 0 : indentation;
+
   if (indentation > 0) {
     lines.forEach((line, i) => {
       if (!EMPTY_RE.test(line)) {
@@ -494,6 +497,14 @@ function computeMissingHint({ line, ch }: { line: number; ch: number }) {
   lines.forEach((line, i) => {
     lines[i] = `${String(i).padStart(2, " ")} | ${line}`;
   });
+  if (indentation > ch) {
+    reportError({
+      message: "indentation > ch",
+      indentation,
+      ch,
+      match: cm.getLine(line).match(/^ */),
+    });
+  }
   lines.splice(
     line - minContextLine + 1,
     0,
