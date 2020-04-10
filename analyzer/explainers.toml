@@ -4,6 +4,145 @@
 # https://github.com/rust-lang/reference/blob/59c1c1dd4b0426c90a63415bdbc2f124755e72d2/LICENSE-MIT
 # https://github.com/rust-lang/reference/blob/59c1c1dd4b0426c90a63415bdbc2f124755e72d2/LICENSE-APACHE
 
+
+[help.AddBinOp]
+title = "Addition Operator"
+info = "The overloadable addition operator `+`."
+std = "ops/trait.Add.html"
+
+[help.SubBinOp]
+title = "Substraction Operator"
+info = "The overloadable substraction operator `-`."
+std = "ops/trait.Sub.html"
+
+[help.MulBinOp]
+title = "Multiplication Operator"
+info = "The overloadable multiplication operator `*`."
+std = "ops/trait.Mul.html"
+
+[help.DivBinOp]
+title = "Division Operator"
+info = "The overloadable division operator `/`."
+std = "ops/trait.Div.html"
+
+[help.RemBinOp]
+title = "Remainder Operator"
+info = "The overloadable remainder operator `%`."
+std = "ops/trait.Rem.html"
+
+[help.AndBinOp]
+title = "Logical AND Operator"
+info = "The logical AND operator `&&`."
+
+[help.OrBinOp]
+title = "Logical OR Operator"
+info = "The logical OR operator `||`."
+
+[help.BitXorBinOp]
+title = "Bitwise XOR Operator"
+info = "The overloadable bitwise XOR operator `^`."
+std = "ops/trait.BitXor.html"
+
+[help.BitAndBinOp]
+title = "Bitwise AND Operator"
+info = "The overloadable bitwise AND operator `&`."
+std = "ops/trait.And.html"
+
+[help.BitOrBinOp]
+title = "Bitwise OR Operator"
+info = "The overloadable bitwise OR operator `|`."
+std = "ops/trait.Or.html"
+
+[help.ShlBinOp]
+title = "Left Shift Operator"
+info = "The overloadable left shift operator `<<`."
+std = "ops/trait.Shl.html"
+
+[help.ShrBinOp]
+title = "Right Shift Operator"
+info = "The overloadable right shift operator `>>`."
+std = "ops/trait.Shr.html"
+
+[help.EqBinOp]
+title = "Equality Operator"
+info = "The overloadable equality operator `==`."
+std = "cmp/trait.PartialEq.html"
+
+[help.LtBinOp]
+title = "Less-than Comparison Operator"
+info = "The overloadable less-than comparison operator `<`."
+std = "cmp/trait.PartialOrd.html"
+
+[help.LeBinOp]
+title = "Less-or-equal Comparison Operator"
+info = "The overloadable less-or-equal comparison operator `<=`."
+std = "cmp/trait.PartialOrd.html"
+
+[help.NeBinOp]
+title = "Not Equal Operator"
+info = "The overloadable non-equality comparison operator `!=`."
+std = "cmp/trait.PartialEq.html"
+
+[help.GeBinOp]
+title = "Greater-or-equal Comparison Operator"
+info = "The overloadable greater-or-equal comparison operator `>=`."
+std = "cmp/trait.PartialOrd.html"
+
+[help.GtBinOp]
+title = "Greater-than Comparison Operator"
+info = "The overloadable greater-than comparison operator `>`."
+std = "cmp/trait.PartialOrd.html"
+
+[help.AddEqBinOp]
+title = "Addition Assignment Operator"
+info = "The overloadable addition assignment operator `+=`."
+std = "ops/trait.AddAssign.html"
+
+[help.SubEqBinOp]
+title = "Substraction Assignment Operator"
+info = "The overloadable substraction assignment operator `-=`."
+std = "ops/trait.SubAssign.html"
+
+[help.MulEqBinOp]
+title = "Multiplication Assignment Operator"
+info = "The overloadable multiplication assignment operator `*=`."
+std = "ops/trait.MulAssign.html"
+
+[help.DivEqBinOp]
+title = "Division Assignment Operator"
+info = "The overloadable division assignment operator `/=`."
+std = "ops/trait.DivAssign.html"
+
+[help.RemEqBinOp]
+title = "Remainder Assignment Operator"
+info = "The overloadable remainder assignment operator `%=`."
+std = "ops/trait.RemAssign.html"
+
+[help.BitXorEqBinOp]
+title = "Bitwise XOR Assignment Operator"
+info = "The overloadable bitwise XOR assignment operator `^=`."
+std = "ops/trait.BitXorAssign.html"
+
+[help.BitAndEqBinOp]
+title = "Bitwise AND Assignment Operator"
+info = "The overloadable bitwise AND assignment operator `&=`."
+std = "ops/trait.BitAndAssign.html"
+
+[help.BitOrEqBinOp]
+title = "Bitwise OR Assignment Operator"
+info = "The overloadable bitwise OR assignment operator `|=`."
+std = "ops/trait.BitOrAssign.html"
+
+[help.ShlEqBinOp]
+title = "Left shift Assignment Operator"
+info = "The overloadable left shift assignment operator `<<=`."
+std = "ops/trait.ShlAssign.html"
+
+[help.ShrEqBinOp]
+title = "Left right Assignment Operator"
+info = "The overloadable left right assignment operator `>>=`."
+std = "ops/trait.ShrAssign.html"
+
 [help.ItemUse]
 title = "`use` Item"
 info = "A `use` declaration acts like a shortcut by shortening the path to the item in a module."
@@ -517,6 +656,13 @@ pattern = "mutable: true"
 title = "`return` expression"
 info = "The `return` keyword stops the execution of the current function with the provided value."
 keyword = "return"
+
+[help.ExprTryQuestionMark]
+title = "Question Mark Operator"
+info = "The question mark operator `?` evaluates a fallible expression, and either unwraps a successful case or performs an early return for an unsuccessful case."
+book = "ch09-02-recoverable-errors-with-result.html#propagating-errors"
+std = "ops/trait.Try.html"
+
 
 [help.PathSegmentSelf]
 title = "TODO"

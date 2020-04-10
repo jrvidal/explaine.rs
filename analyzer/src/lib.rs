@@ -335,7 +335,41 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help(&node, HelpItem::Attribute { outer });
     }];
     method![@attrs visit_bare_fn_arg(self, node: syn::BareFnArg)];
-    method![visit_bin_op(self, node: syn::BinOp)];
+    method![visit_bin_op(self, node: syn::BinOp) @terminal {
+        use syn::BinOp::*;
+        let item = match node {
+            Add(..) => HelpItem::AddBinOp,
+            Sub(..) => HelpItem::SubBinOp,
+            Mul(..) => HelpItem::MulBinOp,
+            Div(..) => HelpItem::DivBinOp,
+            Rem(..) => HelpItem::RemBinOp,
+            And(..) => HelpItem::AndBinOp,
+            Or(..) => HelpItem::OrBinOp,
+            BitXor(..) => HelpItem::BitXorBinOp,
+            BitAnd(..) => HelpItem::BitAndBinOp,
+            BitOr(..) => HelpItem::BitOrBinOp,
+            Shl(..) => HelpItem::ShlBinOp,
+            Shr(..) => HelpItem::ShrBinOp,
+            Eq(..) => HelpItem::EqBinOp,
+            Lt(..) => HelpItem::LtBinOp,
+            Le(..) => HelpItem::LeBinOp,
+            Ne(..) => HelpItem::NeBinOp,
+            Ge(..) => HelpItem::GeBinOp,
+            Gt(..) => HelpItem::GtBinOp,
+            AddEq(..) => HelpItem::AddEqBinOp,
+            SubEq(..) => HelpItem::SubEqBinOp,
+            MulEq(..) => HelpItem::MulEqBinOp,
+            DivEq(..) => HelpItem::DivEqBinOp,
+            RemEq(..) => HelpItem::RemEqBinOp,
+            BitXorEq(..) => HelpItem::BitXorEqBinOp,
+            BitAndEq(..) => HelpItem::BitAndEqBinOp,
+            BitOrEq(..) => HelpItem::BitOrEqBinOp,
+            ShlEq(..) => HelpItem::ShlEqBinOp,
+            ShrEq(..) => HelpItem::ShrEqBinOp,
+        };
+
+        return self.set_help(node, item);
+    }];
     method![visit_binding(self, node: syn::Binding)];
     method![visit_block(self, node: syn::Block)];
     // TODO: BoundLifetimes in function pointers
@@ -444,7 +478,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.return_token, ExprReturn];
     }];
     method![@attrs visit_expr_struct(self, node: syn::ExprStruct)];
-    method![@attrs visit_expr_try(self, node: syn::ExprTry)];
+    method![@attrs visit_expr_try(self, node: syn::ExprTry) {
+        token![self, node.question_token, ExprTryQuestionMark];
+    }];
     method![@attrs visit_expr_try_block(self, node: syn::ExprTryBlock)];
     method![@attrs visit_expr_tuple(self, node: syn::ExprTuple)];
     method![@attrs visit_expr_type(self, node: syn::ExprType)];
