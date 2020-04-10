@@ -21,14 +21,37 @@ export const reportError = __ANALYTICS_URL__
   : (kind, data) => logError(JSON.parse(JSON.stringify({ ...data, kind })));
 
 if (!self.__PRODUCTION__) {
-  self.NATIVE_LOGGING = false;
+  if (self.window != null) {
+    let nativeLogging = false;
+    Object.defineProperty(window, "NATIVE_LOGGING", {
+      get() {
+        return nativeLogging;
+      },
+      set(value) {
+        nativeLogging = value;
+        worker.postMessage({
+          type: "LOGGING",
+          value,
+        });
+      },
+    });
+  } else {
+    self.NATIVE_LOGGING = false;
 
-  self.logWasm = (arg) => {
-    if (self.NATIVE_LOGGING) {
-      console.warn(arg);
-    }
-  };
+    self.logWasm = (arg) => {
+      if (self.NATIVE_LOGGING) {
+        console.warn(arg);
+      }
+    };
+  }
 }
+
+export const handleLogging = (data) => {
+  if (data.type === "LOGGING") {
+    self.NATIVE_LOGGING = data.value;
+    return true;
+  }
+};
 
 self.addEventListener("error", (e) => {
   reportError(typeof window != null ? "window.onerror" : "self.onerror", {

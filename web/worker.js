@@ -3,6 +3,7 @@ import * as messages from "./messages";
 import { logInfo } from "./logging";
 import wasmUrl from "../pkg/explainers_bg.wasm";
 import { reportError } from "./logging";
+import { handleLogging } from "./logging";
 
 logInfo("workerMain");
 
@@ -36,6 +37,11 @@ self.onmessage = (e) => {
       elaborate(data.location);
       break;
     default:
+      if (!self.__PRODUCTION__) {
+        if (handleLogging(data)) {
+          return;
+        }
+      }
       console.error("Unexpected message in worker", data);
   }
 };
