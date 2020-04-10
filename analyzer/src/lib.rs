@@ -244,6 +244,7 @@ macro_rules! method {
     ($name:ident($self:ident, $node:ident: $ty:path) @terminal $body:expr) => {
         method![@_impl, $name, $self, $node, $ty, @_body @terminal $body, @_spancheck];
     };
+    // Sometimes the naive `between()` test is misleading, so we better skip it
     (@nospancheck $name:ident($self:ident, $node:ident: $ty:path)) => {
         method![@_impl, $name, $self, $node, $ty, @_body { () } => (), @_nospancheck];
     };
@@ -394,21 +395,25 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_expr_assign(self, node: syn::ExprAssign)];
     method![@attrs visit_expr_assign_op(self, node: syn::ExprAssignOp)];
     method![@attrs visit_expr_async(self, node: syn::ExprAsync) {
-        token![self, node.async_token, AsyncExpression];
+        token![self, node.async_token, ExprAsync];
         if let Some(capture) = node.capture {
             token![self, capture, Move];
         }
     }];
     method![@attrs visit_expr_await(self, node: syn::ExprAwait) {
-        token![self, node.await_token, AwaitExpression];
+        token![self, node.await_token, ExprAwait];
     }];
     method![@attrs visit_expr_binary(self, node: syn::ExprBinary)];
     method![@attrs visit_expr_block(self, node: syn::ExprBlock)];
     method![@attrs visit_expr_box(self, node: syn::ExprBox)];
-    method![@attrs visit_expr_break(self, node: syn::ExprBreak) {
-        if self.within(node.break_token) {
-            return self.set_help(&node, HelpItem::Break { expr: node.expr.is_some(), label: node.label.is_some() });
+    method![@attrs visit_expr_break(self, node: syn::ExprBreak) => {
+        if self.settled() {
+            return;
         }
+        return self.set_help(&node, HelpItem::ExprBreak {
+            expr: node.expr.is_some(),
+            label: node.label.as_ref().map(|l| l.to_string())
+        });
     }];
     method![@attrs visit_expr_call(self, node: syn::ExprCall)];
     method![@attrs visit_expr_cast(self, node: syn::ExprCast) {
@@ -422,7 +427,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, some node.movability, ExprClosureStatic];
     }];
     method![@attrs visit_expr_continue(self, node: syn::ExprContinue) {
-        self.set_help(node, HelpItem::ExprContinue { label: node.label.is_some() });
+        self.set_help(node, HelpItem::ExprContinue { label: node.label.as_ref().map(|l| l.to_string()) });
     }];
     method![@attrs visit_expr_field(self, node: syn::ExprField)];
     method![@attrs visit_expr_for_loop(self, node: syn::ExprForLoop) {
@@ -473,30 +478,72 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             });
         }
     }];
-    method![@attrs visit_expr_repeat(self, node: syn::ExprRepeat)];
+    method![@attrs visit_expr_repeat(self, node: syn::ExprRepeat) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::ExprRepeat {
+                len: (&*node.len).to_token_stream().to_string()
+            });
+        }
+    }];
     method![@attrs visit_expr_return(self, node: syn::ExprReturn) {
         token![self, node.return_token, ExprReturn];
     }];
-    method![@attrs visit_expr_struct(self, node: syn::ExprStruct)];
+    method![@attrs visit_expr_struct(self, node: syn::ExprStruct) => {
+        if self.settled() {
+            return;
+        }
+
+        if self.within(&node.path) {
+            return self.set_help(node, HelpItem::ExprStruct);
+        }
+
+        if let Some((dot2_token, rest)) = node
+            .dot2_token
+            .and_then(|t| node.rest.as_ref().map(|r| (t, r)))
+        {
+            if self.between_spans(dot2_token.span(), rest.span()) {
+                return self.set_help_between(
+                    dot2_token.span(),
+                    rest.span(),
+                    HelpItem::ExprStructRest,
+                );
+            }
+        }
+    }];
     method![@attrs visit_expr_try(self, node: syn::ExprTry) {
         token![self, node.question_token, ExprTryQuestionMark];
     }];
     method![@attrs visit_expr_try_block(self, node: syn::ExprTryBlock)];
-    method![@attrs visit_expr_tuple(self, node: syn::ExprTuple)];
-    method![@attrs visit_expr_type(self, node: syn::ExprType)];
+    method![@attrs visit_expr_tuple(self, node: syn::ExprTuple) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::ExprTuple);
+        }
+    }];
+    method![@attrs visit_expr_type(self, node: syn::ExprType) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::ExprType);
+        }
+    }];
     method![@attrs visit_expr_unary(self, node: syn::ExprUnary)];
     method![@attrs visit_expr_unsafe(self, node: syn::ExprUnsafe) {
         token![self, node.unsafe_token, ExprUnsafe];
     }];
     method![@attrs visit_expr_while(self, node: syn::ExprWhile) {
-        let while_token = if let syn::Expr::Let(..) = *node.cond {
-            HelpItem::WhileLet
+        let while_let = if let syn::Expr::Let(..) = *node.cond {
+            true
         } else {
-            HelpItem::While
+            false
         };
-        token![self, node.while_token, * while_token];
+
+        token![self, some node.label, * HelpItem::Label {
+            loop_of: if while_let { LoopOf::WhileLet } else { LoopOf::While },
+        }];
+
+        token![self, node.while_token, * if while_let { HelpItem::ExprWhileLet  } else { HelpItem::ExprWhile }];
     }];
-    method![@attrs visit_expr_yield(self, node: syn::ExprYield)];
+    method![@attrs visit_expr_yield(self, node: syn::ExprYield) {
+        token![self, node.yield_token, ExprYield];
+    }];
     method![@attrs visit_field(self, node: syn::Field) => {
         if self.settled() {
             return;
@@ -759,7 +806,20 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help_between(start, node.span(), HelpItem::ItemUse);
     }];
     method![visit_label(self, node: syn::Label) @terminal {
-        return self.set_help(&node, HelpItem::Label);
+        let loop_of = if self.get_ancestor::<syn::ExprLoop>(1).is_some() {
+            LoopOf::Loop
+        } else if self.get_ancestor::<syn::ExprForLoop>(1).is_some() {
+            LoopOf::For
+        } else if self.get_ancestor::<syn::ExprBlock>(1).is_some() {
+            LoopOf::Block
+        } else {
+            // Handled in ExprWhile
+            return;
+        };
+
+        return self.set_help(&node, HelpItem::Label {
+            loop_of
+        });
     }];
     method![visit_lifetime(self, node: syn::Lifetime) {
         if node.ident == "static" {
@@ -834,6 +894,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
         token![self, node.tokens, MacroTokens];
     }];
+    // OMITTED: nothing interesting to say
     // method![visit_macro_delimiter(self, node: syn::MacroDelimiter)];
     method![visit_member(self, node: syn::Member)];
     // OMITTED: unreachable from File
@@ -991,6 +1052,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
         syn::visit::visit_qself(self, node);
     }
+    // OMITTED: handled in parents
     // fn visit_range_limits(&mut self, node: &'ast syn::RangeLimits) {
     method![@attrs visit_receiver(self, node: syn::Receiver) @terminal {
         let item = match (&node.reference, &node.mutability) {

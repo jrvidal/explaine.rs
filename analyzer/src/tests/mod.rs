@@ -21,3 +21,4 @@ case![raw_ident];
 case![nested_item_comment];
 case![inner_doc_comment];
 case![fn_type];
+case![loops];

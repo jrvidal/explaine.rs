@@ -308,24 +308,26 @@ keyword ="async"
 title = "Static Closure"
 info = "???"
 
-[help.AsyncExpression]
+[help.ExprAsync]
 title = "Async Expression"
 info = "AsyncExpression"
 keyword ="async"
 
 [help.AsyncFn]
 title = "Async Function"
-info = "An async function."
+info = "An async function, whose signature is implicitly wrapped in `impl Future<..>`."
 keyword ="async"
 
-[help.AwaitExpression]
+[help.ExprAwait]
 title = "`await` Expression"
-info = "An `.await` expression suspends the computation of an `async` function until the awaited future is ready."
+info = "An `.await` expression suspends the computation of an `async` function until the awaited expression (a future) is ready."
 keyword ="await"
 
-[help.Break]
+[help.ExprBreak]
 title = "`break`"
-info = "A `break` expression terminates the surrounding loop."
+info = """A `break` expression terminates the
+{{if label}}loop labeled by `{ label }`{{else}}innermost enclosing loop{{endif}}{{if expr}}
+and specifies a final value for it{{endif}}."""
 book = "ch03-05-control-flow.html"
 keyword = "break"
 
@@ -356,7 +358,9 @@ keyword = "const"
 
 [help.ExprContinue]
 title = "`continue` expression"
-info = "A `continue` expression interrupts the current iteration of a loop and resumes from its beginning."
+info = """A `continue` expression interrupts the current iteration of
+{{if label}}the loop labeled by `{ label }`{{else}}the innermost enclosing loop{{endif}}
+and resumes from its beginning."""
 keyword = "continue"
 book = "ch03-05-control-flow.html"
 
@@ -511,19 +515,6 @@ info = "The `impl` keyword represents an anonymous (but fixed) type that impleme
 book = "ch10-02-traits.html#returning-types-that-implement-traits"
 keyword = "impl"
 
-[help.WhileLet]
-title = "`while-let`"
-info = "A `while let` loop continues its execution while the provided pattern matches."
-keyword = "while"
-book = "ch18-01-all-the-places-for-patterns.html#while-let-conditional-loops"
-
-[help.While]
-title = "While loop"
-info = "A `while` loop that iterates while its test condition is `true`."
-keyword = "while"
-book = "ch03-05-control-flow.html"
-
-
 [help.Local]
 title = "Variable binding"
 info = "A `let` statement introduces a local variable."
@@ -536,15 +527,26 @@ info = "A `let mut` statement introduces a _mutable_ local variable which can be
 keyword = "mut"
 book = "ch03-01-variables-and-mutability.html"
 
-[help.Label]
-title = "Label"
-info = "A label can be used in `break` and `continue` expressions to indicate which precise loop should be affected."
-
 [help.ExprLoopToken]
 title = "Infinite loop"
 info = "The `loop` keyword introduces an infinite loop."
 keyword = "loop"
 book = "ch03-05-control-flow.html"
+
+[help.Label-stable]
+title = "Loop Label"
+info = """A label for the adjacent `{ loop_of }` expression
+
+It enables `break` and `continue` expressions to specify the particular loop they affect
+(instead of simply the innermost enclosing one)."""
+variant = "Label"
+patterns = ["loop_of: LoopOf::While", "loop_of: LoopOf::WhileLet", "loop_of: LoopOf::For", "loop_of: LoopOf::Loop"]
+
+[help.Label-unstable]
+title = "Block Label"
+info = "Block labels are an [unstable feature](https://github.com/rust-lang/rust/issues/48594)."
+variant = "Label"
+pattern = "loop_of: LoopOf::Block"
 
 [help.ExprMatchToken]
 title = "`match` expression"
@@ -652,10 +654,25 @@ variant = "ExprReference"
 info = "A mutable (exclusive) borrow of another value."
 pattern = "mutable: true"
 
+[help.ExprRepeat]
+title = "Array Initialization"
+info = "An expression that initializes an array of length `{ len }` by copying an initial value in every position."
+book = "ch03-02-data-types.html#the-array-type"
+
 [help.ExprReturn]
 title = "`return` expression"
 info = "The `return` keyword stops the execution of the current function with the provided value."
 keyword = "return"
+
+[help.ExprStruct]
+title = "Struct Instantiation"
+info = "An expression that builds an instance of a struct by listing the values of its fields."
+book = "ch05-01-defining-structs.html#defining-and-instantiating-structs"
+
+[help.ExprStructRest]
+title = "Struct Update Syntax"
+info = "A \"rest\" expression that copies the fields of a struct into another."
+book = "ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax"
 
 [help.ExprTryQuestionMark]
 title = "Question Mark Operator"
@@ -663,6 +680,14 @@ info = "The question mark operator `?` evaluates a fallible expression, and eith
 book = "ch09-02-recoverable-errors-with-result.html#propagating-errors"
 std = "ops/trait.Try.html"
 
+[help.ExprTuple]
+title = "Tuple Expression"
+info = "An expression that constructs a tuple."
+book = "ch03-02-data-types.html#the-tuple-type"
+
+[help.ExprType]
+title = "Type Ascription"
+info = "A type ascription expression, an [experimental feature](https://github.com/rust-lang/rust/issues/23416)."
 
 [help.PathSegmentSelf]
 title = "TODO"
@@ -672,6 +697,22 @@ info = "PathSegmentSelf"
 title = "Unsafe block"
 info = "An `unsafe` block, that allows to dereference raw pointers and call `unsafe` functions, among other things."
 keyword = "unsafe"
+
+[help.ExprWhileLet]
+title = "`while-let`"
+info = "A `while let` loop continues its execution while the provided pattern matches."
+keyword = "while"
+book = "ch18-01-all-the-places-for-patterns.html#while-let-conditional-loops"
+
+[help.ExprWhile]
+title = "While loop"
+info = "A `while` loop that iterates while its test condition is `true`."
+keyword = "while"
+book = "ch03-05-control-flow.html"
+
+[help.ExprYield]
+title = "Yield Expression"
+info = "A `yield` expression, an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
 
 [help.ForeignItemType]
 title = "TODO"
@@ -753,6 +794,7 @@ keyword = "type"
 [help.TypeArray]
 title = "Array Type"
 info = "The type of an array, a sequence of elements with a length that is known at compile-time."
+book = "ch03-02-data-types.html#the-array-type"
 
 [help.TypeInfer]
 title = "Inferred Type"

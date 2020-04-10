@@ -106,21 +106,21 @@ pub enum HelpItem {
     ExprClosureArguments,
     ExprClosureAsync,
     ExprClosureStatic,
-    AsyncExpression,
     AsyncFn,
-    AwaitExpression,
-    Break {
-        label: bool,
+    ExprAsync,
+    ExprAwait,
+    ExprBreak {
+        label: Option<String>,
         expr: bool,
+    },
+    ExprContinue {
+        label: Option<String>,
     },
     ImplItemConst,
     TraitItemConst,
     ItemConst,
     ConstParam,
     ConstFn,
-    ExprContinue {
-        label: bool,
-    },
     VisPublic,
     VisCrate,
     VisRestricted,
@@ -169,12 +169,12 @@ pub enum HelpItem {
         name: String,
     },
     TypeImplTrait,
-    WhileLet,
-    While,
     Local,
     LocalMut,
-    Label,
     ExprLoopToken,
+    Label {
+        loop_of: LoopOf,
+    },
     ExprMatchToken,
     ArmIfGuard,
     Move,
@@ -207,10 +207,20 @@ pub enum HelpItem {
     ExprReference {
         mutable: bool,
     },
+    ExprRepeat {
+        len: String,
+    },
     ExprReturn,
+    ExprStruct,
+    ExprStructRest,
     ExprTryQuestionMark,
+    ExprTuple,
+    ExprType,
     PathSegmentSelf,
     ExprUnsafe,
+    ExprWhileLet,
+    ExprWhile,
+    ExprYield,
     ForeignItemType,
     RawIdent,
     ImplItemType,
@@ -342,6 +352,17 @@ variant![
         BareFunctionType,
         FnTrait,
         Closure,
+    }
+];
+
+variant![
+    pub enum LoopOf {
+        Loop,
+        Block,
+        While,
+        #[serde(rename(serialize = "while let"))]
+        WhileLet,
+        For,
     }
 ];
 

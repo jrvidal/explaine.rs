@@ -103,7 +103,7 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
         .flat_map(|(ln, l)| l.match_indices("<|>").map(move |m| (ln, m)))
         .collect::<Vec<_>>();
 
-    assert_eq!(cursors.len(), 1);
+    assert_eq!(cursors.len(), 1, "Only one cursor per spec");
     let (line, (column, _)) = cursors.pop().unwrap();
 
     source_lines[line]
