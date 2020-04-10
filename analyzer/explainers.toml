@@ -273,11 +273,6 @@ title = "Function ABI"
 info = "FnAbi"
 keyword = "extern"
 
-[help.TypeBareFnAbi]
-title = "TODO"
-info = "TypeBareFnAbi"
-keyword = "extern"
-
 [help.True]
 title = "`true` boolean value"
 info = "The `true` boolean value."
@@ -310,11 +305,6 @@ The underscores `_` are merely for readability reasons.{{endif}}"""
 title = "String Literal"
 info = "A literal string, of type `&'static str`."
 
-[help.FnTypeToken]
-title = "Function Type"
-info = "The type of a free standing function."
-keyword = "fn"
-
 [help.ExprForLoopToken]
 title = "`for` - `in` loop"
 info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
@@ -330,6 +320,12 @@ keyword = "for"
 title = "Higher-Rank Lifetime Bound"
 info = """The `for<..>` construct indicates that the trait bound `{ ty }` is in fact an _infinite_ collection of
 bounds, for every value of `{ lifetime }`{{if multiple}} and the rest of the lifetimes within `<..>`{{endif}}."""
+keyword = "for"
+
+[help.BoundLifetimesBareFnType]
+title = "Higher-Rank Lifetime in Function Type"
+info = """The `for<..>` construct indicates that the given function type `fn(...)` is in fact an _infinite_ collection of
+type bounds."""
 keyword = "for"
 
 [help.IfLet]
@@ -654,10 +650,23 @@ title = "TODO"
 info = "WhereClause"
 keyword = "where"
 
+[help.TypeBareFn]
+title = "Function Pointer Type"
+info = "The type of a function pointer, a reference to a free-standing function or method."
+keyword = "fn"
+std = "primitive.fn.html"
+
 [help.TypeBareUnsafeFn]
-title = "TODO"
-info = "TypeBareUnsafeFn"
+title = "Unsafe Function Pointer Type"
+info = "A modifier of a function pointer type that indicates that the function/method is unsafe."
 keyword = "unsafe"
+std = "primitive.fn.html"
+
+[help.TypeBareFnAbi]
+title = "TODO"
+info = "TypeBareFnAbi"
+keyword = "extern"
+std = "primitive.fn.html"
 
 [help.ItemTraitAlias]
 title = "Trait Alias"
@@ -702,8 +711,8 @@ pattern = "outer: false"
 book = "ch14-02-publishing-to-crates-io.html#commenting-contained-items"
 
 [help.RArrow]
-title = "Right arrow `->`"
-info = "The right arrow token `->` is used to signify the return type of a function."
+title = "Right Arrow `->`"
+info = "A right arrow token `->` used to signify the return type of this { return_of }."
 
 [help.ExprRangeHalfOpen]
 title = "Half-open range"
