@@ -17,3 +17,13 @@ export function setHtml(node: Element, html: string) {
 export function setDisplay(node: Element, display: string) {
   (node as HTMLElement).style.display = display;
 }
+
+export function makeUrl(url: string, params: { [param: string]: string }) {
+  let address = new window.URL(url);
+  let searchParams = new window.URLSearchParams();
+  Object.entries(params).forEach(([key, param]) => {
+    searchParams.append(key, param);
+  });
+  address.search = `?${params.toString()}`;
+  return address.toString();
+}

@@ -1,4 +1,4 @@
-import { addClass, setDisplay, removeClass, setText } from "./util";
+import { addClass, setDisplay, removeClass, setText, makeUrl } from "./util";
 import renderer, { pure } from "./renderer";
 
 const querySelector = (selector: string) => document.querySelector(selector)!!;
@@ -13,9 +13,15 @@ export function openInPlayground({
   ) as HTMLButtonElement;
 
   openInPlaygroundButton.addEventListener("click", () => {
-    const value = getValue();
-    if (value == null) return;
-    window.open(codeAsSearchUrl("https://play.rust-lang.org", value), "_blank");
+    const code = getValue();
+    if (code == null) return;
+    window.open(
+      makeUrl("https://play.rust-lang.org", {
+        code,
+        edition: "2018",
+      }),
+      "_blank"
+    );
   });
 
   return pure(function renderOpenInPlayground({
@@ -38,10 +44,10 @@ export function generateLink({
   const generatedLink = querySelector(".link") as HTMLAnchorElement;
 
   generateButton.addEventListener("click", () => {
-    const value = getValue();
-    if (value == null) return;
+    const code = getValue();
+    if (code == null) return;
 
-    onAddress(codeAsSearchUrl(window.location.href, value));
+    onAddress(makeUrl(window.location.href, { code }));
   });
 
   return pure(function renderGeneratedLink({
@@ -152,12 +158,4 @@ export function showAll({ onToggleShowAll }: { onToggleShowAll: () => void }) {
       setText(showAllText, initialShowAll);
     }
   });
-}
-
-function codeAsSearchUrl(url: string, code: string) {
-  let address = new window.URL(url);
-  let params = new window.URLSearchParams();
-  params.append("code", code);
-  address.search = `?${params.toString()}`;
-  return address.toString();
 }

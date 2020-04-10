@@ -314,7 +314,7 @@ function initialCodeRender(cm: any) {
   let promise = Promise.resolve();
 
   const codeParam = [...new window.URLSearchParams(location.search)].find(
-    ([key, value]) => key === "code"
+    ([key, _value]) => key === "code"
   );
   const code =
     codeParam != null ? window.decodeURIComponent(codeParam[1]) : null;

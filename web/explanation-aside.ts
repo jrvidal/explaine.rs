@@ -1,5 +1,12 @@
 import renderer, { pure } from "./renderer";
-import { setDisplay, setHtml, setText, addClass, removeClass } from "./util";
+import {
+  setDisplay,
+  setHtml,
+  setText,
+  addClass,
+  removeClass,
+  makeUrl,
+} from "./util";
 import { CompilationError, Elaboration } from "./index";
 import {
   Location,
@@ -64,12 +71,10 @@ const missingTooltip = ({
     const { code, location } = tooltipState.missing || {};
     if (!(code && location)) return;
 
-    let params = new URLSearchParams();
-    params.append("labels", "missing-hint");
-    params.append("title", "Missing Hint");
-    params.append(
-      "body",
-      [
+    const url = makeUrl("https://github.com/jrvidal/explaine.rs/issues/new", {
+      labels: "missing-hint",
+      title: "Missing Hint",
+      body: [
         "### What I expected",
         "<!-- What hint should we show here? What part of this syntax don't you understand? -->",
         "",
@@ -79,11 +84,9 @@ const missingTooltip = ({
         "```",
         "",
         `Location: line ${location.line}, column ${location.ch}`,
-      ].join("\n")
-    );
-    let url = new URL("https://github.com/jrvidal/explaine.rs/issues/new");
-    url.search = params.toString();
-    window.open(url.toString(), "_blank");
+      ].join("\n"),
+    });
+    window.open(url, "_blank");
     onNavigate();
   });
 
