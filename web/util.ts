@@ -24,6 +24,6 @@ export function makeUrl(url: string, params: { [param: string]: string }) {
   Object.entries(params).forEach(([key, param]) => {
     searchParams.append(key, param);
   });
-  address.search = `?${params.toString()}`;
+  address.search = `?${searchParams.toString()}`;
   return address.toString();
 }
