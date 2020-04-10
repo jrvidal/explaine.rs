@@ -2,6 +2,7 @@ use crate::{HelpItem, IntersectionVisitor};
 use proc_macro2::LineColumn;
 use serde_json;
 use std::borrow::Cow;
+use std::str::FromStr;
 
 pub fn test_example(source: &str) {
     let lines: Vec<_> = source.lines().collect();
@@ -14,6 +15,7 @@ pub fn test_example(source: &str) {
 
     let mut item: Option<HelpItem> = None;
     let mut span = None;
+    let mut naked = false;
 
     for line in &lines[0..separator] {
         if line.starts_with("span:") {
@@ -47,11 +49,18 @@ pub fn test_example(source: &str) {
             item = Some(help_item);
             continue;
         }
+        if line.starts_with("naked:") {
+            let naked_line = &line["naked:".len()..].trim();
+
+            naked = bool::from_str(naked_line).expect("naked should be boolean");
+            continue;
+        }
         panic!("Unknown directive {:?}", line);
     }
 
     let item = item.expect("missing item");
     let span = span.expect("missing span");
+    let offset = if naked { 0 } else { 1 };
 
     let mut source_lines = { lines }
         .split_at(separator + 1)
@@ -73,13 +82,15 @@ pub fn test_example(source: &str) {
         .to_mut()
         .replace_range(column..(column + 3), "");
 
-    source_lines.insert(0, "fn __main() {".into());
-    source_lines.push("}".into());
+    if !naked {
+        source_lines.insert(0, "fn __main() {".into());
+        source_lines.push("}".into());
+    }
 
     let test_source = source_lines.join("\n");
     let file = syn::parse_file(&test_source).expect("invalid source");
     let visitor = IntersectionVisitor::new(LineColumn {
-        line: line + 2,
+        line: line + 1 + offset,
         column,
     });
 
@@ -88,11 +99,11 @@ pub fn test_example(source: &str) {
     assert_eq!(item, result.help);
     let adjusted = (
         LineColumn {
-            line: result.item_location.0.line - 1,
+            line: result.item_location.0.line - offset,
             ..result.item_location.0
         },
         LineColumn {
-            line: result.item_location.1.line - 1,
+            line: result.item_location.1.line - offset,
             ..result.item_location.1
         },
     );

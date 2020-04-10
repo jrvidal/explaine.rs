@@ -18,3 +18,5 @@ case![unit];
 case![tuple_struct_pat];
 case![struct_field];
 case![raw_ident];
+case![nested_item_comment];
+case![inner_doc_comment];

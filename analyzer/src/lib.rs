@@ -22,15 +22,35 @@ mod tests;
 trait DynAncestor {
     fn as_any(&self) -> &dyn Any;
     fn as_debug(&self) -> &dyn Debug;
+    fn dyn_span(&self) -> Span;
+}
+
+#[cfg(not(feature = "dev"))]
+trait DynAncestor {
+    fn as_any(&self) -> &dyn Any;
+    fn dyn_span(&self) -> Span;
 }
 
 #[cfg(feature = "dev")]
-impl<T: Debug + Any + 'static> DynAncestor for T {
+impl<T: Debug + Any + Spanned + 'static> DynAncestor for T {
     fn as_any(&self) -> &dyn Any {
         self as &dyn Any
     }
     fn as_debug(&self) -> &dyn Debug {
         self as &dyn Debug
+    }
+    fn dyn_span(&self) -> Span {
+        (self as &dyn Spanned).span()
+    }
+}
+
+#[cfg(not(feature = "dev"))]
+impl<T: Spanned + Any + 'static> DynAncestor for T {
+    fn as_any(&self) -> &dyn Any {
+        self as &dyn Any
+    }
+    fn dyn_span(&self) -> Span {
+        (self as &dyn Spanned).span()
     }
 }
 
@@ -354,36 +374,18 @@ impl HelpItem {
 }
 
 pub struct IntersectionVisitor<'ast> {
+    /// The location for the help request
     location: LineColumn,
+    /// The contextual help we return
     help: HelpItem,
+    /// The location of the contextual help
     item_location: (LineColumn, LineColumn),
-    ancestors: Vec<Ancestor<'ast>>,
-    #[cfg(not(feature = "dev"))]
-    ancestors2: Vec<&'ast dyn Any>,
-    #[cfg(feature = "dev")]
-    ancestors2: Vec<&'ast dyn DynAncestor>,
-    next_ancestor: Ancestor<'ast>,
+    /// The attributes of the parent element, only trust in `visit_attribute`
+    attributes: &'ast [syn::Attribute],
+    /// The ancestors of the current element
+    ancestors: Vec<&'ast dyn DynAncestor>,
     #[cfg(feature = "dev")]
     log: fn(&str),
-}
-
-#[cfg_attr(feature = "dev", derive(Debug))]
-struct Ancestor<'a> {
-    span: Span,
-    attributes: &'a [syn::Attribute],
-    #[cfg(feature = "dev")]
-    type_: &'static str,
-}
-
-impl<'a> Ancestor<'a> {
-    fn new() -> Self {
-        Ancestor {
-            span: Span::call_site(),
-            attributes: &[],
-            #[cfg(feature = "dev")]
-            type_: "",
-        }
-    }
 }
 
 pub struct VisitorResult {
@@ -397,9 +399,8 @@ impl<'ast> IntersectionVisitor<'ast> {
             location,
             item_location: (location, location),
             help: HelpItem::Unknown,
+            attributes: &[],
             ancestors: vec![],
-            ancestors2: vec![],
-            next_ancestor: Ancestor::new(),
             #[cfg(feature = "dev")]
             log,
         }
@@ -422,11 +423,8 @@ impl<'ast> IntersectionVisitor<'ast> {
     }
 
     pub fn visit_element(mut self, file: &'ast syn::File, idx: usize) -> VisitorResult {
-        let mut ancestor = Ancestor::new();
-        ancestor.attributes = &file.attrs[..];
-        ancestor.span = file.span();
-        self.ancestors.push(ancestor);
-        self.ancestors2.push(file);
+        self.attributes = &file.attrs[..];
+        self.ancestors.push(file);
 
         if idx < file.attrs.len() {
             self.visit_attribute(&file.attrs[idx]);
@@ -475,78 +473,53 @@ impl<'ast> IntersectionVisitor<'ast> {
         self.item_location = (start.start(), end.end());
     }
 
-    #[cfg(not(feature = "dev"))]
     fn get_ancestor<T: 'static>(&self, idx: usize) -> Option<&'ast T> {
-        self.ancestors2
-            .get(self.ancestors2.len() - idx)
-            .and_then(|any| any.downcast_ref())
-    }
-    #[cfg(feature = "dev")]
-    fn get_ancestor<T: 'static>(&self, idx: usize) -> Option<&'ast T> {
-        self.ancestors2
-            .get(self.ancestors2.len() - idx)
+        self.ancestors
+            .get(self.ancestors.len() - idx)
             .and_then(|any| any.as_any().downcast_ref())
     }
 }
 
 macro_rules! method {
-    (@_spancheck, $self:ident, $node:ident, $ty:path) => {{
+    (@_spancheck, $self:ident, $node:ident) => {{
         if !$self.within(&$node) {
             return;
         }
-        $self.next_ancestor.span = $node.span();
-        #[cfg(feature = "dev")]
-        {
-            $self.next_ancestor.type_ = stringify!($ty);
+    }};
+    (@_attrs_spancheck, $self:ident, $node:ident) => {{
+        method![@_spancheck, $self, $node];
+
+        for attr in $node.attrs.iter() {
+            if $self.within(attr) {
+                method![@_push_ancestor, $self, $node];
+                $self.attributes = &$node.attrs[..];
+                $self.visit_attribute(attr);
+                method![@_pop_ancestor, $self, $node];
+                return;
+            }
         }
     }};
-    (@_nospancheck, $self:ident, $node:ident, $ty:path) => {};
+    (@_nospancheck, $self:ident, $node:ident) => {};
     (@_debug, $name:ident, $self:ident, $node:ident) => {{
         #[cfg(feature = "dev")]
         {
             ($self.log)(stringify!($name));
         }
     }};
-    (@_attrs, $self:ident, $node:ident, $body:expr) => {{
-        let mut within_attribute = false;
-
-        for attr in $node.attrs.iter() {
-            if $self.within(attr) {
-                within_attribute = true;
-                break;
-            }
-        }
-
-        $self.next_ancestor.attributes = &$node.attrs[..];
-
-        if !within_attribute {
-            $body
-        }
-    }};
-    (@_set_ancestor @_spancheck, $self:ident, $node:ident) => {
-        let mut next_ancestor = Ancestor::new();
-        std::mem::swap(&mut $self.next_ancestor, &mut next_ancestor);
-        $self.ancestors.push(next_ancestor);
+    (@_push_ancestor, $self:ident, $node:ident) => {
+        $self.ancestors.push($node);
     };
-    (@_set_ancestor @_nospancheck, $self:ident, $node:ident) => {
-        $self.ancestors2.push($node);
-    };
-    (@_terminal, @_reachable) => {
-        #[allow(unreachable_code)]
-    };
-    (@_terminal, $name:ident, $body:expr) => {
-        $body;
-        unreachable!(stringify!($name));
+    (@_pop_ancestor, $self:ident, $node:ident) => {
+        let _ = $self.ancestors.pop();
     };
     (@_impl, $name:ident, $self:ident, $node:ident, $ty:path, @_body $body:expr => $after:expr, @ $spancheck:ident) => {
         fn $name(&mut $self, $node: &'ast $ty) {
             method![@_debug, $name, $self, $node];
-            method![@$spancheck, $self, $node, $ty];
+            method![@$spancheck, $self, $node];
             $body;
-            method![@_set_ancestor @$spancheck, $self, $node];
-            $self.ancestors2.push($node);
+            method![@_push_ancestor, $self, $node];
             syn::visit::$name($self, $node);
-            $self.ancestors2.pop();
+            method![@_pop_ancestor, $self, $node];
             $after;
         }
     };
@@ -554,7 +527,7 @@ macro_rules! method {
         #[allow(unreachable_code)]
         fn $name(&mut $self, $node: &'ast $ty) {
             method![@_debug, $name, $self, $node];
-            method![@$spancheck, $self, $node, $ty];
+            method![@$spancheck, $self, $node];
             $body;
             unreachable!(stringify!($name));
         }
@@ -579,19 +552,19 @@ macro_rules! method {
         method![@_impl, $name, $self, $node, $ty, @_body $body => (), @_spancheck];
     };
     (@attrs $name:ident($self:ident, $node:ident: $ty:path)) => {
-        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, { () }] => (), @_spancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body () => (), @_attrs_spancheck];
     };
     (@attrs $name:ident($self:ident, $node:ident: $ty:path) $body:expr) => {
-        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, $body] => (), @_spancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body $body => (), @_attrs_spancheck];
     };
     (@attrs $name:ident($self:ident, $node:ident: $ty:path) @terminal $body:expr) => {
-        method![@_impl, $name, $self, $node, $ty, @_body @terminal method![@_attrs, $self, $node, $body], @_spancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body @terminal $body, @_attrs_spancheck];
     };
     (@attrs $name:ident($self:ident, $node:ident: $ty:path) $body:expr => $after:expr) => {
-        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, $body] => $after, @_spancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body $body => $after, @_attrs_spancheck];
     };
     (@attrs $name:ident($self:ident, $node:ident: $ty:path) => $after:expr) => {
-        method![@_impl, $name, $self, $node, $ty, @_body method![@_attrs, $self, $node, ()] => $after, @_spancheck];
+        method![@_impl, $name, $self, $node, $ty, @_body () => $after, @_attrs_spancheck];
     };
     ($name:ident($self:ident, $node:ident: $ty:path) @terminal $body:expr) => {
         method![@_impl, $name, $self, $node, $ty, @_body @terminal $body, @_spancheck];
@@ -642,19 +615,20 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             token![self, if_token, ArmIfGuard];
         }
     }];
+    // OMITTED: handled in visit_attribute
     // method![visit_attr_style(self, node: syn::AttrStyle)];
     method![visit_attribute(self, node: syn::Attribute) @terminal {
         let outer = outer_attr(node);
         if node.path.is_ident("doc") {
-            let bounds = if let Some(Ancestor { attributes, .. }) = self.ancestors.last() {
-                let this_idx = attributes
+            let bounds = if self.attributes.len() > 0 {
+                let this_idx = self.attributes
                     .iter()
                     .enumerate()
                     .find(|(_, attr)| std::ptr::eq(node, *attr))
                     .expect("attr in list")
                     .0;
 
-                let last = attributes
+                let last = self.attributes
                     .iter()
                     .enumerate()
                     .filter(|&(i, attr)| {
@@ -664,7 +638,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
                     .expect("last")
                     .1;
 
-                let start = attributes
+                let start = self.attributes
                     .iter()
                     .enumerate()
                     .rev()
@@ -672,8 +646,8 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
                         i <= this_idx && !(attr.path.is_ident("doc") && outer_attr(attr) == outer)
                     })
                     .next()
-                    .map(|(i, _)| &attributes[i - 1])
-                    .unwrap_or(&attributes[0]);
+                    .map(|(i, _)| &self.attributes[i - 1])
+                    .unwrap_or(&self.attributes[0]);
 
                 Some((start.span(), last.span()))
             } else {
@@ -858,16 +832,13 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_fields(self, node: syn::Fields)];
     method![visit_fields_named(self, node: syn::FieldsNamed)];
     method![visit_fields_unnamed(self, node: syn::FieldsUnnamed)];
-    method![visit_file(self, node: syn::File) {
+    fn visit_file(&mut self, node: &'ast syn::File) {
         // TODO: shebang
-        let mut ancestor = Ancestor::new();
-        ancestor.attributes = &node.attrs[..];
-        ancestor.span = node.span();
-        self.ancestors.push(ancestor);
-        self.ancestors2.push(node);
+        self.ancestors.push(node);
 
         for attr in &node.attrs {
             if self.within(attr) {
+                self.attributes = &node.attrs[..];
                 self.visit_attribute(attr);
                 return;
             }
@@ -879,7 +850,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
                 return;
             }
         }
-    }];
+    }
     method![visit_fn_arg(self, node: syn::FnArg)];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
     method![@attrs visit_foreign_item_fn(self, node: syn::ForeignItemFn)];
@@ -956,7 +927,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             empty: node.variants.is_empty()
         }];
     }];
-    method![@attrs visit_item_extern_crate(self, node: syn::ItemExternCrate) {
+    method![@attrs visit_item_extern_crate(self, node: syn::ItemExternCrate) @terminal {
         if let Some((as_token, _)) = node.rename {
             token![self, as_token, AsRenameExternCrate];
         }
@@ -1301,14 +1272,16 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     fn visit_qself(&mut self, node: &'ast syn::QSelf) {
         if let Some(as_token) = node.as_token {
             if self.within(&as_token) {
-                return self
-                    .set_help_span(self.ancestors.last().unwrap().span, HelpItem::QSelfAsToken);
+                return self.set_help_span(
+                    self.ancestors.last().unwrap().dyn_span(),
+                    HelpItem::QSelfAsToken,
+                );
             }
         }
         syn::visit::visit_qself(self, node);
     }
     // fn visit_range_limits(&mut self, node: &'ast syn::RangeLimits) {
-    method![@attrs visit_receiver(self, node: syn::Receiver) {
+    method![@attrs visit_receiver(self, node: syn::Receiver) @terminal {
         let item = match (&node.reference, &node.mutability) {
             (Some(_), Some(_)) => HelpItem::MutSelf,
             (Some(_), None) => HelpItem::RefSelf,
