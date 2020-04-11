@@ -1,9 +1,7 @@
 import wasm_bindgen from "../pkg/explainers";
 import * as messages from "./messages";
-import { logInfo } from "./logging";
 import wasmUrl from "../pkg/explainers_bg.wasm";
-import { reportError } from "./logging";
-import { handleLogging } from "./logging";
+import { logInfo, reportError, handleLogging } from "./logging";
 
 logInfo("workerMain");
 

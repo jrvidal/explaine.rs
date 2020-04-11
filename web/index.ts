@@ -23,6 +23,7 @@ import {
   ERROR,
   SUCCESS,
 } from "./types";
+import { getFromStorage, UNKNOWN, setInStorage } from "./storage";
 
 declare global {
   var __ANALYTICS_URL__: any;
@@ -324,8 +325,8 @@ function initialCodeRender(cm: any) {
     return promise;
   }
 
-  const local = window.localStorage.getItem("code");
-  if (local != null && local.trim() !== "") {
+  const local = getFromStorage("code");
+  if (typeof local === "string" && local.trim() !== "") {
     cm.setValue(local);
     return promise;
   }
@@ -541,7 +542,7 @@ const debouncedCompile = debounce(
 
 function doCompile() {
   const code = cm.getValue();
-  window.localStorage.setItem("code", code);
+  setInStorage("code", code);
 
   if (code.trim() === "") {
     setState({ compilation: { ...initialCompilation, state: SUCCESS } });

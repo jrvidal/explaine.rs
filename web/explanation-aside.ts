@@ -15,6 +15,7 @@ import {
   CompilationState,
   SUCCESS,
 } from "./types";
+import { getFromStorage, setInStorage } from "./storage";
 
 const querySelector = (selector: string) => document.querySelector(selector)!!;
 
@@ -142,7 +143,7 @@ function session() {
   };
 
   const DIALOG_KEY = "settings.reportDialog";
-  let hasSeenReportDialog = localStorage.getItem(DIALOG_KEY) != null;
+  let hasSeenReportDialog = getFromStorage(DIALOG_KEY) != null;
 
   type State = Props & { issueVisible: boolean };
 
@@ -178,7 +179,7 @@ function session() {
 
   doFileBugLink.addEventListener("click", (e) => {
     e.preventDefault();
-    localStorage.setItem(DIALOG_KEY, "true");
+    setInStorage(DIALOG_KEY, "true");
     hasSeenReportDialog = true;
     setSessionState({ issueVisible: !sessionState.issueVisible });
   });
