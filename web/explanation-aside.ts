@@ -9,7 +9,6 @@ import {
 } from "./util";
 import { CompilationError, Elaboration } from "./index";
 import {
-  Location,
   MissingHint,
   PENDING,
   ERROR,

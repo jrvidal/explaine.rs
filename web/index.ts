@@ -465,7 +465,7 @@ function onElaboration(elaboration: Elaboration | { location: null }) {
   }));
 }
 
-function computeMissingHint({ line, ch }: { line: number; ch: number }) {
+function computeMissingHint({ line, ch }: Location) {
   const MARGIN = 5;
   const EMPTY_RE = /^ *$/;
 
@@ -485,7 +485,8 @@ function computeMissingHint({ line, ch }: { line: number; ch: number }) {
   );
 
   let indentation = Math.min(...indentationPerLine);
-  indentation = indentation === Number.POSITIVE_INFINITY ? 0 : indentation;
+  indentation =
+    indentation === Number.POSITIVE_INFINITY ? 0 : Math.min(indentation, ch);
 
   if (indentation > 0) {
     lines.forEach((line, i) => {
@@ -497,19 +498,10 @@ function computeMissingHint({ line, ch }: { line: number; ch: number }) {
   lines.forEach((line, i) => {
     lines[i] = `${String(i).padStart(2, " ")} | ${line}`;
   });
-  if (indentation > ch) {
-    reportError("indentation", {
-      message: "indentation > ch",
-      indentation,
-      ch,
-      match: cm.getLine(line).match(/^ */),
-    });
-  }
   lines.splice(
     line - minContextLine + 1,
     0,
-    // TODO: prevent this somehow
-    `   | ${" ".repeat(Math.max(0, ch - indentation))}↑`
+    `   | ${" ".repeat(ch - indentation)}↑`
   );
 
   return {
