@@ -95,36 +95,42 @@ function exploreLoop(session, init = false) {
     state.exploration = {
       buffer: new self.Uint32Array(LENGTH * 4),
       result: [],
+      byStart: new Map(),
     };
   }
 
-  const { buffer } = state.exploration;
+  const { buffer, result, byStart } = state.exploration;
   const written = state.session.explore(buffer);
 
   for (let i = 0; i < written; i++) {
-    state.exploration.result.push([
-      [buffer[4 * i] - 1, buffer[4 * i + 1]],
-      [buffer[4 * i + 2] - 1, buffer[4 * i + 3]],
-    ]);
+    const span = {
+      start: { line: buffer[4 * i] - 1, ch: buffer[4 * i + 1] },
+      end: { line: buffer[4 * i + 2] - 1, ch: buffer[4 * i + 3] },
+    };
+    if (!byStart.has(span.start.line)) {
+      byStart.set(span.start.line, []);
+    }
+
+    const exists = byStart
+      .get(span.start.line)
+      .some(
+        (s) =>
+          s.start.line === span.start.line &&
+          s.start.ch === span.start.ch &&
+          s.end.line === span.end.line &&
+          s.end.ch === span.end.ch
+      );
+    if (!exists) {
+      byStart.get(span.start.line).push(span);
+      result.push(span);
+    }
   }
 
   if (written < LENGTH) {
     logInfo("Exploration finished...");
     postMessage({
       type: messages.EXPLORATION,
-      exploration: state.exploration.result.map((range) => {
-        const [start, end] = range;
-        return {
-          start: {
-            line: start[0],
-            ch: start[1],
-          },
-          end: {
-            line: end[0],
-            ch: end[1],
-          },
-        };
-      }),
+      exploration: state.exploration.result,
     });
     return;
   }
