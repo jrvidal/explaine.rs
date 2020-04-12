@@ -78,7 +78,13 @@ const renderGenerateLink = generateLink({
     setState({ address });
   },
   getValue() {
-    return cm && cm.getValue();
+    const code = cm && cm.getValue();
+    return code != null
+      ? {
+          code,
+          location: nonUiState.lastElaborationRequest,
+        }
+      : null;
   },
 });
 
@@ -192,6 +198,7 @@ type NonUIState = {
   compilationIndex: number;
   elaborationIndex: number | null;
   lastElaborationRequest: Location | null;
+  pendingInitialElaboration: Location | null;
 };
 
 let nonUiState: NonUIState = {
@@ -205,6 +212,7 @@ let nonUiState: NonUIState = {
   compilationIndex: 0,
   elaborationIndex: null,
   lastElaborationRequest: null,
+  pendingInitialElaboration: null,
 };
 
 const setState = renderer<State>(
@@ -271,7 +279,7 @@ let { postMessage: postToWorker, ready: workerIsReadyPromise } = worker({
   onMessage(data) {
     switch (data.type) {
       case messages.COMPILED:
-        setState({ compilation: { ...initialCompilation, state: SUCCESS } });
+        onCompilation();
         break;
       case messages.COMPILATION_ERROR:
         setState({
@@ -314,14 +322,27 @@ const styleSheet = (() => {
 function initialCodeRender(cm: any) {
   let promise = Promise.resolve();
 
+  const params = new URLSearchParams(location.search);
+
+  let code = params.get("code");
+  const lineParam = params.get("line");
+  const chParam = params.get("ch");
+
   const codeParam = [...new window.URLSearchParams(location.search)].find(
     ([key, _value]) => key === "code"
   );
-  const code =
-    codeParam != null ? window.decodeURIComponent(codeParam[1]) : null;
+  code = code != null ? decodeURIComponent(code) : null;
+  const line = lineParam != null ? Number(lineParam) : null;
+  const ch = chParam != null ? Number(chParam) : null;
 
   if (code != null && code.trim() !== "") {
     cm.setValue(code);
+    const location =
+      line != null && Number.isFinite(line) && ch != null && Number.isFinite(ch)
+        ? { line, ch }
+        : null;
+
+    nonUiState.pendingInitialElaboration = location;
     return promise;
   }
 
@@ -346,18 +367,16 @@ function initialCodeRender(cm: any) {
 }
 
 const compileOnChange = (() => {
-  let workerIsReady = false;
-  workerIsReadyPromise.then(() => {
-    workerIsReady = true;
-  });
   let firstCompilationEnqueued = false;
+  let firstCompilationDispatched = false;
 
   return () => {
-    if (workerIsReady) {
-      doCompile();
-    } else if (!firstCompilationEnqueued) {
+    if (firstCompilationDispatched || !firstCompilationEnqueued) {
       firstCompilationEnqueued = true;
-      workerIsReadyPromise.then(() => doCompile());
+      workerIsReadyPromise.then(() => {
+        firstCompilationDispatched = true;
+        doCompile();
+      });
     }
   };
 })();
@@ -388,13 +407,15 @@ function onCmMouseMove(e: MouseEvent) {
 }
 
 function onCmClick() {
+  if (nonUiState.pendingInitialElaboration != null) return;
   elaborate(cm.getCursor("from"));
 }
 
-function elaborate(location: Location) {
-  if (state.compilation.state !== SUCCESS || state.empty) return;
+function elaborate(location: Location, isReady = false) {
+  if ((!isReady && state.compilation.state !== SUCCESS) || state.empty) return;
   nonUiState.elaborationIndex = nonUiState.compilationIndex;
   nonUiState.lastElaborationRequest = location;
+  setState({ address: null });
   postToWorker({
     type: messages.ELABORATE,
     location,
@@ -443,6 +464,14 @@ const explainLocation = memoize(
     );
   }
 );
+
+function onCompilation() {
+  setState({ compilation: { ...initialCompilation, state: SUCCESS } });
+  if (nonUiState.pendingInitialElaboration != null) {
+    elaborate(nonUiState.pendingInitialElaboration, true);
+    nonUiState.pendingInitialElaboration = null;
+  }
+}
 
 function onExplanation() {
   if (nonUiState.computedMarks) return;
@@ -544,6 +573,7 @@ function doCompile() {
   const code = cm.getValue();
   setInStorage("code", code);
 
+  nonUiState.lastElaborationRequest = null;
   if (code.trim() === "") {
     setState({ compilation: { ...initialCompilation, state: SUCCESS } });
   } else {

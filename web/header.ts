@@ -1,5 +1,6 @@
 import { addClass, setDisplay, removeClass, setText, makeUrl } from "./util";
 import renderer, { pure } from "./renderer";
+import { Location } from "./types";
 
 const querySelector = (selector: string) => document.querySelector(selector)!!;
 
@@ -38,16 +39,24 @@ export function generateLink({
   getValue,
 }: {
   onAddress: (address: string) => void;
-  getValue: () => string | null;
+  getValue: () => {
+    location: Location | null;
+    code: string;
+  } | null;
 }) {
   const generateButton = querySelector(".generate") as HTMLButtonElement;
   const generatedLink = querySelector(".link") as HTMLAnchorElement;
 
   generateButton.addEventListener("click", () => {
-    const code = getValue();
+    const { code, location } = getValue() || {};
     if (code == null) return;
 
-    onAddress(makeUrl(window.location.href, { code }));
+    let params: { [param: string]: string } =
+      location == null
+        ? { code }
+        : { code, line: String(location.line), ch: String(location.ch) };
+
+    onAddress(makeUrl(window.location.href, params));
   });
 
   return pure(function renderGeneratedLink({
