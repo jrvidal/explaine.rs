@@ -51,8 +51,6 @@ pub enum HelpItem {
     ShlEqBinOp,
     ShrEqBinOp,
     ItemUse,
-    ItemUseCrate,
-    ItemUseLeadingColon,
     Macro,
     MacroTokens,
     PatBox,
@@ -86,6 +84,14 @@ pub enum HelpItem {
         bindings: Option<BindingOf>,
     },
     PatWild,
+    PathLeadingColon,
+    PathSegmentSelf,
+    // TODO: reference the implementing type in an impl Block
+    PathSegmentSelfType,
+    PathSegmentCrate,
+    // TODO: reference the actual module if it is inline, or refer to the relevant ancestor
+    PathSegmentSuper,
+    ReceiverPath,
     Attribute {
         outer: bool,
     },
@@ -169,8 +175,11 @@ pub enum HelpItem {
         name: String,
     },
     TypeImplTrait,
-    Local,
-    LocalMut,
+    // TODO: maybe list the locals introduced, special case for when no locals are introduced
+    Local {
+        ident: Option<String>,
+        mutability: bool,
+    },
     ExprLoopToken,
     Label {
         loop_of: LoopOf,
@@ -179,12 +188,14 @@ pub enum HelpItem {
     ArmIfGuard,
     Move,
     MutSelf,
-    ValueSelf,
+    ValueSelf {
+        mutability: bool,
+    },
     RefSelf,
-    PathLeadingColon,
     QSelfAsToken,
     StaticMut,
     Static,
+    // TODO: handle special cases, like str
     TypeReference {
         mutable: bool,
         lifetime: bool,
@@ -204,6 +215,9 @@ pub enum HelpItem {
     UseGroup {
         parent: String,
     },
+    UseGroupSelf {
+        parent: String,
+    },
     ExprReference {
         mutable: bool,
     },
@@ -216,7 +230,6 @@ pub enum HelpItem {
     ExprTryQuestionMark,
     ExprTuple,
     ExprType,
-    PathSegmentSelf,
     ExprUnsafe,
     ExprWhileLet,
     ExprWhile,
@@ -233,7 +246,6 @@ pub enum HelpItem {
     ItemTrait,
     ItemType,
     ItemUnion,
-    PathSegmentSuper,
     UnsafeFn,
     TraitBoundModifierQuestion {
         sized: bool,

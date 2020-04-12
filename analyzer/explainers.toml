@@ -149,14 +149,6 @@ info = "A `use` declaration acts like a shortcut by shortening the path to the i
 book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html"
 keyword = "use"
 
-[help.ItemUseCrate]
-title = "`crate` Path Component"
-info = "A path that starts with `crate` refers to the current crate."
-
-[help.ItemUseLeadingColon]
-title = "`using` external crates"
-info = "A leading `::` in a path means that the path refers to an external crate."
-
 [help.Macro]
 title = "Macro Invocation"
 info = "A macro is a special form that generates syntax at compile time. They are distinguished by the final bang (`!`) symbol."
@@ -231,6 +223,31 @@ info = "A pattern {{if bindings}}that introduces bindings through destructuring{
 title = "Wildcard Pattern"
 info = "The wildcard pattern `_`, that matches any value and discards it."
 book = "ch18-03-pattern-syntax.html#ignoring-an-entire-value-with-_"
+
+[help.PathSegmentSelf]
+title = "`self` Module"
+info = "The `self` keyword refers to the current module."
+keyword = "self"
+
+[help.PathSegmentSuper]
+title = "`super` Module"
+info = "The `super` keyword represents the parent module."
+keyword = "super"
+
+[help.PathSegmentSelfType]
+title = "Implementing Type"
+info = "A reference to the implementing type of an implementation block or trait definition."
+keyword = "Self"
+
+[help.PathSegmentCrate]
+title = "`crate` Root Module"
+info = "A reference to the root module of the current crate."
+keyword = "crate"
+
+[help.ReceiverPath]
+title = "Method Receiver"
+info = "The receiver of this method call, like `this` in other languages."
+keyword = "self"
 
 [help.Attribute]
 title = "Attribute"
@@ -515,17 +532,21 @@ info = "The `impl` keyword represents an anonymous (but fixed) type that impleme
 book = "ch10-02-traits.html#returning-types-that-implement-traits"
 keyword = "impl"
 
-[help.Local]
-title = "Variable binding"
-info = "A `let` statement introduces a local variable."
+[help.Local-immutable]
+title = "Variable Binding"
+info = "A `let` statement that introduces {{if ident}}the `{ ident }` local variable{{else}}one or more local variables{{endif}}."
 keyword = "let"
 book = "ch02-00-guessing-game-tutorial.html#storing-values-with-variables"
+variant = "Local"
+pattern = "mutability: false, .."
 
-[help.LocalMut]
-title = "Mutable variable binding"
-info = "A `let mut` statement introduces a _mutable_ local variable which can be reassigned and for which mutable borrows can be taken."
+[help.Local-mutable]
+title = "Mutable Variable Binding"
+info = "A `let mut` statement that introduces the _mutable_ local variable `{ ident }`, which can be reassigned and for which mutable borrows can be taken."
 keyword = "mut"
 book = "ch03-01-variables-and-mutability.html"
+variant = "Local"
+pattern = "mutability: true, .."
 
 [help.ExprLoopToken]
 title = "Infinite loop"
@@ -575,7 +596,7 @@ keyword = "self"
 
 [help.ValueSelf]
 title = "Owned `self`"
-info = "This method consumes `self` as a value."
+info = "This method consumes `self` as a value. {{if mutability}}Since it is marked as `mut`, it can also be mutated like a variable introduced by `let mut`.{{endif}}"
 book = "ch05-03-method-syntax.html"
 keyword = "self"
 
@@ -642,6 +663,12 @@ book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#the-glob-ope
 title = "Group Import"
 info = "A group of several items imported from `{ parent }`, grouped together in a single import."
 
+[help.UseGroupSelf]
+title = "Self Module Import"
+info = "A reference to the parent `{ parent }` module so it is brought to scope."
+keyword = "self"
+book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#using-nested-paths-to-clean-up-large-use-lists"
+
 [help.ExprReference-immutable]
 title = "Immutable reference"
 variant = "ExprReference"
@@ -688,10 +715,6 @@ book = "ch03-02-data-types.html#the-tuple-type"
 [help.ExprType]
 title = "Type Ascription"
 info = "A type ascription expression, an [experimental feature](https://github.com/rust-lang/rust/issues/23416)."
-
-[help.PathSegmentSelf]
-title = "TODO"
-info = "PathSegmentSelf"
 
 [help.ExprUnsafe]
 title = "Unsafe block"
@@ -762,10 +785,6 @@ keyword = "type"
 title = "Union"
 info = "A `union` is an \"unsafe enum\", that allows interoperation with C enums. Reading fields from a union is unsafe."
 keyword = "union"
-
-[help.PathSegmentSuper]
-title = "`super`"
-info = "PathSegmentSuper"
 
 [help.UnsafeFn]
 title = "Unsafe function"

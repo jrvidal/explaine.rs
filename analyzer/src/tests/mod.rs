@@ -22,3 +22,7 @@ case![nested_item_comment];
 case![inner_doc_comment];
 case![fn_type];
 case![loops];
+case![item_use_special];
+case![paths];
+case![let_stmt];
+case![receiver];

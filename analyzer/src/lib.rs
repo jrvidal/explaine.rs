@@ -153,6 +153,13 @@ impl<'ast> IntersectionVisitor<'ast> {
             .get(self.ancestors.len() - idx)
             .and_then(|any| any.as_any().downcast_ref())
     }
+
+    fn has_ancestor<T: 'static>(&self, idx: usize) -> bool {
+        self.ancestors
+            .get(self.ancestors.len() - idx)
+            .map(|any| any.as_any().is::<T>())
+            .unwrap_or(false)
+    }
 }
 
 macro_rules! method {
@@ -785,19 +792,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.union_token, ItemUnion];
     }];
     method![@attrs visit_item_use(self, node: syn::ItemUse) {
-        token![self, some node.leading_colon, ItemUseLeadingColon];
-
-        let mut queue = vec![&node.tree];
-
-        while let Some(use_tree) = queue.pop() {
-            match use_tree {
-                syn::UseTree::Path(use_path) => if use_path.ident == "crate" && self.between(&use_path.ident, &use_path.ident) {
-                    return self.set_help(&use_path.ident, HelpItem::ItemUseCrate);
-                },
-                syn::UseTree::Group(use_group) => queue.extend(use_group.items.iter()),
-                _ => {}
-            }
-        }
+        token![self, some node.leading_colon, PathLeadingColon];
     } => {
         if self.settled() {
             return;
@@ -876,17 +871,31 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help(node, HelpItem::LitStr);
     }];
     method![@attrs visit_local(self, node: syn::Local) {
-        if let syn::Pat::Ident(syn::PatIdent { mutability, ..}) = node.pat {
-            let start = node.let_token.span();
-            let end = mutability.map(|m| m.span())
-                .unwrap_or_else(|| node.let_token.span());
+        let ident_pat = match &node.pat {
+            syn::Pat::Ident(pat) => Some(pat),
+            syn::Pat::Type(syn::PatType { pat, .. }) => match &**pat {
+                syn::Pat::Ident(pat_ident) => Some(pat_ident),
+                _ => None
+            },
+            _ => None
+        };
 
-            if mutability.is_some() && self.between_spans(start, end) {
-                return self.set_help_between(start, end, HelpItem::LocalMut);
+
+        match ident_pat {
+            Some(syn::PatIdent { ident, mutability, ..}) => {
+                token![self, node.let_token => ident, * HelpItem::Local {
+                    mutability: mutability.is_some(),
+                    ident: Some(ident.to_string())
+                }];
+            },
+            _ => {
+                token![self, node.let_token, * HelpItem::Local {
+                    mutability: false,
+                    ident: None
+                }];
             }
         }
 
-        token![self, node.let_token, Local];
     }];
     method![visit_macro(self, node: syn::Macro) {
         if self.between_spans(node.path.span(), node.bang_token.span()) {
@@ -927,7 +936,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         }
 
-        if node.mutability.is_some() && self.get_ancestor::<syn::PatType>(2).is_some() {
+        if node.mutability.is_some() && self.has_ancestor::<syn::FnArg>(3) {
             return self.set_help(node, HelpItem::PatIdentMutableArg {
                 ident: node.ident.to_string()
             });
@@ -1028,14 +1037,19 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // * turbofish foo::<sfd>
     // * Fn patterns: Fn(A, B) -> C
     method![visit_path(self, node: syn::Path) {
-        token![self, some node.leading_colon, PathLeadingColon]
+        if special_path_help(
+            self,
+            node.leading_colon,
+            node.segments.first().map(|s| &s.ident),
+            node.segments.len() == 1 && self.has_ancestor::<syn::ExprPath>(1),
+        ) {
+            return;
+        }
     }];
     method![visit_path_arguments(self, node: syn::PathArguments)];
     method![visit_path_segment(self, node: syn::PathSegment) {
-        if node.ident == "self" {
-            token![self, node.ident, PathSegmentSelf];
-        } else if node.ident == "super" {
-            token![self, node.ident, PathSegmentSuper];
+        if node.ident == "super" {
+            return self.set_help(&node.ident, HelpItem::PathSegmentSuper);
         }
     }];
     method![visit_predicate_eq(self, node: syn::PredicateEq)];
@@ -1058,13 +1072,11 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         let item = match (&node.reference, &node.mutability) {
             (Some(_), Some(_)) => HelpItem::MutSelf,
             (Some(_), None) => HelpItem::RefSelf,
-            (None, Some(mutability)) => {
-                token![self, mutability, * HelpItem::PatIdentMutableArg {
-                    ident: "self".to_string()
-                }];
-                HelpItem::ValueSelf
-            },
-            (None, None) => HelpItem::ValueSelf
+            (None, mutability) => {
+                HelpItem::ValueSelf {
+                    mutability: mutability.is_some()
+                }
+            }
         };
         return self.set_help(&node, item);
     }];
@@ -1251,18 +1263,54 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_use_glob(self, node: syn::UseGlob) @terminal {
         return self.set_help(node, HelpItem::UseGlob);
     }];
-    method![visit_use_group(self, node: syn::UseGroup)];
-    method![visit_use_name(self, node: syn::UseName)];
+    method![visit_use_group(self, node: syn::UseGroup) => {
+        if self.settled() {
+            return;
+        }
+
+        if let Some(path) = self.get_ancestor::<syn::UsePath>(2) {
+            return self.set_help(node, HelpItem::UseGroup {
+                parent: path.ident.to_string()
+            });
+        }
+    }];
+    method![visit_use_name(self, node: syn::UseName) @terminal {
+        if node.ident != "self" {
+            return;
+        }
+
+        if self.get_ancestor::<syn::UseGroup>(2).is_none() {
+            return;
+        }
+
+        let path_ancestor = if let Some(path) = self.get_ancestor::<syn::UsePath>(4) {
+            path
+        } else {
+            return;
+        };
+
+        return self.set_help(node, HelpItem::UseGroupSelf {
+            parent: path_ancestor.ident.to_string()
+        });
+    }];
     method![visit_use_path(self, node: syn::UsePath) => {
-        match &*node.tree {
-            syn::UseTree::Group(use_group) => {
-                if self.within(use_group) {
-                    return self.set_help(use_group, HelpItem::UseGroup {
-                        parent: node.ident.to_string()
-                    });
-                }
-            },
-            _ => {}
+        let mut root_path = true;
+
+        for i in (2..).step_by(2) {
+            if self.get_ancestor::<syn::UseGroup>(i).is_some() {
+                continue;
+            }
+
+            root_path = self.get_ancestor::<syn::ItemUse>(i).is_some();
+            break;
+        }
+
+        if root_path && special_path_help(self, None, Some(&node.ident), false) {
+            return;
+        }
+
+        if node.ident == "super" {
+            return self.set_help(&node.ident, HelpItem::PathSegmentSuper);
         }
     }];
     method![visit_use_rename(self, node: syn::UseRename) {
@@ -1330,14 +1378,58 @@ fn outer_attr(attr: &syn::Attribute) -> bool {
 }
 
 fn pattern_bindings(visitor: &IntersectionVisitor) -> Option<BindingOf> {
-    if visitor.get_ancestor::<syn::Local>(2).is_some() {
+    if visitor.has_ancestor::<syn::Local>(2)
+        || (visitor.has_ancestor::<syn::Local>(4) && visitor.has_ancestor::<syn::PatType>(2))
+    {
         return Some(BindingOf::Let);
     }
-    if visitor.get_ancestor::<syn::PatType>(2).is_some() {
+    if visitor.has_ancestor::<syn::FnArg>(4) {
         return Some(BindingOf::Arg);
     }
 
-    return None;
+    None
+}
+
+fn special_path_help(
+    visitor: &mut IntersectionVisitor,
+    leading_colon: Option<syn::token::Colon2>,
+    leading_segment: Option<&syn::Ident>,
+    can_be_receiver: bool,
+) -> bool {
+    if let Some(leading_colon) = leading_colon {
+        if visitor.within(leading_colon) {
+            visitor.set_help(&leading_colon, HelpItem::PathLeadingColon);
+            return true;
+        }
+    }
+
+    let mut settled = false;
+    if let Some(ident) = leading_segment {
+        if visitor.within(&ident) {
+            if ident == "super" {
+                visitor.set_help(&ident, HelpItem::PathSegmentSuper);
+                settled = true;
+            } else if ident == "self" {
+                visitor.set_help(
+                    &ident,
+                    if can_be_receiver {
+                        HelpItem::ReceiverPath
+                    } else {
+                        HelpItem::PathSegmentSelf
+                    },
+                );
+                settled = true;
+            } else if ident == "Self" {
+                visitor.set_help(&ident, HelpItem::PathSegmentSelfType);
+                settled = true;
+            } else if ident == "crate" {
+                visitor.set_help(&ident, HelpItem::PathSegmentCrate);
+                settled = true;
+            }
+        }
+    }
+
+    settled
 }
 
 pub fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
