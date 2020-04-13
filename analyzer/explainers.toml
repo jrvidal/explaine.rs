@@ -311,29 +311,22 @@ title = "Cast"
 info = "The `as` keyword allows casting between certain types."
 keyword = "as"
 
-[help.ExprClosureArguments]
-title = "Closure arguments"
-info = "Two vertical bars `| ··· |` enclose the list of arguments of a closure."
-book = "ch13-01-closures.html"
-
-[help.ExprClosureAsync]
-title = "Async closure"
-info = "This marks an async closure."
-keyword ="async"
-
-[help.ExprClosureStatic]
-title = "Static Closure"
-info = "???"
-
-[help.ExprAsync]
-title = "Async Expression"
-info = "AsyncExpression"
-keyword ="async"
-
 [help.AsyncFn]
 title = "Async Function"
 info = "An async function, whose signature is implicitly wrapped in `impl Future<..>`."
 keyword ="async"
+
+[help.ExprAsync]
+title = "Async Block"
+info = """An `async` block represents a delayed computation, much like the body of an async function or closure.
+
+It produces a future that will run thorugh the block's statements once it is polled."""
+keyword ="async"
+
+[help.ExprAsyncMove]
+title = "Moving Async Block"
+info = "The `move` keyword instructs the compiler to capture variables in this async block by moving them, much like in the case of `move` closures."
+keyword ="move"
 
 [help.ExprAwait]
 title = "`await` Expression"
@@ -347,6 +340,32 @@ info = """A `break` expression terminates the
 and specifies a final value for it{{endif}}."""
 book = "ch03-05-control-flow.html"
 keyword = "break"
+
+[help.ExprClosure]
+title = "Closure"
+info = "A closure expression, an anonymous function that can capture environment variables."
+book = "ch13-01-closures.html"
+
+[help.ExprClosureMove]
+title = "`move` Closure"
+info = "The `move` keyword specifies that a closure should take ownership over the ambient variables it refers to in its body."
+keyword = "move"
+book = "ch13-01-closures.html"
+
+[help.ExprClosureArguments]
+title = "Closure arguments"
+info = "Two vertical bars `| ··· |` enclose the list of arguments of a closure."
+book = "ch13-01-closures.html"
+
+[help.ExprClosureAsync]
+title = "Async closure"
+info = "An `async` closure (an [experimental feature](https://github.com/rust-lang/rust/issues/62290))."
+keyword ="async"
+
+[help.ExprClosureStatic]
+title = "Static Closure"
+info = "Static closures are an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
+keyword = "static"
 
 [help.ImplItemConst]
 title = "Associated constant"
@@ -582,12 +601,6 @@ within a `match` expression before matching."""
 book = "ch18-03-pattern-syntax.html#extra-conditionals-with-match-guards"
 keyword = "if"
 
-[help.Move]
-title = "`move` closure"
-info = "The `move` keyword specifies that a closure should take ownership over the ambient variables it refers to in its body."
-keyword = "move"
-book = "ch13-01-closures.html"
-
 [help.MutSelf]
 title = "Mutably borrowed `self`"
 info = "This method takes `self` as a mutable (exclusive) reference."
@@ -686,6 +699,7 @@ title = "Array Initialization"
 info = "An expression that initializes an array of length `{ len }` by copying an initial value in every position."
 book = "ch03-02-data-types.html#the-array-type"
 
+# TODO: contextualize to functions/closures/async block
 [help.ExprReturn]
 title = "`return` expression"
 info = "The `return` keyword stops the execution of the current function with the provided value."
@@ -701,6 +715,7 @@ title = "Struct Update Syntax"
 info = "A \"rest\" expression that copies the fields of a struct into another."
 book = "ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax"
 
+# TODO: contextualize to function/closure/async block?
 [help.ExprTryQuestionMark]
 title = "Question Mark Operator"
 info = "The question mark operator `?` evaluates a fallible expression, and either unwraps a successful case or performs an early return for an unsuccessful case."

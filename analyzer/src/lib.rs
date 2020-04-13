@@ -402,10 +402,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_expr_assign(self, node: syn::ExprAssign)];
     method![@attrs visit_expr_assign_op(self, node: syn::ExprAssignOp)];
     method![@attrs visit_expr_async(self, node: syn::ExprAsync) {
-        token![self, node.async_token, ExprAsync];
-        if let Some(capture) = node.capture {
-            token![self, capture, Move];
+        token![self, some node.capture, ExprAsyncMove];
+    } => {
+        if self.settled() {
+            return;
         }
+        return self.set_help(node, HelpItem::ExprAsync);
     }];
     method![@attrs visit_expr_await(self, node: syn::ExprAwait) {
         token![self, node.await_token, ExprAwait];
@@ -430,8 +432,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.or1_token, ExprClosureArguments];
         token![self, node.or2_token, ExprClosureArguments];
         token![self, some node.asyncness, ExprClosureAsync];
-        token![self, some node.capture, Move];
+        token![self, some node.capture, ExprClosureMove];
         token![self, some node.movability, ExprClosureStatic];
+    } => {
+        if self.settled() {
+            return;
+        }
+
+        return self.set_help(node, HelpItem::ExprClosure);
     }];
     method![@attrs visit_expr_continue(self, node: syn::ExprContinue) {
         self.set_help(node, HelpItem::ExprContinue { label: node.label.as_ref().map(|l| l.to_string()) });
