@@ -291,7 +291,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_angle_bracketed_generic_arguments(
         self,
         node: syn::AngleBracketedGenericArguments
-    )];
+    ) => {
+        if self.settled() {
+            return;
+        }
+        if node.colon2_token.is_some() {
+            return self.set_help(node, HelpItem::Turbofish);
+        }
+    }];
     method![@attrs visit_arm(self, node: syn::Arm) {
         token![self, node.fat_arrow_token, FatArrow];
         if let Some((if_token, _)) = node.guard {
@@ -933,7 +940,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // method![visit_meta_list(self, node: syn::MetaList)];
     // OMITTED: unreachable from File
     // method![visit_meta_name_value(self, node: syn::MetaNameValue)];
-    method![visit_method_turbofish(self, node: syn::MethodTurbofish)];
+    method![visit_method_turbofish(self, node: syn::MethodTurbofish) => {
+        if self.settled() {
+            return;
+        }
+        return self.set_help(node, HelpItem::Turbofish);
+    }];
     // OMITTED: unreachable from File
     // method![visit_nested_meta(self, node: syn::NestedMeta)];
     method![visit_parenthesized_generic_arguments(
@@ -1055,7 +1067,6 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help(node, HelpItem::PatWild);
     }];
     // TODO:
-    // * turbofish foo::<sfd>
     // * Fn patterns: Fn(A, B) -> C
     method![visit_path(self, node: syn::Path) {
         if special_path_help(

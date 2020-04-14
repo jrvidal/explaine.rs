@@ -159,6 +159,10 @@ title = "Macro Input"
 info = "The input of a macro is a bunch of (almost) arbitrary tokens, and its interpretation depends on the particular macro."
 book = "ch19-06-macros.html"
 
+[help.Turbofish]
+title = "Turbofish"
+info = "The venerable [turbofish](https://turbo.fish/random) `::<>`. It is sometimes needed to specify generic arguments in paths to avoid ambiguity with the less than operator `<`."
+
 [help.PatBox]
 title = "Box Pattern"
 info = "A pattern that matches a `Box<..>`. This is an [experimental feature](https://doc.rust-lang.org/unstable-book/language-features/box-patterns.html)."

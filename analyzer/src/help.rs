@@ -53,6 +53,7 @@ pub enum HelpItem {
     ItemUse,
     Macro,
     MacroTokens,
+    Turbofish,
     PatBox,
     PatIdent {
         mutability: bool,
