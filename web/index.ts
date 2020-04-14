@@ -1,6 +1,6 @@
 import * as messages from "./messages";
 import renderer, { pure } from "./renderer";
-import { addClass, removeClass } from "./util";
+import { addClass, removeClass, compareLocations } from "./util";
 import worker from "./worker-client";
 import { reportHit, reportError } from "./logging";
 
@@ -550,7 +550,7 @@ function computeExploration(exploration: Span[]) {
 
   for (let i = nonUiState.lastRule + 1; i < exploration.length; i++) {
     styleSheet.insertRule(
-      `.hover-${i} .computed-${i} { background: #eee8d5 }`,
+      `.hover-${i} .computed-${i} { background: #e9deba; font-weight: bold; }`,
       styleSheet.cssRules.length
     );
   }
@@ -591,20 +591,47 @@ const renderHover = pure(function renderHover({
 }: {
   hoverEl: EventTarget | null;
 }) {
-  const klass =
+  const PREFIX = "computed-";
+  const PREFIX_LEN = PREFIX.length;
+
+  const indices =
     hoverEl &&
-    [...(hoverEl as HTMLElement).classList].find((klass) =>
-      klass.startsWith("computed-")
-    );
-  const newIndex =
-    klass != null ? Number(klass.replace("computed-", "")) : null;
+    [...(hoverEl as HTMLElement).classList]
+      .filter((klass) => klass.startsWith(PREFIX))
+      .map((klass) => Number(klass.slice(PREFIX_LEN)));
 
-  if (nonUiState.hoverIndex != null && newIndex !== nonUiState.hoverIndex) {
-    removeClass(codemirrorEl, `hover-${nonUiState.hoverIndex}`);
-  }
+  // "Most visible" mark
+  // Sort by (first to end, last to start) and take the minimum
+  let mostVisible = null as { mark: TextMarker; index: number } | null;
 
-  if (newIndex != null) {
-    addClass(codemirrorEl, `hover-${newIndex}`);
+  (indices || []).forEach((index) => {
+    const mark = nonUiState.computedMarks!![index];
+
+    if (mostVisible == null) {
+      mostVisible = { mark, index };
+      return;
+    }
+
+    const { from: fromA, to: toA } = mostVisible.mark.find();
+    const { from: fromB, to: toB } = mark.find();
+
+    const toCmp = compareLocations(toA, toB);
+    const cmp = toCmp === 0 ? -compareLocations(fromA, fromB) : toCmp;
+
+    if (cmp > 0) {
+      mostVisible = { mark, index };
+    }
+  });
+
+  const newIndex = mostVisible?.index ?? null;
+
+  if (newIndex != nonUiState.hoverIndex) {
+    if (nonUiState.hoverIndex != null) {
+      removeClass(codemirrorEl, `hover-${nonUiState.hoverIndex}`);
+    }
+    if (newIndex != null) {
+      addClass(codemirrorEl, `hover-${newIndex}`);
+    }
   }
 
   nonUiState.hoverIndex = newIndex;
@@ -655,7 +682,7 @@ const renderExplanationMark = pure(function renderExplanationMark({
 }) {
   nonUiState.hoverMark && nonUiState.hoverMark.clear();
   if (explanation == null || nonUiState.computedMarks != null) return;
-  nonUiState.hoverMark = getMark(explanation);
+  nonUiState.hoverMark = getMark(explanation, "hover-highlight");
 });
 
 const renderCodeEditor = pure(function renderCodeEditor({
@@ -751,11 +778,8 @@ function debounceUntilDone<T>(
   };
 }
 
-function withinRange({ line, ch }: Location, start: Location, end: Location) {
-  return (
-    (start.line < line || (start.line === line && start.ch <= ch)) &&
-    (line < end.line || (line === end.line && ch <= end.ch))
-  );
+function withinRange(loc: Location, start: Location, end: Location) {
+  return compareLocations(start, loc) <= 0 && compareLocations(loc, end) <= 0;
 }
 
 if (!self.__PRODUCTION__) {

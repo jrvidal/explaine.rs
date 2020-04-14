@@ -192,6 +192,11 @@ header {
   background: #eee8d5;
 }
 
+.hover-highlight {
+  background: #e9deba;
+  font-weight: bold;
+}
+
 .compilation-error {
   color: red !important;
   text-decoration: underline red wavy;

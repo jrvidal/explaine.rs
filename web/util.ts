@@ -1,3 +1,5 @@
+import { Location } from "./types";
+
 export function addClass(node: Element, klass: string) {
   node.classList.add(klass);
 }
@@ -26,4 +28,18 @@ export function makeUrl(url: string, params: { [param: string]: string }) {
   });
   address.search = `?${searchParams.toString()}`;
   return address.toString();
+}
+
+export function compareLocations(locA: Location, locB: Location) {
+  if (locA.line < locB.line) {
+    return -1;
+  } else if (locA.line > locB.line) {
+    return 1;
+  } else if (locA.ch < locB.ch) {
+    return -1;
+  } else if (locA.ch > locB.ch) {
+    return 1;
+  } else {
+    return 0;
+  }
 }
