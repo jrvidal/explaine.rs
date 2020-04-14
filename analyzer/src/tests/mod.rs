@@ -26,3 +26,4 @@ case![item_use_special];
 case![paths];
 case![let_stmt];
 case![receiver];
+case![arrays];

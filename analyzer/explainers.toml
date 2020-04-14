@@ -316,6 +316,17 @@ title = "Async Function"
 info = "An async function, whose signature is implicitly wrapped in `impl Future<..>`."
 keyword ="async"
 
+[help.ExprArray]
+title = "Array Literal"
+info = "A literal array, a sequence of elements with a known length at compile time."
+std = "primitive.array.html"
+book = "ch03-02-data-types.html#the-array-type"
+
+[help.ExprArraySlice]
+title = "Slice"
+info = "A literal slice, a dynamically sized sequence of elements."
+std = "primitive.slice.html"
+
 [help.ExprAsync]
 title = "Async Block"
 info = """An `async` block represents a delayed computation, much like the body of an async function or closure.
@@ -829,6 +840,7 @@ keyword = "type"
 title = "Array Type"
 info = "The type of an array, a sequence of elements with a length that is known at compile-time."
 book = "ch03-02-data-types.html#the-array-type"
+std = "primitive.array.html"
 
 [help.TypeInfer]
 title = "Inferred Type"

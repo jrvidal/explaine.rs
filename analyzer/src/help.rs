@@ -110,6 +110,8 @@ pub enum HelpItem {
     AsRenameExternCrate,
     AsCast,
     AsyncFn,
+    ExprArray,
+    ExprArraySlice,
     ExprAsync,
     ExprAsyncMove,
     ExprAwait,

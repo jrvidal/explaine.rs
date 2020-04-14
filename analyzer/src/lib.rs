@@ -398,7 +398,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // fn visit_derive_input(&mut self, _: &'ast syn::DeriveInput) {}
 
     method![visit_expr(self, node: syn::Expr)];
-    method![@attrs visit_expr_array(self, node: syn::ExprArray)];
+    method![@attrs visit_expr_array(self, node: syn::ExprArray) => {
+        if self.settled() {
+            return;
+        }
+
+        if !self.has_ancestor::<syn::ExprReference>(2) {
+            self.set_help(node, HelpItem::ExprArray)
+        }
+    }];
     method![@attrs visit_expr_assign(self, node: syn::ExprAssign)];
     method![@attrs visit_expr_assign_op(self, node: syn::ExprAssignOp)];
     method![@attrs visit_expr_async(self, node: syn::ExprAsync) {
@@ -483,15 +491,20 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             syn::RangeLimits::Closed(..) => return self.set_help(node, HelpItem::ExprRangeClosed { from, to }),
         }
     }];
-    method![@attrs visit_expr_reference(self, node: syn::ExprReference) {
-        let last_span = node.mutability.map(|t| t.span())
-            .unwrap_or_else(|| node.and_token.span());
-
-        if self.between_spans(node.and_token.span(), last_span) {
-            return self.set_help(&node, HelpItem::ExprReference {
-                mutable: node.mutability.is_some()
-            });
+    method![@attrs visit_expr_reference(self, node: syn::ExprReference) => {
+        if self.settled() {
+            return;
         }
+
+        let item = if let syn::Expr::Array(_) = &*node.expr {
+            HelpItem::ExprArraySlice
+        } else {
+            HelpItem::ExprReference {
+                mutable: node.mutability.is_some()
+            }
+        };
+
+        return self.set_help(node, item);
     }];
     method![@attrs visit_expr_repeat(self, node: syn::ExprRepeat) => {
         if !self.settled() {
