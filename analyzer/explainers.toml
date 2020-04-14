@@ -246,8 +246,9 @@ keyword = "crate"
 
 [help.ReceiverPath]
 title = "Method Receiver"
-info = "The receiver of this method call, like `this` in other languages."
+info = "The receiver of {{if method}}the `{ method }` method{{else}}this method call{{endif}}, like `this` in other languages."
 keyword = "self"
+book = "ch05-03-method-syntax.html"
 
 [help.Attribute]
 title = "Attribute"

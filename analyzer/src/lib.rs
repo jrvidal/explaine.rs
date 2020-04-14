@@ -1434,7 +1434,23 @@ fn special_path_help(
                 visitor.set_help(
                     &ident,
                     if can_be_receiver {
-                        HelpItem::ReceiverPath
+                        HelpItem::ReceiverPath {
+                            method: visitor
+                                .ancestors
+                                .iter()
+                                .rev()
+                                .map(|ancestor| ancestor.as_any())
+                                .filter_map(|any| {
+                                    any.downcast_ref::<syn::ImplItemMethod>()
+                                        .map(|method| &method.sig)
+                                        .or_else(|| {
+                                            any.downcast_ref::<syn::TraitItemMethod>()
+                                                .map(|method| &method.sig)
+                                        })
+                                })
+                                .next()
+                                .map(|sig| sig.ident.to_string()),
+                        }
                     } else {
                         HelpItem::PathSegmentSelf
                     },

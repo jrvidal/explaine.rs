@@ -91,7 +91,9 @@ pub enum HelpItem {
     PathSegmentCrate,
     // TODO: reference the actual module if it is inline, or refer to the relevant ancestor
     PathSegmentSuper,
-    ReceiverPath,
+    ReceiverPath {
+        method: Option<String>,
+    },
     Attribute {
         outer: bool,
     },
