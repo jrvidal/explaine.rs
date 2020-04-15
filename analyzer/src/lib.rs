@@ -284,8 +284,6 @@ macro_rules! token {
     };
 }
 
-// TODO
-// - operators: question mark, <<, >>, +, -, /, %, +=, -=, *=, /=, %=, ||, &&, range operators, [..]
 impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_abi(self, node: syn::Abi)];
     method![visit_angle_bracketed_generic_arguments(
@@ -387,8 +385,6 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![visit_binding(self, node: syn::Binding)];
     method![visit_block(self, node: syn::Block)];
-    // TODO: BoundLifetimes in function pointers
-    // TODO: BoundLifetimes in predicates, `for<'a> Foo<'a>: Bar<'a>`
     method![visit_bound_lifetimes(self, node: syn::BoundLifetimes) @terminal {
         return self.set_help(&node, HelpItem::BoundLifetimes);
     }];
@@ -463,21 +459,51 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_expr_for_loop(self, node: syn::ExprForLoop) {
         token![self, node.for_token, ExprForLoopToken];
         token![self, node.in_token, ExprForLoopToken];
+        if self.within(&node.pat) {
+            match &node.pat {
+                syn::Pat::Ident(syn::PatIdent { ident, mutability, .. }) => {
+                    return self.set_help(&node.pat, HelpItem::ForLoopLocal {
+                        mutability: mutability.is_some(),
+                        ident: Some(ident.to_string())
+                    });
+                },
+                syn::Pat::Wild(..) => {
+                    return self.set_help(&node.pat, HelpItem::ForLoopLocal{
+                        mutability: false,
+                        ident: None
+                    });
+                }
+                _ => {}
+            }
+        }
     }];
     method![@attrs visit_expr_group(self, node: syn::ExprGroup)];
     method![@attrs visit_expr_if(self, node: syn::ExprIf) {
         if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
             if self.between_spans(node.if_token.span(), let_token.span()) {
-                return self.set_help_between(node.if_token.span(), let_token.span(), HelpItem::IfLet);
+                return self.set_help_between(node.if_token.span(), let_token.span(), HelpItem::ExprIfLet);
             }
         } else {
-            token![self, node.if_token, If];
+            token![self, node.if_token, ExprIf];
         };
         if let Some((else_token, _)) = node.else_branch {
             token![self, else_token, Else];
         }
     }];
-    method![@attrs visit_expr_index(self, node: syn::ExprIndex)];
+    method![@attrs visit_expr_index(self, node: syn::ExprIndex) => {
+        if self.settled() {
+            return;
+        }
+        let range = if let syn::Expr::Range(..) = &*node.index {
+            true
+        } else {
+            false
+        };
+
+        return self.set_help(node, HelpItem::ExprIndex {
+            range
+        });
+    }];
     method![@attrs visit_expr_let(self, node: syn::ExprLet)];
     method![@attrs visit_expr_lit(self, node: syn::ExprLit)];
     method![@attrs visit_expr_loop(self, node: syn::ExprLoop) {
@@ -548,10 +574,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_expr_try(self, node: syn::ExprTry) {
         token![self, node.question_token, ExprTryQuestionMark];
     }];
-    method![@attrs visit_expr_try_block(self, node: syn::ExprTryBlock)];
+    method![@attrs visit_expr_try_block(self, node: syn::ExprTryBlock) {
+        token![self, node.try_token, ExprTryBlock];
+    }];
     method![@attrs visit_expr_tuple(self, node: syn::ExprTuple) => {
         if !self.settled() {
-            return self.set_help(node, HelpItem::ExprTuple);
+            return self.set_help(node, if node.elems.is_empty() { HelpItem::ExprUnitTuple } else { HelpItem::ExprTuple });
         }
     }];
     method![@attrs visit_expr_type(self, node: syn::ExprType) => {
@@ -626,7 +654,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_fields_named(self, node: syn::FieldsNamed)];
     method![visit_fields_unnamed(self, node: syn::FieldsUnnamed)];
     fn visit_file(&mut self, node: &'ast syn::File) {
-        // TODO: shebang
+        // TODO: handle shebang in exploration
+        // TODO: assign proper span to shebang
+        token![self, some node.shebang, Shebang];
         self.ancestors.push(node);
 
         for attr in &node.attrs {
@@ -858,7 +888,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_lit_byte_str(self, node: syn::LitByteStr) @terminal {
         return self.set_help(node, HelpItem::LitByteStr);
     }];
-    method![visit_lit_char(self, node: syn::LitChar)];
+    method![visit_lit_char(self, node: syn::LitChar) @terminal {
+        return self.set_help(node, HelpItem::LitChar);
+    }];
     method![visit_lit_float(self, node: syn::LitFloat) @terminal {
         let raw = node.to_string();
         let suffix = Some(node.suffix())
@@ -1064,6 +1096,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_pat_type(self, node: syn::PatType)];
     method![@attrs visit_pat_wild(self, node: syn::PatWild) @terminal {
+        // TODO: special case final, catch-all arm in a match pattern
         return self.set_help(node, HelpItem::PatWild);
     }];
     // TODO:
@@ -1082,6 +1115,13 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_path_segment(self, node: syn::PathSegment) {
         if node.ident == "super" {
             return self.set_help(&node.ident, HelpItem::PathSegmentSuper);
+        }
+    } => {
+        if self.settled() {
+            return;
+        }
+        if let syn::PathArguments::Parenthesized(..) = node.arguments {
+            return self.set_help(node, HelpItem::ParenthesizedGenericArguments);
         }
     }];
     method![visit_predicate_eq(self, node: syn::PredicateEq)];
@@ -1206,7 +1246,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_type_param(self, node: syn::TypeParam)];
     method![visit_type_param_bound(self, node: syn::TypeParamBound)];
     method![visit_type_paren(self, node: syn::TypeParen)];
-    method![visit_type_path(self, node: syn::TypePath)];
+    method![visit_type_path(self, node: syn::TypePath) => {
+        if self.settled() {
+            return;
+        }
+        if let Some(item) = well_known_type(node) {
+            return self.set_help(node, item);
+        }
+    }];
     method![visit_type_ptr(self, node: syn::TypePtr) {
         let end = node.const_token
             .map(|t| t.span())
@@ -1220,7 +1267,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             });
         }
     }];
-    method![visit_type_reference(self, node: syn::TypeReference) => {
+    method![visit_type_reference(self, node: syn::TypeReference) {
+        if let syn::Type::Path(type_path) = &*node.elem {
+            if let Some(HelpItem::KnownTypeStr) = well_known_type(type_path) {
+                return self.set_help(node, HelpItem::KnownTypeStrSlice {
+                    mutability: node.mutability.is_some()
+                });
+            }
+        }
+    } => {
         let last_span = node.mutability.map(|t| t.span())
             .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
             .unwrap_or_else(|| node.and_token.span());
@@ -1483,4 +1538,54 @@ fn special_path_help(
 pub fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
     (start.line < loc.line || (start.line == loc.line && start.column <= loc.column))
         && (loc.line < end.line || (loc.line == end.line && loc.column <= end.column))
+}
+
+pub fn well_known_type(type_path: &syn::TypePath) -> Option<HelpItem> {
+    let path = &type_path.path;
+    if type_path.qself.is_some() || path.leading_colon.is_some() || path.segments.len() > 1 {
+        return None;
+    }
+
+    let ident = match path.segments.first() {
+        Some(segment) if segment.arguments.is_empty() => &segment.ident,
+        _ => return None,
+    };
+
+    if ident == "u8" {
+        Some(HelpItem::KnownTypeU8)
+    } else if ident == "u16" {
+        Some(HelpItem::KnownTypeU16)
+    } else if ident == "u32" {
+        Some(HelpItem::KnownTypeU32)
+    } else if ident == "u64" {
+        Some(HelpItem::KnownTypeU64)
+    } else if ident == "u128" {
+        Some(HelpItem::KnownTypeU128)
+    } else if ident == "usize" {
+        Some(HelpItem::KnownTypeUSize)
+    } else if ident == "i8" {
+        Some(HelpItem::KnownTypeI8)
+    } else if ident == "i16" {
+        Some(HelpItem::KnownTypeI16)
+    } else if ident == "i32" {
+        Some(HelpItem::KnownTypeI32)
+    } else if ident == "i64" {
+        Some(HelpItem::KnownTypeI64)
+    } else if ident == "i128" {
+        Some(HelpItem::KnownTypeI128)
+    } else if ident == "isize" {
+        Some(HelpItem::KnownTypeISize)
+    } else if ident == "char" {
+        Some(HelpItem::KnownTypeChar)
+    } else if ident == "bool" {
+        Some(HelpItem::KnownTypeBool)
+    } else if ident == "f32" {
+        Some(HelpItem::KnownTypeF32)
+    } else if ident == "f64" {
+        Some(HelpItem::KnownTypeF64)
+    } else if ident == "str" {
+        Some(HelpItem::KnownTypeStr)
+    } else {
+        None
+    }
 }

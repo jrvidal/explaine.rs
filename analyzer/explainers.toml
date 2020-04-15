@@ -163,6 +163,14 @@ book = "ch19-06-macros.html"
 title = "Turbofish"
 info = "The venerable [turbofish](https://turbo.fish/random) `::<>`. It is sometimes needed to specify generic arguments in paths to avoid ambiguity with the less than operator `<`."
 
+[help.ParenthesizedGenericArguments]
+title = "`Fn`-like Generic Arguments"
+info = """For some traits, it's possible to specify their generic arguments as `Trait(A, B) -> C` instead of `Trait<A, B, Output=C>`.
+
+In stable Rust, this is only possible for the `Fn*` traits.
+"""
+std = "ops/trait.Fn.html"
+
 [help.PatBox]
 title = "Box Pattern"
 info = "A pattern that matches a `Box<..>`. This is an [experimental feature](https://doc.rust-lang.org/unstable-book/language-features/box-patterns.html)."
@@ -201,7 +209,7 @@ info = "The `|` syntax allows to test several patterns in one case, from left to
 book = "ch18-03-pattern-syntax.html#multiple-patterns"
 
 [help.PatRange]
-title = "Range Patter"
+title = "Range Pattern"
 info = "A {{if closed}}closed{{else}}half-open{{endif}} range pattern that matches any value within its bounds ({{if closed}}including{{else}}excluding{{endif}} the upper bound)."
 
 [help.PatRest]
@@ -297,7 +305,7 @@ info = "A method inside a trait."
 book = "ch10-02-traits.html"
 
 [help.ImplItemMethod]
-title = "Type method"
+title = "Type Method"
 info = "This is a method declaration for a type."
 book = "ch05-03-method-syntax.html"
 
@@ -416,6 +424,56 @@ and resumes from its beginning."""
 keyword = "continue"
 book = "ch03-05-control-flow.html"
 
+[help.ExprForLoopToken]
+title = "`for` - `in` loop"
+info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
+keyword = "for"
+book = "ch03-05-control-flow.html"
+
+[help.ForLoopLocal-variable]
+variant = "ForLoopLocal"
+pattern = "ident: Some(..), .."
+title = "`for` Loop Variable"
+info = "Each element in the interator gets assigned to the `{ ident }` variable{{if mutability}}, which is mutable as if introduced with `let mut`{{endif}}."
+
+[help.ForLoopLocal]
+variant = "ForLoopLocal"
+pattern = "ident: None, .."
+title = "`for` Loop without Variable"
+info = "By using the wildcard pattern `_`, this `for` loop iterates over every value of the iterator without actually using the values it yields."
+
+[help.ExprIf]
+title = "`if`"
+info = "An `if` expression."
+book = "ch03-05-control-flow.html"
+keyword = "if"
+
+[help.ExprIfLet]
+title = "`if-let`"
+info = "An `if-let` expression enters its body only if the given pattern matches."
+book = "ch06-03-if-let.html"
+keyword = "let"
+
+[help.Else]
+title = "`else`"
+info = "`else` denotes the alternative branch of a `if` block, like in many other languages."
+keyword = "else"
+book = "ch03-05-control-flow.html"
+
+[help.ExprIndex-simple]
+variant = "ExprIndex"
+pattern = "range: false"
+title = "Index Expression"
+info = "An index expression that might, for instance, access the element of a collection at a given index."
+std = "ops/trait.Index.html"
+
+[help.ExprIndex-range]
+variant = "ExprIndex"
+pattern = "range: true"
+title = "Range Index Expression"
+info = "A range index operation that might, for instance, return a sub-slice of the elements of a collection."
+std = "ops/trait.Index.html"
+
 [help.VisPublic]
 title = "`pub` visibility"
 info = "An item declared `pub` is accessible from the parent module."
@@ -441,12 +499,6 @@ title = "Variant Discriminant"
 info = "An explicit discriminant for the `{ name }` variant."
 # TODO: reference
 
-[help.Else]
-title = "`else`"
-info = "`else` denotes the alternative branch of a `if` block, like in many other languages."
-keyword = "else"
-book = "ch03-05-control-flow.html"
-
 [help.ItemEnum]
 title = "`enum` Declaration"
 info = """The declaration for an `enum`, a data type specified through a list of variants.
@@ -468,44 +520,6 @@ title = "Function ABI"
 info = "FnAbi"
 keyword = "extern"
 
-[help.True]
-title = "`true` boolean value"
-info = "The `true` boolean value."
-keyword = "true"
-
-[help.False]
-title = "`false` boolean value"
-info = "The `false` boolean value."
-keyword = "false"
-
-[help.LitByteStr]
-title = "Byte String Literal"
-info = "A literal string with a leading `b` is a _byte literal string_, of type `&'static [u8]`."
-# reference/tokens.html#byte-string-literals
-
-[help.LitFloat]
-title = "Floating-point Literal"
-info = """A floating-point number literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}.{{if separators}}
-
-The underscores `_` are merely for readability reasons.{{endif}}"""
-
-[help.LitInt]
-title = "Integer Literal"
-info = """An integer literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}{{if mode}},
-in { mode } notation (as indicated by the `{ prefix }` prefix){{endif}}.{{if separators}}
-
-The underscores `_` are merely for readability reasons.{{endif}}"""
-
-[help.LitStr]
-title = "String Literal"
-info = "A literal string, of type `&'static str`."
-
-[help.ExprForLoopToken]
-title = "`for` - `in` loop"
-info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
-keyword = "for"
-book = "ch03-05-control-flow.html"
-
 [help.BoundLifetimes]
 title = "Higher-Rank Lifetime Bound"
 info = "The `for` keyword indicates a generic bound over an infinite set of lifetimes."
@@ -522,18 +536,6 @@ title = "Higher-Rank Lifetime in Function Type"
 info = """The `for<..>` construct indicates that the given function type `fn(...)` is in fact an _infinite_ collection of
 type bounds."""
 keyword = "for"
-
-[help.IfLet]
-title = "`if-let`"
-info = "An `if-let` expression enters its body only if the given pattern matches."
-book = "ch06-03-if-let.html"
-keyword = "let"
-
-[help.If]
-title = "`if`"
-info = "An `if` expression."
-book = "ch03-05-control-flow.html"
-keyword = "if"
 
 [help.ItemImpl-intrinsic]
 title = "Implementation Block"
@@ -603,6 +605,45 @@ title = "Block Label"
 info = "Block labels are an [unstable feature](https://github.com/rust-lang/rust/issues/48594)."
 variant = "Label"
 pattern = "loop_of: LoopOf::Block"
+
+[help.True]
+title = "`true` boolean value"
+info = "The `true` boolean value."
+keyword = "true"
+std = "primitive.bool.html"
+
+[help.False]
+title = "`false` boolean value"
+info = "The `false` boolean value."
+keyword = "false"
+std = "primitive.bool.html"
+
+[help.LitChar]
+title = "Character Literal"
+info = "A character literal of type `char`."
+std = "primitive.char.html"
+
+[help.LitByteStr]
+title = "Byte String Literal"
+info = "A literal string with a leading `b` is a _byte literal string_, of type `&'static [u8]`."
+# reference/tokens.html#byte-string-literals
+
+[help.LitFloat]
+title = "Floating-point Literal"
+info = """A floating-point number literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}.{{if separators}}
+
+The underscores `_` are merely for readability reasons.{{endif}}"""
+
+[help.LitInt]
+title = "Integer Literal"
+info = """An integer literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}{{if mode}},
+in { mode } notation (as indicated by the `{ prefix }` prefix){{endif}}.{{if separators}}
+
+The underscores `_` are merely for readability reasons.{{endif}}"""
+
+[help.LitStr]
+title = "String Literal"
+info = "A literal string, of type `&'static str`."
 
 [help.ExprMatchToken]
 title = "`match` expression"
@@ -738,10 +779,21 @@ info = "The question mark operator `?` evaluates a fallible expression, and eith
 book = "ch09-02-recoverable-errors-with-result.html#propagating-errors"
 std = "ops/trait.Try.html"
 
+[help.ExprTryBlock]
+title = "Try Block"
+info = "`try` blocks are an [unstable feature](https://github.com/rust-lang/rust/issues/31436)."
+std = "ops/trait.Try.html"
+
 [help.ExprTuple]
 title = "Tuple Expression"
 info = "An expression that constructs a tuple."
 book = "ch03-02-data-types.html#the-tuple-type"
+
+[help.ExprUnitTuple]
+title = "Unit Expression"
+info = "The `unit` value, a tuple without elements."
+book = "ch03-02-data-types.html#the-tuple-type"
+std = "primitive.unit.html"
 
 [help.ExprType]
 title = "Type Ascription"
@@ -872,6 +924,96 @@ info = "The `unit` type, a tuple without elements."
 book = "ch03-02-data-types.html#the-tuple-type"
 std = "primitive.unit.html"
 
+[help.KnownTypeU8]
+title = "`u8` Type"
+info = "The `u8` primitive type."
+std = "primitive.u8.html"
+
+[help.KnownTypeU16]
+title = "`u16` Type"
+info = "The `u16` primitive type."
+std = "primitive.u16.html"
+
+[help.KnownTypeU32]
+title = "`u32` Type"
+info = "The `u32` primitive type."
+std = "primitive.u32.html"
+
+[help.KnownTypeU64]
+title = "`u64` Type"
+info = "The `u64` primitive type."
+std = "primitive.u64.html"
+
+[help.KnownTypeU128]
+title = "`u128` Type"
+info = "The `u128` primitive type."
+std = "primitive.u128.html"
+
+[help.KnownTypeUSize]
+title = "`usize` Type"
+info = "The `usize` primitive type."
+std = "primitive.usize.html"
+
+[help.KnownTypeI8]
+title = "`i8` Type"
+info = "The `i8` primitive type."
+std = "primitive.i8.html"
+
+[help.KnownTypeI16]
+title = "`i16` Type"
+info = "The `i16` primitive type."
+std = "primitive.i16.html"
+
+[help.KnownTypeI32]
+title = "`i32` Type"
+info = "The `i32` primitive type."
+std = "primitive.i32.html"
+
+[help.KnownTypeI64]
+title = "`i64` Type"
+info = "The `i64` primitive type."
+std = "primitive.i64.html"
+
+[help.KnownTypeI128]
+title = "`i128` Type"
+info = "The `i128` primitive type."
+std = "primitive.i128.html"
+
+[help.KnownTypeISize]
+title = "`isize` Type"
+info = "The `isize` primitive type."
+std = "primitive.isize.html"
+
+[help.KnownTypeChar]
+title = "`char` Type"
+info = "The `char` primitive type."
+std = "primitive.char.html"
+
+[help.KnownTypeBool]
+title = "`bool` Type"
+info = "The `bool` primitive type."
+std = "primitive.bool.html"
+
+[help.KnownTypeF32]
+title = "`f32` Type"
+info = "The `f32` primitive type."
+std = "primitive.f32.html"
+
+[help.KnownTypeF64]
+title = "`f64` Type"
+info = "The `f64` primitive type."
+std = "primitive.f64.html"
+
+[help.KnownTypeStr]
+title = "`str` Type"
+info = "The `str` primitive type."
+std = "primitive.str.html"
+
+[help.KnownTypeStrSlice]
+title = "`&str` Type"
+info = "The type of a{{if mutability}} mutable{{endif}} string slice."
+std = "primitive.str.html"
+
 [help.TypeConstPtr]
 title = "Raw Pointer"
 info = "A `const` pointer is a raw pointer without the safety guarantees of the borrow checker."
@@ -912,10 +1054,17 @@ title = "Trait Alias"
 info = "ItemTraitAlias"
 keyword = "trait"
 
-[help.Field]
+[help.Field-named]
 variant = "Field"
 title = "Named Field"
-info = "{{ if name }}The field `{name}`{{ else }}An unnamed field{{endif}} in the `{ of_name }` { of }."
+info = "The field `{name}` in the `{ of_name }` { of }."
+pattern = "name: Some(..), .."
+
+[help.Field-unnamed]
+variant = "Field"
+title = "Unnamed Field"
+info = "An unnamed field in the `{ of_name }` { of }."
+pattern = "name: None, .."
 
 [help.FieldPatUnnamed]
 title = "Tuple Struct Explicit Field Pattern"
@@ -928,6 +1077,11 @@ info = "Shorthand pattern equivalent to `{ ident }: { ident }`."
 [help.FieldValueShorthand]
 title = "Field Init Shorthand"
 info = "Shorthand expression equivalent to `{ name }: { name }`."
+
+[help.Shebang]
+title = "Shebang"
+info = "The Rust compiler accepts a shebang in source files, but ignores it."
+# TODO: reference
 
 [help.FatArrow]
 title = "Fat Arrow"

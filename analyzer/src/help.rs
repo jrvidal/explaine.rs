@@ -54,6 +54,7 @@ pub enum HelpItem {
     Macro,
     MacroTokens,
     Turbofish,
+    ParenthesizedGenericArguments,
     PatBox,
     PatIdent {
         mutability: bool,
@@ -63,6 +64,7 @@ pub enum HelpItem {
     PatIdentSubPat {
         ident: String,
     },
+    // TODO: include closure arguments as well
     PatIdentMutableArg {
         ident: String,
     },
@@ -78,6 +80,8 @@ pub enum HelpItem {
         empty: bool,
         bindings: Option<BindingOf>,
     },
+    // TODO: Special case the unit tuple
+    // TODO: watch out for tuple struct/variants with no fields
     PatTuple {
         bindings: Option<BindingOf>,
     },
@@ -103,11 +107,14 @@ pub enum HelpItem {
     ItemInlineMod,
     ItemExternMod,
     Unknown,
+    // TODO: refine the detection of methods vs. associated functions
     FnToken {
         of: FnOf,
         name: String,
     },
+    // TODO: refine the detection of methods vs. associated functions
     TraitItemMethod,
+    // TODO: refine the detection of methods vs. associated functions
     ImplItemMethod,
     AsRename,
     AsRenameExternCrate,
@@ -130,6 +137,19 @@ pub enum HelpItem {
     ExprContinue {
         label: Option<String>,
     },
+    ExprForLoopToken,
+    ForLoopLocal {
+        mutability: bool,
+        ident: Option<String>,
+    },
+    // TODO: could we special case an `if` expression to see if it's being used as an expression vs. statement?
+    // What about other expressions (`match`, `loop`, etc)?
+    ExprIf,
+    ExprIfLet,
+    Else,
+    ExprIndex {
+        range: bool,
+    },
     ImplItemConst,
     TraitItemConst,
     ItemConst,
@@ -145,27 +165,11 @@ pub enum HelpItem {
     VariantDiscriminant {
         name: String,
     },
-    Else,
     ItemEnum {
         empty: bool,
     },
     ItemForeignModAbi,
     FnAbi,
-    True,
-    False,
-    LitByteStr,
-    LitFloat {
-        suffix: Option<String>,
-        separators: bool,
-    },
-    LitInt {
-        suffix: Option<String>,
-        mode: Option<IntMode>,
-        prefix: Option<String>,
-        separators: bool,
-    },
-    LitStr,
-    ExprForLoopToken,
     BoundLifetimes,
     BoundLifetimesTraitBound {
         lifetime: String,
@@ -173,8 +177,6 @@ pub enum HelpItem {
         multiple: bool,
     },
     BoundLifetimesBareFnType,
-    IfLet,
-    If,
     ItemImpl {
         trait_: bool,
     },
@@ -192,8 +194,25 @@ pub enum HelpItem {
     Label {
         loop_of: LoopOf,
     },
+    True,
+    False,
+    // TODO: byte literals, escapes in chars and strings
+    LitByteStr,
+    LitChar,
+    LitFloat {
+        suffix: Option<String>,
+        separators: bool,
+    },
+    LitInt {
+        suffix: Option<String>,
+        mode: Option<IntMode>,
+        prefix: Option<String>,
+        separators: bool,
+    },
+    LitStr,
     ExprMatchToken,
     ArmIfGuard,
+    // TODO: handle special self cases, and explicit self references (`self: &Self`)
     MutSelf,
     ValueSelf {
         mutability: bool,
@@ -202,7 +221,7 @@ pub enum HelpItem {
     QSelfAsToken,
     StaticMut,
     Static,
-    // TODO: handle special cases, like str
+    // TODO: handle special cases: dyn
     TypeReference {
         mutable: bool,
         lifetime: bool,
@@ -232,10 +251,15 @@ pub enum HelpItem {
         len: String,
     },
     ExprReturn,
+    // TODO: handle ambiguity with struct variant instantiation. Also, in struct patterns.
+    // Also in tuple structs.
     ExprStruct,
     ExprStructRest,
     ExprTryQuestionMark,
+    ExprTryBlock,
+    // TODO: explain 1-element tuple disambiguation (also in type)
     ExprTuple,
+    ExprUnitTuple,
     ExprType,
     ExprUnsafe,
     ExprWhileLet,
@@ -267,6 +291,26 @@ pub enum HelpItem {
     TypeParamBoundAdd,
     TypeTupleUnit,
     TypeTuple,
+    KnownTypeU8,
+    KnownTypeU16,
+    KnownTypeU32,
+    KnownTypeU64,
+    KnownTypeU128,
+    KnownTypeUSize,
+    KnownTypeI8,
+    KnownTypeI16,
+    KnownTypeI32,
+    KnownTypeI64,
+    KnownTypeI128,
+    KnownTypeISize,
+    KnownTypeChar,
+    KnownTypeBool,
+    KnownTypeF32,
+    KnownTypeF64,
+    KnownTypeStr,
+    KnownTypeStrSlice {
+        mutability: bool,
+    },
     TypeConstPtr,
     TypeMutPtr,
     WhereClause,
@@ -286,6 +330,7 @@ pub enum HelpItem {
     FieldValueShorthand {
         name: String,
     },
+    Shebang,
     FatArrow,
     DocBlock {
         outer: bool,
@@ -369,6 +414,7 @@ variant![
         Method,
         #[serde(rename(serialize = "bare function type"))]
         BareFunctionType,
+        #[serde(rename(serialize = "function trait"))]
         FnTrait,
         Closure,
     }
