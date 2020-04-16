@@ -256,6 +256,16 @@ title = "`crate` Root Module"
 info = "A reference to the root module of the current crate."
 keyword = "crate"
 
+[help.QSelf]
+title = "Explicit Self Type"
+info = """This syntax allows to explicitly specify the type for which we access a method or another associated item."""
+
+[help.QSelfAsTrait]
+title = "Fully Qualified Syntax for Traits"
+info = """This syntax allows to unambigously specify the trait for which we access a method or another associated item."""
+keyword = "as"
+book = "ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name"
+
 [help.ReceiverPath]
 title = "Method Receiver"
 info = "The receiver of {{if method}}the `{ method }` method{{else}}this method call{{endif}}, like `this` in other languages."
@@ -679,13 +689,6 @@ keyword = "self"
 [help.PathLeadingColon]
 title = "Referencing External Crates"
 info = "A leading `::` in a path means that the path refers to an external crate."
-
-[help.QSelfAsToken]
-title = "Fully Qualified Syntax for Traits"
-info = """The `as` keyword allows specifying the trait among the several that a type might implement
-for which we're trying to call a given method on a type."""
-keyword = "as"
-book = "ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name"
 
 [help.StaticMut]
 title = "Mutable Static"

@@ -27,3 +27,4 @@ case![paths];
 case![let_stmt];
 case![receiver];
 case![arrays];
+case![qself];

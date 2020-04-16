@@ -96,6 +96,8 @@ pub enum HelpItem {
     PathSegmentCrate,
     // TODO: reference the actual module if it is inline, or refer to the relevant ancestor
     PathSegmentSuper,
+    QSelf,
+    QSelfAsTrait,
     ReceiverPath {
         method: Option<String>,
     },
@@ -218,7 +220,6 @@ pub enum HelpItem {
         mutability: bool,
     },
     RefSelf,
-    QSelfAsToken,
     StaticMut,
     Static,
     // TODO: handle special cases: dyn

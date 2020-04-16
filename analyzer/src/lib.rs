@@ -16,35 +16,27 @@ pub use help::HelpItem;
 trait DynAncestor {
     fn as_any(&self) -> &dyn Any;
     fn as_debug(&self) -> &dyn Debug;
-    fn dyn_span(&self) -> Span;
 }
 
 #[cfg(not(feature = "dev"))]
 trait DynAncestor {
     fn as_any(&self) -> &dyn Any;
-    fn dyn_span(&self) -> Span;
 }
 
 #[cfg(feature = "dev")]
-impl<T: Debug + Any + Spanned + 'static> DynAncestor for T {
+impl<T: Debug + Any> DynAncestor for T {
     fn as_any(&self) -> &dyn Any {
         self as &dyn Any
     }
     fn as_debug(&self) -> &dyn Debug {
         self as &dyn Debug
     }
-    fn dyn_span(&self) -> Span {
-        (self as &dyn Spanned).span()
-    }
 }
 
 #[cfg(not(feature = "dev"))]
-impl<T: Spanned + Any + 'static> DynAncestor for T {
+impl<T: Any> DynAncestor for T {
     fn as_any(&self) -> &dyn Any {
         self as &dyn Any
-    }
-    fn dyn_span(&self) -> Span {
-        (self as &dyn Spanned).span()
     }
 }
 
@@ -134,10 +126,6 @@ impl<'ast> IntersectionVisitor<'ast> {
         self.set_help_between(item.span(), item.span(), help);
     }
 
-    fn set_help_span(&mut self, span: Span, help: HelpItem) {
-        self.set_help_between(span, span, help);
-    }
-
     fn set_help_between(
         &mut self,
         start: proc_macro2::Span,
@@ -151,13 +139,13 @@ impl<'ast> IntersectionVisitor<'ast> {
     fn get_ancestor<T: 'static>(&self, idx: usize) -> Option<&'ast T> {
         self.ancestors
             .get(self.ancestors.len() - idx)
-            .and_then(|any| any.as_any().downcast_ref())
+            .and_then(|any| (*any).as_any().downcast_ref())
     }
 
     fn has_ancestor<T: 'static>(&self, idx: usize) -> bool {
         self.ancestors
             .get(self.ancestors.len() - idx)
-            .map(|any| any.as_any().is::<T>())
+            .map(|any| (*any).as_any().is::<T>())
             .unwrap_or(false)
     }
 }
@@ -1102,9 +1090,34 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // TODO:
     // * Fn patterns: Fn(A, B) -> C
     method![visit_path(self, node: syn::Path) {
+        let qself = loop {
+            let ancestor = if let Some(ancestor) = self.ancestors.last() {
+                *ancestor
+            } else {
+                return;
+            };
+
+            if let Some(expr_path) = ancestor.as_any().downcast_ref::<syn::ExprPath>() {
+                break &expr_path.qself;
+            }
+            if let Some(type_path) = ancestor.as_any().downcast_ref::<syn::TypePath>() {
+                break &type_path.qself;
+            }
+            if let Some(pat_path) = ancestor.as_any().downcast_ref::<syn::PatPath>() {
+                break &pat_path.qself;
+            }
+
+            break &None;
+        };
+
+        let simple_qself = qself
+            .as_ref()
+            .map(|q| q.as_token.is_some())
+            .unwrap_or(false);
+
         if special_path_help(
             self,
-            node.leading_colon,
+            node.leading_colon.filter(|_| simple_qself),
             node.segments.first().map(|s| &s.ident),
             node.segments.len() == 1 && self.has_ancestor::<syn::ExprPath>(1),
         ) {
@@ -1127,16 +1140,38 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_predicate_eq(self, node: syn::PredicateEq)];
     method![visit_predicate_lifetime(self, node: syn::PredicateLifetime)];
     method![visit_predicate_type(self, node: syn::PredicateType)];
+    // OPEN QUESTION: what is the purpose of the `<T>::foo()` syntax?
+    // If `T` has an intrinsic `foo()`, both:
+    // * T::foo()
+    // * <T>::foo()
+    // call it, regardless of whether there are additional `foo`s defined in traits.
+    // The only thing that I can fathom is that `T::foo()` assumes `T` is a valid
+    // path segment, and this is not always true:
+    // * <dyn Foo>::foo()
+    // * <&Foo>::foo()  ?
+    // * <_>::foo()   ?
     fn visit_qself(&mut self, node: &'ast syn::QSelf) {
-        if let Some(as_token) = node.as_token {
-            if self.within(&as_token) {
-                return self.set_help_span(
-                    self.ancestors.last().unwrap().dyn_span(),
-                    HelpItem::QSelfAsToken,
-                );
-            }
+        if !self.between_spans(node.lt_token.span(), node.gt_token.span()) {
+            return;
         }
+
+        self.ancestors.push(node);
         syn::visit::visit_qself(self, node);
+        let _ = self.ancestors.pop();
+
+        if self.settled() {
+            return;
+        }
+
+        return self.set_help_between(
+            node.lt_token.span(),
+            node.gt_token.span(),
+            if node.as_token.is_some() {
+                HelpItem::QSelfAsTrait
+            } else {
+                HelpItem::QSelf
+            },
+        );
     }
     // OMITTED: handled in parents
     // fn visit_range_limits(&mut self, node: &'ast syn::RangeLimits) {
@@ -1505,7 +1540,7 @@ fn special_path_help(
                                 .ancestors
                                 .iter()
                                 .rev()
-                                .map(|ancestor| ancestor.as_any())
+                                .map(|ancestor| (*ancestor).as_any())
                                 .filter_map(|any| {
                                     any.downcast_ref::<syn::ImplItemMethod>()
                                         .map(|method| &method.sig)

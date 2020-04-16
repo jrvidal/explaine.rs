@@ -29,8 +29,7 @@ pub fn test_example(source: &str) {
 struct RunData {
     naked: bool,
     expected_item: HelpItem,
-    start: LineColumn,
-    end: LineColumn,
+    span: Option<(LineColumn, LineColumn)>,
 }
 
 fn parse_run_data(lines: &[&str]) -> RunData {
@@ -79,12 +78,13 @@ fn parse_run_data(lines: &[&str]) -> RunData {
         panic!("Unknown directive {:?}", line);
     }
 
-    let (start, end) = span.expect("no span found");
+    if item.is_some() != span.is_some() {
+        panic!("Item and location must be specified together");
+    }
 
     RunData {
-        expected_item: item.expect("not item found"),
-        start,
-        end,
+        expected_item: item.unwrap_or(HelpItem::Unknown),
+        span,
         naked,
     }
 }
@@ -135,5 +135,7 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
             ..result.item_location.1
         },
     );
-    assert_eq!((run_data.start, run_data.end), adjusted, "Case {}", case);
+    if let Some((start, end)) = run_data.span {
+        assert_eq!((start, end), adjusted, "Case {}", case);
+    }
 }
