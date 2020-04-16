@@ -499,6 +499,11 @@ title = "Restricted visibility"
 info = "This item is can be only accessed in some modules."
 keyword = "pub"
 
+[help.WhereClause]
+title = "`where` Clause"
+info = "A `where` clause that introduces additional constraints to the generic types of this item."
+keyword = "where"
+
 [help.Variant]
 title = "Enum Variant"
 info = "One of the _variants_ of the `{ name }` enum, {{if fields}}with associated data as { fields } fields{{else}}with no associated data{{endif}}."
@@ -521,8 +526,8 @@ keyword = "enum"
 book = "ch06-00-enums.html"
 
 [help.ItemForeignModAbi]
-title = "TODO"
-info = "ItemForeignModAbi"
+title = "Extern Module"
+info = "An `extern` declaration that introduces items that should be linked together with this program."
 keyword = "extern"
 
 [help.FnAbi]
@@ -824,8 +829,8 @@ title = "Yield Expression"
 info = "A `yield` expression, an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
 
 [help.ForeignItemType]
-title = "TODO"
-info = "ForeignItemType"
+title = "`extern` Type"
+info = "Extern types are an [experimental feature](https://github.com/rust-lang/rust/issues/43467)."
 keyword = "type"
 
 [help.RawIdent]
@@ -834,8 +839,9 @@ info = "A raw identifier (as indicated by the `r#` prefix), that allows using ke
 
 [help.ImplItemType]
 title = "Associated Type"
-info = "The `type` keyword introduces an _associated type_ that implementors can specify."
+info = "The `type` keyword specifies an associated type for the implementing type."
 keyword = "type"
+# TODO: book
 
 [help.ItemUnsafeImpl]
 title = "Unsafe Trait Implementation"
@@ -861,6 +867,11 @@ keyword ="unsafe"
 title = "Trait Definition"
 info = "A trait declaration."
 keyword = "trait"
+
+[help.ItemTraitSupertraits]
+title = "Supertraits"
+info = "A list of supertraits that all implementors of this trait must also implement."
+book = "ch19-03-advanced-traits.html#using-supertraits-to-require-one-traits-functionality-within-another-trait"
 
 [help.ItemType]
 title = "Type Alias"
@@ -892,9 +903,10 @@ variant = "TraitBoundModifierQuestion"
 pattern = "sized: false"
 
 [help.TraitItemType]
-title = "TODO"
-info = "TraitItemType"
+title = "Associated Type"
+info = "The `type` keyword introduces an _associated type_ that implementors can specify."
 keyword = "type"
+# TODO: book
 
 [help.TypeArray]
 title = "Array Type"
@@ -1029,11 +1041,6 @@ info = "A `mut` pointer is a mutable, raw pointer without the safety guarantees 
 keyword = "mut"
 book = "ch19-01-unsafe-rust.html#dereferencing-a-raw-pointer"
 
-[help.WhereClause]
-title = "TODO"
-info = "WhereClause"
-keyword = "where"
-
 [help.TypeBareFn]
 title = "Function Pointer Type"
 info = "The type of a function pointer, a reference to a free-standing function or method."
@@ -1047,8 +1054,8 @@ keyword = "unsafe"
 std = "primitive.fn.html"
 
 [help.TypeBareFnAbi]
-title = "TODO"
-info = "TypeBareFnAbi"
+title = "Function Pointer Type ABI"
+info = "An ABI that the functions of this type must have."
 keyword = "extern"
 std = "primitive.fn.html"
 

@@ -273,7 +273,8 @@ macro_rules! token {
 }
 
 impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
-    method![visit_abi(self, node: syn::Abi)];
+    // OMITTED: handled upstream
+    // method![visit_abi(self, node: syn::Abi)];
     method![visit_angle_bracketed_generic_arguments(
         self,
         node: syn::AngleBracketedGenericArguments
@@ -379,6 +380,8 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_const_param(self, node: syn::ConstParam) {
         token![self, node.const_token, ConstParam];
     }];
+    // EXAMPLE
+    // impl<P: Deref<Target: Eq>> Eq for Pin<P> {}
     method![visit_constraint(self, node: syn::Constraint)];
 
     // OMITTED: unreachable from File
@@ -818,6 +821,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_item_trait(self, node: syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
         token![self, node.trait_token, ItemTrait];
+        if let Some(colon_token) = node.colon_token {
+            if self.within(colon_token) {
+                let last = node.supertraits.last().map(|t| t.span()).unwrap_or(colon_token.span());
+                return self.set_help_between(colon_token.span(), last, HelpItem::ItemTraitSupertraits);
+            }
+        }
     }];
     method![@attrs visit_item_trait_alias(self, node: syn::ItemTraitAlias) {
         token![self, node.trait_token, ItemTraitAlias];

@@ -160,6 +160,7 @@ pub enum HelpItem {
     VisPublic,
     VisCrate,
     VisRestricted,
+    WhereClause,
     Variant {
         name: String,
         fields: Option<Fields>,
@@ -276,6 +277,7 @@ pub enum HelpItem {
     },
     ItemUnsafeTrait,
     ItemTrait,
+    ItemTraitSupertraits,
     ItemType,
     ItemUnion,
     UnsafeFn,
@@ -314,7 +316,6 @@ pub enum HelpItem {
     },
     TypeConstPtr,
     TypeMutPtr,
-    WhereClause,
     ItemTraitAlias,
     Field {
         name: Option<String>,
