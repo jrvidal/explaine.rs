@@ -28,7 +28,10 @@ fn main() {
             match ty {
                 Type::Syn(ident) => {
                     let field_id = id_map.insert(&format!("syn::{}", ident));
-                    to_parents.entry(field_id).or_insert_with(Vec::new).push(id);
+                    to_parents
+                        .entry(field_id)
+                        .or_insert_with(HashSet::new)
+                        .insert(id);
                 }
                 Type::Option(ty) => {
                     types.push(&*ty);
@@ -44,12 +47,18 @@ fn main() {
                 }
                 Type::Token(token) => {
                     let token_id = id_map.insert(&format!("token::{}", token));
-                    to_parents.entry(token_id).or_insert_with(Vec::new).push(id);
+                    to_parents
+                        .entry(token_id)
+                        .or_insert_with(HashSet::new)
+                        .insert(id);
                 }
                 Type::Punctuated(punct) => {
                     types.push(&*punct.element);
                     let token_id = id_map.insert(&format!("token::{}", punct.punct));
-                    to_parents.entry(token_id).or_insert_with(Vec::new).push(id);
+                    to_parents
+                        .entry(token_id)
+                        .or_insert_with(HashSet::new)
+                        .insert(id);
                 }
                 Type::Ext(..) => {}
                 Type::Group(..) => {}
@@ -58,27 +67,82 @@ fn main() {
         }
     }
 
-    let mut args = std::env::args().skip(1);
-    let maybe_ty = args.next();
-    let depth = args
-        .next()
-        .map(|s| u8::from_str_radix(&s, 10).unwrap())
-        .unwrap_or(1);
+    let mut to_children = HashMap::new();
 
-    let ty = if let Some(ty) = maybe_ty {
-        ty
+    for &id in id_map.id_to_name.keys() {
+        if let Some(parents) = to_parents.get(&id) {
+            for parent in parents {
+                to_children
+                    .entry(*parent)
+                    .or_insert_with(HashSet::new)
+                    .insert(id);
+            }
+        }
+    }
+
+    let to_children = to_children;
+
+    let mut args = std::env::args().skip(1).collect::<Vec<_>>();
+
+    let child_to_parent = if args[0] == "--reverse" {
+        let _ = args.remove(0);
+        false
     } else {
-        return print_all(to_parents, id_map, depth);
+        true
     };
-    let id = id_map.name_to_id[&ty[..]];
-    let mut queue = vec![(id, 0)];
+
+    let no_tokens = if args[0] == "--no-tokens" {
+        let _ = args.remove(0);
+        true
+    } else {
+        false
+    };
+
+    enum Accept {
+        Type,
+        Depth,
+        Blacklist,
+    }
+
+    let mut types = vec![];
+    let mut accepting = Accept::Type;
+    let mut blacklist = HashSet::new();
+
+    for arg in args {
+        match accepting {
+            Accept::Type => {
+                if arg == "--blacklist" {
+                    accepting = Accept::Blacklist;
+                } else {
+                    accepting = Accept::Depth;
+                    let id = id_map.name_to_id[&arg];
+                    types.push((id, 1, 0));
+                }
+            }
+            Accept::Blacklist => {
+                accepting = Accept::Type;
+                let id = id_map.name_to_id[&arg];
+                blacklist.insert(id);
+            }
+            Accept::Depth => {
+                types.last_mut().unwrap().1 = u8::from_str_radix(&arg, 10).unwrap();
+                accepting = Accept::Type;
+            }
+        }
+    }
 
     println!("digraph Deps {{\n");
 
     let mut visited = HashSet::new();
 
-    while let Some((id, deep)) = queue.pop() {
-        if deep >= depth {
+    let nodes = if child_to_parent {
+        &to_parents
+    } else {
+        &to_children
+    };
+
+    while let Some((id, max_depth, depth)) = types.pop() {
+        if depth >= max_depth {
             continue;
         }
 
@@ -86,87 +150,31 @@ fn main() {
             continue;
         }
 
-        if !to_parents.contains_key(&id) {
+        if !nodes.contains_key(&id) {
             continue;
         }
 
-        let parents = &to_parents[&id];
-        let name = &id_map.id_to_name[&id];
-        for parent in parents {
-            let parent_name = &id_map.id_to_name[parent];
-            println!("\"{}\" -> \"{}\"", name, parent_name);
+        if blacklist.contains(&id) {
+            continue;
         }
-        queue.extend(parents.iter().map(|p| (*p, deep + 1)));
-    }
 
-    println!("}}\n");
-}
+        let name = &id_map.id_to_name[&id];
 
-fn print_all(to_parents: HashMap<usize, Vec<usize>>, id_map: IdMap, max_depth: u8) {
-    let mut to_children = HashMap::new();
+        if no_tokens && name.starts_with("token::") {
+            continue;
+        }
 
-    for &id in id_map.id_to_name.keys() {
-        if let Some(parents) = to_parents.get(&id) {
-            for parent in parents {
-                to_children
-                    .entry(parent)
-                    .or_insert_with(HashSet::new)
-                    .insert(id);
+        let neighbours = &nodes[&id];
+
+        for neighbour in neighbours {
+            let neighbour_name = &id_map.id_to_name[neighbour];
+            if no_tokens && neighbour_name.starts_with("token::") {
+                continue;
             }
-        } else {
-            eprintln!("no parents for {}", &id_map.id_to_name[&id]);
-        }
-    }
-
-    eprintln!(
-        "{:?}",
-        to_children[&id_map.name_to_id["syn::Macro"]]
-            .iter()
-            .map(|id| &id_map.id_to_name[id])
-            .collect::<Vec<_>>()
-    );
-
-    let mut queue = id_map
-        .id_to_name
-        .keys()
-        .cloned()
-        .filter(|id| !to_children.contains_key(&id))
-        .map(|t| (t, 0))
-        .collect::<Vec<_>>();
-
-    eprintln!(
-        "{:?}",
-        queue
-            .iter()
-            .map(|id| &id_map.id_to_name[&id.0])
-            .collect::<Vec<_>>()
-    );
-    println!("digraph Deps {{\n");
-
-    while let Some((id, depth)) = queue.pop() {
-        if depth >= max_depth {
-            continue;
+            println!("{:?} -> {:?}", name, neighbour_name);
         }
 
-        if !to_parents.contains_key(&id) {
-            eprintln!("discarding {}", &id_map.id_to_name[&id]);
-            continue;
-        }
-
-        let parents = &to_parents[&id];
-
-        let name = &id_map.id_to_name[&id];
-
-        if name == "syn::Macro" {
-            panic!("{:?}", depth);
-        }
-
-        for parent in parents {
-            let parent_name = &id_map.id_to_name[parent];
-            println!("{:?} -> {:?}", name, parent_name);
-        }
-
-        queue.extend(parents.iter().map(|&p| (p, depth + 1)));
+        types.extend(neighbours.iter().map(|p| (*p, max_depth, depth + 1)));
     }
 
     println!("}}\n");

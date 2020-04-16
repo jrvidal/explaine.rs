@@ -50,7 +50,74 @@ pub enum HelpItem {
     BitOrEqBinOp,
     ShlEqBinOp,
     ShrEqBinOp,
-    ItemUse,
+    Binding {
+        ident: String,
+    },
+    ExprArray,
+    ExprArraySlice,
+    ExprAssign,
+    ExprAssignOp,
+    ExprAsync,
+    ExprAsyncMove,
+    ExprAwait,
+    ExprBreak {
+        label: Option<String>,
+        expr: bool,
+    },
+    ExprClosure,
+    ExprClosureArguments,
+    ExprClosureAsync,
+    ExprClosureMove,
+    ExprClosureStatic,
+    ExprContinue {
+        label: Option<String>,
+    },
+    ExprUnnamedField,
+    ExprForLoopToken,
+    ForLoopLocal {
+        mutability: bool,
+        ident: Option<String>,
+    },
+    // TODO: could we special case an `if` expression to see if it's being used as an expression vs. statement?
+    // What about other expressions (`match`, `loop`, etc)?
+    // Maybe explain that the test does not need parenthesis?
+    ExprIf,
+    ExprIfLet,
+    Else,
+    ExprIndex {
+        range: bool,
+    },
+    ExprLoopToken,
+    ExprMatchToken,
+    ExprRangeHalfOpen {
+        from: bool,
+        to: bool,
+    },
+    ExprRangeClosed {
+        from: bool,
+        to: bool,
+    },
+    ExprReference {
+        mutable: bool,
+    },
+    ExprRepeat {
+        len: String,
+    },
+    ExprReturn,
+    // TODO: handle ambiguity with struct variant instantiation. Also, in struct patterns.
+    // Also in tuple structs.
+    ExprStruct,
+    ExprStructRest,
+    ExprTryQuestionMark,
+    ExprTryBlock,
+    // TODO: explain 1-element tuple disambiguation (also in type)
+    ExprTuple,
+    ExprUnitTuple,
+    ExprType,
+    ExprUnsafe,
+    ExprWhileLet,
+    ExprWhile,
+    ExprYield,
     Macro,
     MacroTokens,
     Turbofish,
@@ -122,36 +189,6 @@ pub enum HelpItem {
     AsRenameExternCrate,
     AsCast,
     AsyncFn,
-    ExprArray,
-    ExprArraySlice,
-    ExprAsync,
-    ExprAsyncMove,
-    ExprAwait,
-    ExprBreak {
-        label: Option<String>,
-        expr: bool,
-    },
-    ExprClosure,
-    ExprClosureArguments,
-    ExprClosureAsync,
-    ExprClosureMove,
-    ExprClosureStatic,
-    ExprContinue {
-        label: Option<String>,
-    },
-    ExprForLoopToken,
-    ForLoopLocal {
-        mutability: bool,
-        ident: Option<String>,
-    },
-    // TODO: could we special case an `if` expression to see if it's being used as an expression vs. statement?
-    // What about other expressions (`match`, `loop`, etc)?
-    ExprIf,
-    ExprIfLet,
-    Else,
-    ExprIndex {
-        range: bool,
-    },
     ImplItemConst,
     TraitItemConst,
     ItemConst,
@@ -193,7 +230,6 @@ pub enum HelpItem {
         ident: Option<String>,
         mutability: bool,
     },
-    ExprLoopToken,
     Label {
         loop_of: LoopOf,
     },
@@ -213,11 +249,14 @@ pub enum HelpItem {
         separators: bool,
     },
     LitStr,
-    ExprMatchToken,
     ArmIfGuard,
     // TODO: handle special self cases, and explicit self references (`self: &Self`)
     MutSelf,
     ValueSelf {
+        mutability: bool,
+    },
+    // TODO: explain mutability
+    SpecialSelf {
         mutability: bool,
     },
     RefSelf,
@@ -246,27 +285,6 @@ pub enum HelpItem {
     UseGroupSelf {
         parent: String,
     },
-    ExprReference {
-        mutable: bool,
-    },
-    ExprRepeat {
-        len: String,
-    },
-    ExprReturn,
-    // TODO: handle ambiguity with struct variant instantiation. Also, in struct patterns.
-    // Also in tuple structs.
-    ExprStruct,
-    ExprStructRest,
-    ExprTryQuestionMark,
-    ExprTryBlock,
-    // TODO: explain 1-element tuple disambiguation (also in type)
-    ExprTuple,
-    ExprUnitTuple,
-    ExprType,
-    ExprUnsafe,
-    ExprWhileLet,
-    ExprWhile,
-    ExprYield,
     ForeignItemType,
     RawIdent,
     ImplItemType,
@@ -280,6 +298,7 @@ pub enum HelpItem {
     ItemTraitSupertraits,
     ItemType,
     ItemUnion,
+    ItemUse,
     UnsafeFn,
     TraitBoundModifierQuestion {
         sized: bool,
@@ -332,6 +351,7 @@ pub enum HelpItem {
     FieldValueShorthand {
         name: String,
     },
+    FieldUnnamedValue,
     Shebang,
     FatArrow,
     DocBlock {
@@ -339,14 +359,6 @@ pub enum HelpItem {
     },
     RArrow {
         return_of: ReturnOf,
-    },
-    ExprRangeHalfOpen {
-        from: bool,
-        to: bool,
-    },
-    ExprRangeClosed {
-        from: bool,
-        to: bool,
     },
     StaticLifetime,
 }

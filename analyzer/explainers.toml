@@ -143,11 +143,243 @@ title = "Left right Assignment Operator"
 info = "The overloadable left right assignment operator `>>=`."
 std = "ops/trait.ShrAssign.html"
 
-[help.ItemUse]
-title = "`use` Item"
-info = "A `use` declaration acts like a shortcut by shortening the path to the item in a module."
-book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html"
-keyword = "use"
+[help.Binding]
+title = "Associated Type Binding"
+info = "This constraint specifies the actual type for the associated type `{ ident }` of this trait."
+book = "ch19-03-advanced-traits.html#specifying-placeholder-types-in-trait-definitions-with-associated-types"
+
+[help.ExprArray]
+title = "Array Literal"
+info = "A literal array, a sequence of elements with a known length at compile time."
+std = "primitive.array.html"
+book = "ch03-02-data-types.html#the-array-type"
+
+[help.ExprArraySlice]
+title = "Slice"
+info = "A literal slice, a dynamically sized sequence of elements."
+std = "primitive.slice.html"
+
+[help.ExprAssign]
+title = "Assignment"
+info = "An assignment of a value to a variable or place."
+
+[help.ExprAssignOp]
+title = "Operation plus Assignment"
+info = "An assignment of a computed value to a variable or place."
+
+[help.ExprAsync]
+title = "Async Block"
+info = """An `async` block represents a delayed computation, much like the body of an async function or closure.
+
+It produces a future that will run thorugh the block's statements once it is polled."""
+keyword ="async"
+
+[help.ExprAsyncMove]
+title = "Moving Async Block"
+info = "The `move` keyword instructs the compiler to capture variables in this async block by moving them, much like in the case of `move` closures."
+keyword ="move"
+
+[help.ExprAwait]
+title = "`await` Expression"
+info = "An `.await` expression suspends the computation of an `async` function until the awaited expression (a future) is ready."
+keyword ="await"
+
+[help.ExprBreak]
+title = "`break`"
+info = """A `break` expression terminates the
+{{if label}}loop labeled by `{ label }`{{else}}innermost enclosing loop{{endif}}{{if expr}}
+and specifies a final value for it{{endif}}."""
+book = "ch03-05-control-flow.html"
+keyword = "break"
+
+[help.ExprClosure]
+title = "Closure"
+info = "A closure expression, an anonymous function that can capture environment variables."
+book = "ch13-01-closures.html"
+
+[help.ExprClosureMove]
+title = "`move` Closure"
+info = "The `move` keyword specifies that a closure should take ownership over the ambient variables it refers to in its body."
+keyword = "move"
+book = "ch13-01-closures.html"
+
+[help.ExprClosureArguments]
+title = "Closure arguments"
+info = "Two vertical bars `| ··· |` enclose the list of arguments of a closure."
+book = "ch13-01-closures.html"
+
+[help.ExprClosureAsync]
+title = "Async closure"
+info = "An `async` closure (an [experimental feature](https://github.com/rust-lang/rust/issues/62290))."
+keyword ="async"
+
+[help.ExprClosureStatic]
+title = "Static Closure"
+info = "Static closures are an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
+keyword = "static"
+
+[help.ExprContinue]
+title = "`continue` expression"
+info = """A `continue` expression interrupts the current iteration of
+{{if label}}the loop labeled by `{ label }`{{else}}the innermost enclosing loop{{endif}}
+and resumes from its beginning."""
+keyword = "continue"
+book = "ch03-05-control-flow.html"
+
+[help.ExprUnnamedField]
+title = "Unnamed Field"
+info = "This expression accesses an unnamed, indexed field of a tuple or a tuple struct."
+
+[help.ExprForLoopToken]
+title = "`for` - `in` loop"
+info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
+keyword = "for"
+book = "ch03-05-control-flow.html"
+
+[help.ForLoopLocal-variable]
+variant = "ForLoopLocal"
+pattern = "ident: Some(..), .."
+title = "`for` Loop Variable"
+info = "Each element in the interator gets assigned to the `{ ident }` variable{{if mutability}}, which is mutable as if introduced with `let mut`{{endif}}."
+
+[help.ForLoopLocal]
+variant = "ForLoopLocal"
+pattern = "ident: None, .."
+title = "`for` Loop without Variable"
+info = "By using the wildcard pattern `_`, this `for` loop iterates over every value of the iterator without actually using the values it yields."
+
+[help.ExprIf]
+title = "`if`"
+info = "An `if` expression."
+book = "ch03-05-control-flow.html"
+keyword = "if"
+
+[help.ExprIfLet]
+title = "`if-let`"
+info = "An `if-let` expression enters its body only if the given pattern matches."
+book = "ch06-03-if-let.html"
+keyword = "let"
+
+[help.Else]
+title = "`else`"
+info = "`else` denotes the alternative branch of a `if` block, like in many other languages."
+keyword = "else"
+book = "ch03-05-control-flow.html"
+
+[help.ExprIndex-simple]
+variant = "ExprIndex"
+pattern = "range: false"
+title = "Index Expression"
+info = "An index expression that might, for instance, access the element of a collection at a given index."
+std = "ops/trait.Index.html"
+
+[help.ExprIndex-range]
+variant = "ExprIndex"
+pattern = "range: true"
+title = "Range Index Expression"
+info = "A range index operation that might, for instance, return a sub-slice of the elements of a collection."
+std = "ops/trait.Index.html"
+
+[help.ExprLoopToken]
+title = "Infinite loop"
+info = "The `loop` keyword introduces an infinite loop."
+keyword = "loop"
+book = "ch03-05-control-flow.html"
+
+[help.ExprMatchToken]
+title = "`match` expression"
+info = "A `match` expression enumerates a list of patterns to match against a given expression."
+book = "ch06-02-match.html"
+keyword = "match"
+
+[help.ExprRangeHalfOpen]
+title = "Half-open range"
+info = "A half open range expression `(..)`, that generates a range of elements with an inclusive lower bound and an exclusive upper bound."
+
+[help.ExprRangeClosed]
+title = "Closed range"
+info = "A closed range expression `(..=)`, that generates a range of elements with inclusive lower and upper bounds."
+
+[help.ExprReference-immutable]
+title = "Immutable reference"
+variant = "ExprReference"
+pattern = "mutable: false"
+info = "An immutable (shared) borrow of another value."
+
+[help.ExprReference-mutable]
+title = "Mutable reference"
+variant = "ExprReference"
+info = "A mutable (exclusive) borrow of another value."
+pattern = "mutable: true"
+
+[help.ExprRepeat]
+title = "Array Initialization"
+info = "An expression that initializes an array of length `{ len }` by copying an initial value in every position."
+book = "ch03-02-data-types.html#the-array-type"
+
+# TODO: contextualize to functions/closures/async block
+[help.ExprReturn]
+title = "`return` expression"
+info = "The `return` keyword stops the execution of the current function with the provided value."
+keyword = "return"
+
+[help.ExprStruct]
+title = "Struct Instantiation"
+info = "An expression that builds an instance of a struct by listing the values of its fields."
+book = "ch05-01-defining-structs.html#defining-and-instantiating-structs"
+
+[help.ExprStructRest]
+title = "Struct Update Syntax"
+info = "A \"rest\" expression that copies the fields of a struct into another."
+book = "ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax"
+
+# TODO: contextualize to function/closure/async block?
+[help.ExprTryQuestionMark]
+title = "Question Mark Operator"
+info = "The question mark operator `?` evaluates a fallible expression, and either unwraps a successful case or performs an early return for an unsuccessful case."
+book = "ch09-02-recoverable-errors-with-result.html#propagating-errors"
+std = "ops/trait.Try.html"
+
+[help.ExprTryBlock]
+title = "Try Block"
+info = "`try` blocks are an [unstable feature](https://github.com/rust-lang/rust/issues/31436)."
+std = "ops/trait.Try.html"
+
+[help.ExprTuple]
+title = "Tuple Expression"
+info = "An expression that constructs a tuple."
+book = "ch03-02-data-types.html#the-tuple-type"
+
+[help.ExprUnitTuple]
+title = "Unit Expression"
+info = "The `unit` value, a tuple without elements."
+book = "ch03-02-data-types.html#the-tuple-type"
+std = "primitive.unit.html"
+
+[help.ExprType]
+title = "Type Ascription"
+info = "A type ascription expression, an [experimental feature](https://github.com/rust-lang/rust/issues/23416)."
+
+[help.ExprUnsafe]
+title = "Unsafe block"
+info = "An `unsafe` block, that allows to dereference raw pointers and call `unsafe` functions, among other things."
+keyword = "unsafe"
+
+[help.ExprWhileLet]
+title = "`while-let`"
+info = "A `while let` loop continues its execution while the provided pattern matches."
+keyword = "while"
+book = "ch18-01-all-the-places-for-patterns.html#while-let-conditional-loops"
+
+[help.ExprWhile]
+title = "While loop"
+info = "A `while` loop that iterates while its test condition is `true`."
+keyword = "while"
+book = "ch03-05-control-flow.html"
+
+[help.ExprYield]
+title = "Yield Expression"
+info = "A `yield` expression, an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
 
 [help.Macro]
 title = "Macro Invocation"
@@ -339,68 +571,6 @@ title = "Async Function"
 info = "An async function, whose signature is implicitly wrapped in `impl Future<..>`."
 keyword ="async"
 
-[help.ExprArray]
-title = "Array Literal"
-info = "A literal array, a sequence of elements with a known length at compile time."
-std = "primitive.array.html"
-book = "ch03-02-data-types.html#the-array-type"
-
-[help.ExprArraySlice]
-title = "Slice"
-info = "A literal slice, a dynamically sized sequence of elements."
-std = "primitive.slice.html"
-
-[help.ExprAsync]
-title = "Async Block"
-info = """An `async` block represents a delayed computation, much like the body of an async function or closure.
-
-It produces a future that will run thorugh the block's statements once it is polled."""
-keyword ="async"
-
-[help.ExprAsyncMove]
-title = "Moving Async Block"
-info = "The `move` keyword instructs the compiler to capture variables in this async block by moving them, much like in the case of `move` closures."
-keyword ="move"
-
-[help.ExprAwait]
-title = "`await` Expression"
-info = "An `.await` expression suspends the computation of an `async` function until the awaited expression (a future) is ready."
-keyword ="await"
-
-[help.ExprBreak]
-title = "`break`"
-info = """A `break` expression terminates the
-{{if label}}loop labeled by `{ label }`{{else}}innermost enclosing loop{{endif}}{{if expr}}
-and specifies a final value for it{{endif}}."""
-book = "ch03-05-control-flow.html"
-keyword = "break"
-
-[help.ExprClosure]
-title = "Closure"
-info = "A closure expression, an anonymous function that can capture environment variables."
-book = "ch13-01-closures.html"
-
-[help.ExprClosureMove]
-title = "`move` Closure"
-info = "The `move` keyword specifies that a closure should take ownership over the ambient variables it refers to in its body."
-keyword = "move"
-book = "ch13-01-closures.html"
-
-[help.ExprClosureArguments]
-title = "Closure arguments"
-info = "Two vertical bars `| ··· |` enclose the list of arguments of a closure."
-book = "ch13-01-closures.html"
-
-[help.ExprClosureAsync]
-title = "Async closure"
-info = "An `async` closure (an [experimental feature](https://github.com/rust-lang/rust/issues/62290))."
-keyword ="async"
-
-[help.ExprClosureStatic]
-title = "Static Closure"
-info = "Static closures are an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
-keyword = "static"
-
 [help.ImplItemConst]
 title = "Associated constant"
 info = "An _associated constant_ that can be accessed as a nested item."
@@ -426,63 +596,6 @@ title = "`const` function"
 info = "A `const` function can be used to compute constants at compile time."
 keyword = "const"
 
-[help.ExprContinue]
-title = "`continue` expression"
-info = """A `continue` expression interrupts the current iteration of
-{{if label}}the loop labeled by `{ label }`{{else}}the innermost enclosing loop{{endif}}
-and resumes from its beginning."""
-keyword = "continue"
-book = "ch03-05-control-flow.html"
-
-[help.ExprForLoopToken]
-title = "`for` - `in` loop"
-info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
-keyword = "for"
-book = "ch03-05-control-flow.html"
-
-[help.ForLoopLocal-variable]
-variant = "ForLoopLocal"
-pattern = "ident: Some(..), .."
-title = "`for` Loop Variable"
-info = "Each element in the interator gets assigned to the `{ ident }` variable{{if mutability}}, which is mutable as if introduced with `let mut`{{endif}}."
-
-[help.ForLoopLocal]
-variant = "ForLoopLocal"
-pattern = "ident: None, .."
-title = "`for` Loop without Variable"
-info = "By using the wildcard pattern `_`, this `for` loop iterates over every value of the iterator without actually using the values it yields."
-
-[help.ExprIf]
-title = "`if`"
-info = "An `if` expression."
-book = "ch03-05-control-flow.html"
-keyword = "if"
-
-[help.ExprIfLet]
-title = "`if-let`"
-info = "An `if-let` expression enters its body only if the given pattern matches."
-book = "ch06-03-if-let.html"
-keyword = "let"
-
-[help.Else]
-title = "`else`"
-info = "`else` denotes the alternative branch of a `if` block, like in many other languages."
-keyword = "else"
-book = "ch03-05-control-flow.html"
-
-[help.ExprIndex-simple]
-variant = "ExprIndex"
-pattern = "range: false"
-title = "Index Expression"
-info = "An index expression that might, for instance, access the element of a collection at a given index."
-std = "ops/trait.Index.html"
-
-[help.ExprIndex-range]
-variant = "ExprIndex"
-pattern = "range: true"
-title = "Range Index Expression"
-info = "A range index operation that might, for instance, return a sub-slice of the elements of a collection."
-std = "ops/trait.Index.html"
 
 [help.VisPublic]
 title = "`pub` visibility"
@@ -600,12 +713,6 @@ book = "ch03-01-variables-and-mutability.html"
 variant = "Local"
 pattern = "mutability: true, .."
 
-[help.ExprLoopToken]
-title = "Infinite loop"
-info = "The `loop` keyword introduces an infinite loop."
-keyword = "loop"
-book = "ch03-05-control-flow.html"
-
 [help.Label-stable]
 title = "Loop Label"
 info = """A label for the adjacent `{ loop_of }` expression
@@ -660,12 +767,6 @@ The underscores `_` are merely for readability reasons.{{endif}}"""
 title = "String Literal"
 info = "A literal string, of type `&'static str`."
 
-[help.ExprMatchToken]
-title = "`match` expression"
-info = "A `match` expression enumerates a list of patterns to match against a given expression."
-book = "ch06-02-match.html"
-keyword = "match"
-
 [help.ArmIfGuard]
 title = "`if` guard"
 info = """The `if` keyword can be used to introduce _match guards_, that add extra conditions to a case
@@ -684,6 +785,11 @@ title = "Owned `self`"
 info = "This method consumes `self` as a value. {{if mutability}}Since it is marked as `mut`, it can also be mutated like a variable introduced by `let mut`.{{endif}}"
 book = "ch05-03-method-syntax.html"
 keyword = "self"
+
+[help.SpecialSelf]
+title = "Special `self`"
+info = "This method consumes a special `Self` type."
+keyword = "Self"
 
 [help.RefSelf]
 title = "Borrowed `self`"
@@ -747,87 +853,6 @@ info = "A reference to the parent `{ parent }` module so it is brought to scope.
 keyword = "self"
 book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#using-nested-paths-to-clean-up-large-use-lists"
 
-[help.ExprReference-immutable]
-title = "Immutable reference"
-variant = "ExprReference"
-pattern = "mutable: false"
-info = "An immutable (shared) borrow of another value."
-
-[help.ExprReference-mutable]
-title = "Mutable reference"
-variant = "ExprReference"
-info = "A mutable (exclusive) borrow of another value."
-pattern = "mutable: true"
-
-[help.ExprRepeat]
-title = "Array Initialization"
-info = "An expression that initializes an array of length `{ len }` by copying an initial value in every position."
-book = "ch03-02-data-types.html#the-array-type"
-
-# TODO: contextualize to functions/closures/async block
-[help.ExprReturn]
-title = "`return` expression"
-info = "The `return` keyword stops the execution of the current function with the provided value."
-keyword = "return"
-
-[help.ExprStruct]
-title = "Struct Instantiation"
-info = "An expression that builds an instance of a struct by listing the values of its fields."
-book = "ch05-01-defining-structs.html#defining-and-instantiating-structs"
-
-[help.ExprStructRest]
-title = "Struct Update Syntax"
-info = "A \"rest\" expression that copies the fields of a struct into another."
-book = "ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax"
-
-# TODO: contextualize to function/closure/async block?
-[help.ExprTryQuestionMark]
-title = "Question Mark Operator"
-info = "The question mark operator `?` evaluates a fallible expression, and either unwraps a successful case or performs an early return for an unsuccessful case."
-book = "ch09-02-recoverable-errors-with-result.html#propagating-errors"
-std = "ops/trait.Try.html"
-
-[help.ExprTryBlock]
-title = "Try Block"
-info = "`try` blocks are an [unstable feature](https://github.com/rust-lang/rust/issues/31436)."
-std = "ops/trait.Try.html"
-
-[help.ExprTuple]
-title = "Tuple Expression"
-info = "An expression that constructs a tuple."
-book = "ch03-02-data-types.html#the-tuple-type"
-
-[help.ExprUnitTuple]
-title = "Unit Expression"
-info = "The `unit` value, a tuple without elements."
-book = "ch03-02-data-types.html#the-tuple-type"
-std = "primitive.unit.html"
-
-[help.ExprType]
-title = "Type Ascription"
-info = "A type ascription expression, an [experimental feature](https://github.com/rust-lang/rust/issues/23416)."
-
-[help.ExprUnsafe]
-title = "Unsafe block"
-info = "An `unsafe` block, that allows to dereference raw pointers and call `unsafe` functions, among other things."
-keyword = "unsafe"
-
-[help.ExprWhileLet]
-title = "`while-let`"
-info = "A `while let` loop continues its execution while the provided pattern matches."
-keyword = "while"
-book = "ch18-01-all-the-places-for-patterns.html#while-let-conditional-loops"
-
-[help.ExprWhile]
-title = "While loop"
-info = "A `while` loop that iterates while its test condition is `true`."
-keyword = "while"
-book = "ch03-05-control-flow.html"
-
-[help.ExprYield]
-title = "Yield Expression"
-info = "A `yield` expression, an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
-
 [help.ForeignItemType]
 title = "`extern` Type"
 info = "Extern types are an [experimental feature](https://github.com/rust-lang/rust/issues/43467)."
@@ -841,7 +866,7 @@ info = "A raw identifier (as indicated by the `r#` prefix), that allows using ke
 title = "Associated Type"
 info = "The `type` keyword specifies an associated type for the implementing type."
 keyword = "type"
-# TODO: book
+book = "ch19-03-advanced-traits.html#specifying-placeholder-types-in-trait-definitions-with-associated-types"
 
 [help.ItemUnsafeImpl]
 title = "Unsafe Trait Implementation"
@@ -877,11 +902,18 @@ book = "ch19-03-advanced-traits.html#using-supertraits-to-require-one-traits-fun
 title = "Type Alias"
 info = "A type alias works as a synonym of the aliased type."
 keyword = "type"
+book = "ch19-03-advanced-traits.html#specifying-placeholder-types-in-trait-definitions-with-associated-types"
 
 [help.ItemUnion]
 title = "Union"
 info = "A `union` is an \"unsafe enum\", that allows interoperation with C enums. Reading fields from a union is unsafe."
 keyword = "union"
+
+[help.ItemUse]
+title = "`use` Item"
+info = "A `use` declaration acts like a shortcut by shortening the path to the item in a module."
+book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html"
+keyword = "use"
 
 [help.UnsafeFn]
 title = "Unsafe function"
@@ -906,7 +938,7 @@ pattern = "sized: false"
 title = "Associated Type"
 info = "The `type` keyword introduces an _associated type_ that implementors can specify."
 keyword = "type"
-# TODO: book
+book = "ch19-03-advanced-traits.html#specifying-placeholder-types-in-trait-definitions-with-associated-types"
 
 [help.TypeArray]
 title = "Array Type"
@@ -1088,6 +1120,10 @@ info = "Shorthand pattern equivalent to `{ ident }: { ident }`."
 title = "Field Init Shorthand"
 info = "Shorthand expression equivalent to `{ name }: { name }`."
 
+[help.FieldUnnamedValue]
+title = "Unnamed Field Value"
+info = "The unnamed fields of this tuple struct (or tuple enum variant) are being initialized explicitly by specifying their indices."
+
 [help.Shebang]
 title = "Shebang"
 info = "The Rust compiler accepts a shebang in source files, but ignores it."
@@ -1116,14 +1152,6 @@ book = "ch14-02-publishing-to-crates-io.html#commenting-contained-items"
 [help.RArrow]
 title = "Right Arrow `->`"
 info = "A right arrow token `->` used to signify the return type of this { return_of }."
-
-[help.ExprRangeHalfOpen]
-title = "Half-open range"
-info = "A half open range expression `(..)`, that generates a range of elements with an inclusive lower bound and an exclusive upper bound."
-
-[help.ExprRangeClosed]
-title = "Closed range"
-info = "A closed range expression `(..=)`, that generates a range of elements with inclusive lower and upper bounds."
 
 [help.StaticLifetime]
 title = "`'static` lifetime"

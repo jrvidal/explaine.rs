@@ -372,7 +372,13 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
 
         return self.set_help(node, item);
     }];
-    method![visit_binding(self, node: syn::Binding)];
+    method![visit_binding(self, node: syn::Binding) => {
+        if !self.settled() {
+            return self.set_help(node, HelpItem::Binding {
+                ident: node.ident.to_string()
+            });
+        }
+    }];
     method![visit_block(self, node: syn::Block)];
     method![visit_bound_lifetimes(self, node: syn::BoundLifetimes) @terminal {
         return self.set_help(&node, HelpItem::BoundLifetimes);
@@ -401,8 +407,20 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             self.set_help(node, HelpItem::ExprArray)
         }
     }];
-    method![@attrs visit_expr_assign(self, node: syn::ExprAssign)];
-    method![@attrs visit_expr_assign_op(self, node: syn::ExprAssignOp)];
+    method![@attrs visit_expr_assign(self, node: syn::ExprAssign) => {
+        if self.settled() {
+            return;
+        }
+        // TODO: add context on the lvalue/place expression: deref, index, field access, etc.
+        return self.set_help(node, HelpItem::ExprAssign);
+    }];
+    method![@attrs visit_expr_assign_op(self, node: syn::ExprAssignOp) => {
+        if self.settled() {
+            return;
+        }
+        // TODO: add context on the lvalue/place expression: deref, index, field access, etc.
+        return self.set_help(node, HelpItem::ExprAssignOp);
+    }];
     method![@attrs visit_expr_async(self, node: syn::ExprAsync) {
         token![self, some node.capture, ExprAsyncMove];
     } => {
@@ -446,7 +464,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_expr_continue(self, node: syn::ExprContinue) {
         self.set_help(node, HelpItem::ExprContinue { label: node.label.as_ref().map(|l| l.to_string()) });
     }];
-    method![@attrs visit_expr_field(self, node: syn::ExprField)];
+    method![@attrs visit_expr_field(self, node: syn::ExprField) => {
+        if self.settled() {
+            return;
+        }
+
+        if let syn::Member::Unnamed(..) = node.member {
+            return self.set_help_between(node.dot_token.span(), node.member.span(), HelpItem::ExprUnnamedField);
+        }
+    }];
     method![@attrs visit_expr_for_loop(self, node: syn::ExprForLoop) {
         token![self, node.for_token, ExprForLoopToken];
         token![self, node.in_token, ExprForLoopToken];
@@ -640,6 +666,14 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             },
             _ => {}
         }
+    } => {
+        if self.settled() {
+            return
+        }
+
+        if let syn::Member::Unnamed(..) = node.member {
+            return self.set_help(node, HelpItem::FieldUnnamedValue);
+        }
     }];
     method![visit_fields(self, node: syn::Fields)];
     method![visit_fields_named(self, node: syn::FieldsNamed)];
@@ -665,7 +699,31 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         }
     }
-    method![visit_fn_arg(self, node: syn::FnArg)];
+    method![visit_fn_arg(self, node: syn::FnArg) => {
+        if self.settled() {
+            return;
+        }
+
+        let pat = if let syn::FnArg::Typed(pat_type) = node {
+            pat_type
+        } else {
+            return;
+        };
+
+        let (is_self, mutability) = match &*pat.pat {
+            syn::Pat::Ident(pat_ident) => {
+                let is_self = pat_ident.by_ref.is_none() && pat_ident.subpat.is_none() && pat_ident.ident == "self";
+                (is_self, pat_ident.mutability.is_some())
+            },
+            _ => (false, false)
+        };
+
+        if is_self {
+            return self.set_help(node, HelpItem::SpecialSelf {
+                mutability
+            });
+        }
+    }];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
     method![@attrs visit_foreign_item_fn(self, node: syn::ForeignItemFn)];
     method![@attrs visit_foreign_item_macro(self, node: syn::ForeignItemMacro)];
