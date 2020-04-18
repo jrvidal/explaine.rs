@@ -628,11 +628,31 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         if self.settled() {
             return;
         }
-        return self.set_help(node, HelpItem::Field {
-            name: node.ident.as_ref().map(|id| id.to_string()),
-            of: FieldOf::Struct,
-            of_name: "".to_string()
-        });
+
+        let field_data = loop {
+            if let Some(variant) = self.get_ancestor::<syn::Variant>(3) {
+                break Some((FieldOf::Variant, variant.ident.to_string()));
+            }
+
+            if let Some(item_struct) = self.get_ancestor::<syn::ItemStruct>(3) {
+                break Some((FieldOf::Struct, item_struct.ident.to_string()));
+            }
+
+            if let Some(item_union) = self.get_ancestor::<syn::ItemUnion>(2) {
+                break Some((FieldOf::Union, item_union.ident.to_string()));
+            }
+
+            break None;
+        };
+
+        if let Some((field_of, of_name)) = field_data {
+            return self.set_help(node, HelpItem::Field {
+                name: node.ident.as_ref().map(|id| id.to_string()),
+                of: field_of,
+                of_name
+            });
+        }
+
     }];
     method![@attrs visit_field_pat(self, node: syn::FieldPat) => {
         if self.settled() {
@@ -699,29 +719,77 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             }
         }
     }
-    method![visit_fn_arg(self, node: syn::FnArg) => {
-        if self.settled() {
-            return;
-        }
+    method![visit_fn_arg(self, node: syn::FnArg) {
+        loop {
+            let sig = if let Some(sig) = self.get_ancestor::<syn::Signature>(1) {
+                sig
+            } else {
+                break;
+            };
 
-        let pat = if let syn::FnArg::Typed(pat_type) = node {
-            pat_type
-        } else {
-            return;
-        };
+            let is_first = sig
+                .inputs
+                .first()
+                .map(|arg| std::ptr::eq(arg, node))
+                .unwrap_or(false);
+            if !is_first {
+                break;
+            }
 
-        let (is_self, mutability) = match &*pat.pat {
-            syn::Pat::Ident(pat_ident) => {
-                let is_self = pat_ident.by_ref.is_none() && pat_ident.subpat.is_none() && pat_ident.ident == "self";
-                (is_self, pat_ident.mutability.is_some())
-            },
-            _ => (false, false)
-        };
+            let pat = if let syn::FnArg::Typed(pat_type) = node {
+                pat_type
+            } else {
+                break;
+            };
 
-        if is_self {
-            return self.set_help(node, HelpItem::SpecialSelf {
-                mutability
-            });
+            let pat_ident = match &*pat.pat {
+                syn::Pat::Ident(pat_ident) => pat_ident,
+                _ => break,
+            };
+
+            let is_self = pat_ident.by_ref.is_none()
+                && pat_ident.subpat.is_none()
+                && pat_ident.ident == "self";
+
+            if !is_self {
+                break;
+            }
+
+            let mutability = pat_ident.mutability.is_some();
+
+            match &*pat.ty {
+                syn::Type::Path(type_path) if type_path.path.is_ident("Self") => {
+                    return self.set_help(
+                        node,
+                        HelpItem::ValueSelf {
+                            explicit: true,
+                            mutability,
+                        },
+                    )
+                }
+                syn::Type::Reference(type_reference) => match &*type_reference.elem {
+                    syn::Type::Path(type_ref_path) if type_ref_path.path.is_ident("Self") => {
+                        return self.set_help(
+                            node,
+                            if type_reference.mutability.is_some() {
+                                HelpItem::MutSelf {
+                                    explicit: true,
+                                    mutability,
+                                }
+                            } else {
+                                HelpItem::RefSelf {
+                                    explicit: true,
+                                    mutability,
+                                }
+                            },
+                        )
+                    }
+                    _ => {}
+                },
+                _ => return self.set_help(node, HelpItem::SpecialSelf { mutability }),
+            }
+
+            break;
         }
     }];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
@@ -788,13 +856,6 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         token![self, node.const_token, ItemConst];
     }];
     method![@attrs visit_item_enum(self, node: syn::ItemEnum) => {
-        match self.help {
-            HelpItem::Variant { ref mut name, .. } => {
-                *name = node.ident.to_string();
-                return;
-            }
-            _ => {}
-        }
         token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
             empty: node.variants.is_empty()
         }];
@@ -832,15 +893,17 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
     }];
     method![@attrs visit_item_macro2(self, node: syn::ItemMacro2)];
-    method![@attrs visit_item_mod(self, node: syn::ItemMod) {
-        if !self.within(&node.vis) {
-            if let Some(..) = node.content {
-                if self.between(&node.mod_token, &node.ident) {
-                    return self.set_help_between(node.mod_token.span(), node.ident.span(), HelpItem::ItemInlineMod);
-                }
-            } else {
-                return self.set_help(&node, HelpItem::ItemExternMod);
+    method![@attrs visit_item_mod(self, node: syn::ItemMod) => {
+        if self.settled() {
+            return;
+        }
+
+        if node.content.is_some() {
+            if self.between(&node.mod_token, &node.ident) {
+                return self.set_help_between(node.mod_token.span(), node.ident.span(), HelpItem::ItemInlineMod);
             }
+        } else {
+            return self.set_help(&node, HelpItem::ItemExternMod);
         }
     }];
     method![@attrs visit_item_static(self, node: syn::ItemStatic) {
@@ -856,28 +919,23 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
     }];
     method![@attrs visit_item_struct(self, node: syn::ItemStruct) => {
-        match self.help {
-            HelpItem::Field { ref mut of, ref mut of_name, .. } => {
-                *of = FieldOf::Struct;
-                *of_name = node.ident.to_string();
-            },
-            _ if !self.settled() => {
-                let unit = match node.fields {
-                    syn::Fields::Unit => true,
-                    _ => false
-                };
-                if self.between_spans(node.struct_token.span(), node.ident.span()) {
-                    return self.set_help_between(node.struct_token.span(), node.ident.span(), HelpItem::ItemStruct {
-                        unit,
-                        name: node.ident.to_string()
-                    });
-                }
-            }
-            _ => {}
+        if self.settled() {
+            return;
+        }
+        let unit = match node.fields {
+            syn::Fields::Unit => true,
+            _ => false
+        };
+        if self.between_spans(node.struct_token.span(), node.ident.span()) {
+            return self.set_help_between(node.struct_token.span(), node.ident.span(), HelpItem::ItemStruct {
+                unit,
+                name: node.ident.to_string()
+            });
         }
     }];
     method![@attrs visit_item_trait(self, node: syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
+        token![self, some node.auto_token, ItemAutoTrait];
         token![self, node.trait_token, ItemTrait];
         if let Some(colon_token) = node.colon_token {
             if self.within(colon_token) {
@@ -892,16 +950,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![@attrs visit_item_type(self, node: syn::ItemType) {
         token![self, node.type_token => node.ident, ItemType];
     }];
-    method![@attrs visit_item_union(self, node: syn::ItemUnion) => {
-        match self.help {
-            HelpItem::Field { ref mut of, ref mut of_name, .. } => {
-                *of = FieldOf::Union;
-                *of_name = node.ident.to_string();
-                return;
-            },
-            _ if self.settled() => return,
-            _ => {}
-        }
+    method![@attrs visit_item_union(self, node: syn::ItemUnion) {
         token![self, node.union_token, ItemUnion];
     }];
     method![@attrs visit_item_use(self, node: syn::ItemUse) {
@@ -939,9 +988,13 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_lit_bool(self, node: syn::LitBool) @terminal {
         return self.set_help(node, if node.value { HelpItem::True } else { HelpItem:: False });
     }];
-    method![visit_lit_byte(self, node: syn::LitByte)];
+    method![visit_lit_byte(self, node: syn::LitByte) @terminal {
+        return self.set_help(node, HelpItem::LitByte);
+    }];
     method![visit_lit_byte_str(self, node: syn::LitByteStr) @terminal {
-        return self.set_help(node, HelpItem::LitByteStr);
+        let prefix = raw_string_literal(node.to_token_stream().to_string(), "br");
+        let raw = prefix.is_some();
+        return self.set_help(node, HelpItem::LitByteStr { raw, prefix });
     }];
     method![visit_lit_char(self, node: syn::LitChar) @terminal {
         return self.set_help(node, HelpItem::LitChar);
@@ -983,7 +1036,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         });
     }];
     method![visit_lit_str(self, node: syn::LitStr) @terminal {
-        return self.set_help(node, HelpItem::LitStr);
+        let prefix = raw_string_literal(node.to_token_stream().to_string(), "r");
+        let raw = prefix.is_some();
+        return self.set_help(node, HelpItem::LitStr { raw, prefix });
     }];
     method![@attrs visit_local(self, node: syn::Local) {
         let ident_pat = match &node.pat {
@@ -1244,10 +1299,11 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     // fn visit_range_limits(&mut self, node: &'ast syn::RangeLimits) {
     method![@attrs visit_receiver(self, node: syn::Receiver) @terminal {
         let item = match (&node.reference, &node.mutability) {
-            (Some(_), Some(_)) => HelpItem::MutSelf,
-            (Some(_), None) => HelpItem::RefSelf,
+            (Some(_), Some(_)) => HelpItem::MutSelf { explicit: false, mutability: false },
+            (Some(_), None) => HelpItem::RefSelf { explicit: false, mutability: false },
             (None, mutability) => {
                 HelpItem::ValueSelf {
+                    explicit: false,
                     mutability: mutability.is_some()
                 }
             }
@@ -1508,43 +1564,50 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     method![visit_use_tree(self, node: syn::UseTree)];
     method![@attrs visit_variadic(self, node: syn::Variadic)];
     method![@attrs visit_variant(self, node: syn::Variant) => {
-        if !self.settled() {
-            if let Some((eq_token, discriminant)) = &node.discriminant {
-                if self.between(&eq_token, &discriminant) {
-                    return self.set_help_between(eq_token.span(), discriminant.span(), HelpItem::VariantDiscriminant {
-                        name: node.ident.to_string()
-                    });
-                }
+        if self.settled() {
+            return;
+        }
+        if let Some((eq_token, discriminant)) = &node.discriminant {
+            if self.between(&eq_token, &discriminant) {
+                return self.set_help_between(eq_token.span(), discriminant.span(), HelpItem::VariantDiscriminant {
+                    name: node.ident.to_string()
+                });
             }
-            return self.set_help(node, HelpItem::Variant {
-                name: "".to_string(),
-                fields: match node.fields {
-                    syn::Fields::Named(..) => Some(Fields::Named),
-                    syn::Fields::Unnamed(..) => Some(Fields::Unnamed),
-                    syn::Fields::Unit => None
-                }
-            });
         }
+        let name = if let Some(item_enum) = self.get_ancestor::<syn::ItemEnum>(1) {
+            item_enum.ident.to_string()
+        } else {
+            return;
+        };
 
-        match self.help {
-            HelpItem::Field { ref mut of, ref mut of_name, .. } => {
-                *of = FieldOf::Variant;
-                *of_name = node.ident.to_string();
-            },
-            _ => {}
-        }
+        return self.set_help(node, HelpItem::Variant {
+            name,
+            fields: match node.fields {
+                syn::Fields::Named(..) => Some(Fields::Named),
+                syn::Fields::Unnamed(..) => Some(Fields::Unnamed),
+                syn::Fields::Unit => None
+            }
+        });
     }];
-    method![visit_vis_crate(self, node: syn::VisCrate)];
-    method![visit_vis_public(self, node: syn::VisPublic)];
-    method![visit_vis_restricted(self, node: syn::VisRestricted)];
-    method![visit_visibility(self, node: syn::Visibility) {
-        match node {
-            syn::Visibility::Public(vis) => token![self, vis.pub_token, VisPublic],
-            syn::Visibility::Crate(vis) => token![self, vis.crate_token, VisCrate],
-            syn::Visibility::Restricted(..) => token![self, node, VisRestricted],
-            syn::Visibility::Inherited => {}
-        }
+    method![visit_vis_crate(self, node: syn::VisCrate) @terminal {
+        return self.set_help(node, HelpItem::VisCrate);
     }];
+    method![visit_vis_public(self, node: syn::VisPublic) @terminal {
+        return self.set_help(node, HelpItem::VisPublic);
+    }];
+    method![visit_vis_restricted(self, node: syn::VisRestricted) @terminal {
+        let path = match &*node.path {
+            path if path.is_ident("self") => VisRestrictedPath::Self_,
+            path if path.is_ident("super") => VisRestrictedPath::Super,
+            path if path.is_ident("crate") => VisRestrictedPath::Crate,
+            _ => VisRestrictedPath::Path
+        };
+        return self.set_help(node, HelpItem::VisRestricted {
+            path,
+            in_: node.in_token.is_some()
+        });
+    }];
+    method![visit_visibility(self, node: syn::Visibility)];
     method![visit_where_clause(self, node: syn::WhereClause) {
         token![self, node.where_token, WhereClause];
     }];
@@ -1687,6 +1750,26 @@ pub fn well_known_type(type_path: &syn::TypePath) -> Option<HelpItem> {
         Some(HelpItem::KnownTypeF64)
     } else if ident == "str" {
         Some(HelpItem::KnownTypeStr)
+    } else {
+        None
+    }
+}
+
+fn raw_string_literal(mut literal: String, prefix: &str) -> Option<String> {
+    if literal.starts_with(prefix) {
+        for _ in 0..prefix.len() {
+            literal.remove(0);
+        }
+        let open = literal
+            .chars()
+            .enumerate()
+            .filter(|(_, c)| *c == '"')
+            .next();
+
+        open.map(|(idx, _)| {
+            literal.truncate(idx);
+            literal
+        })
     } else {
         None
     }

@@ -17,6 +17,12 @@ struct HelpData {
 }
 
 std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
+
+// TODO: known conflicts/bugs
+// * Clicking on an unnamed field in a struct/enum results in a clash between help for the type
+//  and help for unnamed fields
+// * `Self { x: 1 }` is not identified as a struct instantiation expression (probably same with patterns)
+
 #[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize))]
 #[cfg_attr(test, derive(Debug, Clone, Serialize, Deserialize, PartialEq))]
 #[cfg_attr(feature = "dev", derive(Debug, Clone, Serialize))]
@@ -194,9 +200,13 @@ pub enum HelpItem {
     ItemConst,
     ConstParam,
     ConstFn,
+    // TODO: specify `field` or `item` for visibility
     VisPublic,
     VisCrate,
-    VisRestricted,
+    VisRestricted {
+        path: VisRestrictedPath,
+        in_: bool,
+    },
     WhereClause,
     Variant {
         name: String,
@@ -235,8 +245,12 @@ pub enum HelpItem {
     },
     True,
     False,
-    // TODO: byte literals, escapes in chars and strings
-    LitByteStr,
+    // TODO: escapes in chars and strings
+    LitByte,
+    LitByteStr {
+        raw: bool,
+        prefix: Option<String>,
+    },
     LitChar,
     LitFloat {
         suffix: Option<String>,
@@ -248,18 +262,32 @@ pub enum HelpItem {
         prefix: Option<String>,
         separators: bool,
     },
-    LitStr,
+    LitStr {
+        raw: bool,
+        prefix: Option<String>,
+    },
     ArmIfGuard,
-    // TODO: handle special self cases, and explicit self references (`self: &Self`)
-    MutSelf,
-    ValueSelf {
+    MutSelf {
+        explicit: bool,
         mutability: bool,
     },
-    // TODO: explain mutability
+    ValueSelf {
+        mutability: bool,
+        explicit: bool,
+    },
+    // TODO: maybe handle explicit references to `Self` type?
+    // e.g.
+    // struct Foo;
+    // impl Foo {
+    //   fn foo(self: Foo) {}
+    // }
     SpecialSelf {
         mutability: bool,
     },
-    RefSelf,
+    RefSelf {
+        explicit: bool,
+        mutability: bool,
+    },
     StaticMut,
     Static,
     // TODO: handle special cases: dyn
@@ -293,6 +321,7 @@ pub enum HelpItem {
         unit: bool,
         name: String,
     },
+    ItemAutoTrait,
     ItemUnsafeTrait,
     ItemTrait,
     ItemTraitSupertraits,
@@ -442,6 +471,16 @@ variant![
         #[serde(rename(serialize = "while let"))]
         WhileLet,
         For,
+    }
+];
+
+variant![
+    pub enum VisRestrictedPath {
+        Crate,
+        Super,
+        #[serde(rename(serialize = "self"))]
+        Self_,
+        Path,
     }
 ];
 

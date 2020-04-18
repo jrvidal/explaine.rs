@@ -598,18 +598,41 @@ keyword = "const"
 
 
 [help.VisPublic]
-title = "`pub` visibility"
-info = "An item declared `pub` is accessible from the parent module."
+title = "`pub` Visibility"
+info = "This item is accessible and re-exportable from the parent module."
 book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
 
 [help.VisCrate]
-title = "`crate` visibility"
-info = "Equivalent to `pub(crate)`, this item is accessible in the current crate."
+title = "`crate` Visibility"
+info = "This item is accessible and re-exportable from the parent module, but can only be used from within the current crate. This [experimental syntax](https://github.com/rust-lang/rust/issues/53120) is equivalent to `pub(crate)`."
 keyword = "crate"
 
-[help.VisRestricted]
-title = "Restricted visibility"
-info = "This item is can be only accessed in some modules."
+[help.VisRestricted-super]
+variant = "VisRestricted"
+pattern = "path: VisRestrictedPath::Super, .."
+title = "Restricted Visibility"
+info = "This item is accessible from the parent module, but cannot be re-exported.{{if in_}} It is equivalent to writing `pub(super)`.{{endif}}"
+keyword = "pub"
+
+[help.VisRestricted-crate]
+variant = "VisRestricted"
+pattern = "path: VisRestrictedPath::Crate, .."
+title = "Restricted Visibility"
+info = "This item is accessible and re-exportable from the parent module, but can only be used from within the current crate. {{if in_}} It is equivalent to writing `pub(super)`.{{endif}}"
+keyword = "pub"
+
+[help.VisRestricted-self]
+variant = "VisRestricted"
+pattern = "path: VisRestrictedPath::Self_, .."
+title = "Restricted Visibility"
+info = "This item is private, and cannot be accessed from the parent module. Writing {{if in_}}`pub(in self)` (equivalent to `pub(self)`){{else}}`pub(self)`{{endif}} has the same effect as not writing any privacy modifier at all."
+keyword = "pub"
+
+[help.VisRestricted-path]
+variant = "VisRestricted"
+pattern = "path: VisRestrictedPath::Path, .."
+title = "Restricted Visibility"
+info = "This item is only visible from the specified module and its descendants."
 keyword = "pub"
 
 [help.WhereClause]
@@ -745,9 +768,16 @@ title = "Character Literal"
 info = "A character literal of type `char`."
 std = "primitive.char.html"
 
+[help.LitByte]
+title = "Byte Literal"
+info = "A byte literal of type `u8`."
+
 [help.LitByteStr]
 title = "Byte String Literal"
-info = "A literal string with a leading `b` is a _byte literal string_, of type `&'static [u8]`."
+info = """A literal string with a leading `b` is a _byte literal string_, of type `&'static [u8]`.{{if raw}}
+
+This is a _raw_ byte string literal (given its `r{ prefix }` prefix) that does not process escapes{{if prefix}}
+and which needs to be closed by a matching number of `#` symbols{{endif}}.{{endif}}"""
 # reference/tokens.html#byte-string-literals
 
 [help.LitFloat]
@@ -765,7 +795,10 @@ The underscores `_` are merely for readability reasons.{{endif}}"""
 
 [help.LitStr]
 title = "String Literal"
-info = "A literal string, of type `&'static str`."
+info = """A literal string, of type `&'static str`.{{if raw}}
+
+This is a _raw_ string literal (given its `r{ prefix }` prefix) that does not process escapes{{if prefix}}
+and which needs to be closed by a matching number of `#` symbols{{endif}}.{{endif}}"""
 
 [help.ArmIfGuard]
 title = "`if` guard"
@@ -776,26 +809,35 @@ keyword = "if"
 
 [help.MutSelf]
 title = "Mutably borrowed `self`"
-info = "This method takes `self` as a mutable (exclusive) reference."
+info = """This method takes `self` as a mutable (exclusive) reference.{{if explicit}}
+
+This syntax is the longer version of the more usual "`&mut self`".{{if mutability}} The `mut` modifier makes the `self` _binding_
+mutable, so it can be reassigned.{{endif}}{{endif}}"""
 book = "ch05-03-method-syntax.html"
 keyword = "self"
 
 [help.ValueSelf]
 title = "Owned `self`"
-info = "This method consumes `self` as a value. {{if mutability}}Since it is marked as `mut`, it can also be mutated like a variable introduced by `let mut`.{{endif}}"
+info = """This method consumes `self` as a value.{{if mutability}}
+Since it is marked as `mut`, it can also be mutated like a variable introduced by `let mut`.{{endif}}{{if explicit}}
+
+This syntax annotates the `self` type explicitly, which is usually shortened to simply "`self`".{{endif}}"""
+book = "ch05-03-method-syntax.html"
+keyword = "self"
+
+[help.RefSelf]
+title = "Borrowed `self`"
+info = """This method takes an immutable (shared) reference to `self`.{{if explicit}}
+
+This syntax is the longer version of the more usual "`&self`".{{if mutability}} The `mut` modifier makes the `self` _binding_
+(not the value) mutable, so it can be reassigned.{{endif}}{{endif}}"""
 book = "ch05-03-method-syntax.html"
 keyword = "self"
 
 [help.SpecialSelf]
 title = "Special `self`"
-info = "This method consumes a special `Self` type."
+info = "This method consumes a special `Self` type.{{if mutability}} The `mut` modifier allows mutation, as if introduced by `let mut`.{{endif}}"
 keyword = "Self"
-
-[help.RefSelf]
-title = "Borrowed `self`"
-info = "This method takes an immutable (shared) reference to `self`."
-book = "ch05-03-method-syntax.html"
-keyword = "self"
 
 [help.PathLeadingColon]
 title = "Referencing External Crates"
@@ -881,6 +923,11 @@ In this case, `{ name }` is a _unit_ struct, with no fields.{{endif}}"""
 keyword = "struct"
 book = "ch05-01-defining-structs.html"
 pattern = ".."
+
+[help.ItemAutoTrait]
+title = "Auto Trait"
+info = "`auto` traits are automatically implemented by the compiler in a structural fashion. `auto` traits are an unstable feature."
+# TODO: nomicon
 
 [help.ItemUnsafeTrait]
 title = "Unsafe trait"
@@ -1093,7 +1140,7 @@ std = "primitive.fn.html"
 
 [help.ItemTraitAlias]
 title = "Trait Alias"
-info = "ItemTraitAlias"
+info = "A trait alias, an [experimental feature](https://github.com/rust-lang/rust/issues/41517)."
 keyword = "trait"
 
 [help.Field-named]
