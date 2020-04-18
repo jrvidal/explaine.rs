@@ -729,8 +729,12 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
     }
     method![visit_fn_arg(self, node: syn::FnArg) {
-        if let Some(item) = self.get_ancestor::<syn::Signature>(1).and_then(|sig| receiver_help(sig)) {
-            return self.set_help(node, item);
+        if let Some(sig) = self.get_ancestor::<syn::Signature>(1) {
+            if sig.inputs.first().map(|arg| std::ptr::eq(arg, node)).unwrap_or(false) {
+                if let Some(item) = receiver_help(sig) {
+                    return self.set_help(node, item);
+                }
+            }
         }
     }];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
