@@ -22,12 +22,15 @@ std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
 // * Clicking on an unnamed field in a struct/enum results in a clash between help for the type
 //  and help for unnamed fields
 // * `Self { x: 1 }` is not identified as a struct instantiation expression (probably same with patterns)
+// * We need separate notions for "hitbox" and "highlight zone", so the user can hover over a token and
+// see that something is clickable, but then highlight the relevant extent of the help
 
 #[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize))]
 #[cfg_attr(test, derive(Debug, Clone, Serialize, Deserialize, PartialEq))]
 #[cfg_attr(feature = "dev", derive(Debug, Clone, Serialize))]
 #[serde(tag = "type")]
 pub enum HelpItem {
+    Unknown,
     AddBinOp,
     SubBinOp,
     MulBinOp,
@@ -110,14 +113,13 @@ pub enum HelpItem {
         len: String,
     },
     ExprReturn,
-    // TODO: handle ambiguity with struct variant instantiation. Also, in struct patterns.
-    // Also in tuple structs.
     ExprStruct,
     ExprStructRest,
     ExprTryQuestionMark,
     ExprTryBlock,
-    // TODO: explain 1-element tuple disambiguation (also in type)
-    ExprTuple,
+    ExprTuple {
+        single_comma: bool,
+    },
     ExprUnitTuple,
     ExprType,
     ExprUnsafe,
@@ -153,15 +155,19 @@ pub enum HelpItem {
         empty: bool,
         bindings: Option<BindingOf>,
     },
-    // TODO: Special case the unit tuple
     // TODO: watch out for tuple struct/variants with no fields
+    // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=005c87b573205fe29993d051eebbd011
+    PatUnit,
     PatTuple {
         bindings: Option<BindingOf>,
+        single_comma: bool,
     },
     PatTupleStruct {
         bindings: Option<BindingOf>,
     },
-    PatWild,
+    PatWild {
+        last_arm: bool,
+    },
     PathLeadingColon,
     PathSegmentSelf,
     // TODO: reference the implementing type in an impl Block
@@ -181,16 +187,16 @@ pub enum HelpItem {
     ItemFn,
     ItemInlineMod,
     ItemExternMod,
-    Unknown,
-    // TODO: refine the detection of methods vs. associated functions
-    FnToken {
+    TraitItemMethod {
         of: FnOf,
-        name: String,
+        default: bool,
+        trait_: String,
     },
-    // TODO: refine the detection of methods vs. associated functions
-    TraitItemMethod,
-    // TODO: refine the detection of methods vs. associated functions
-    ImplItemMethod,
+    ImplItemMethod {
+        of: FnOf,
+        self_ty: String,
+        trait_: Option<String>,
+    },
     AsRename,
     AsRenameExternCrate,
     AsCast,
@@ -229,6 +235,8 @@ pub enum HelpItem {
     BoundLifetimesBareFnType,
     ItemImpl {
         trait_: bool,
+        // TODO: negative impls should be more visible, in the bang symbol itself
+        negative: bool,
     },
     ItemImplForTrait,
     ItemMacroRules {
@@ -341,7 +349,9 @@ pub enum HelpItem {
     TypeNever,
     TypeParamBoundAdd,
     TypeTupleUnit,
-    TypeTuple,
+    TypeTuple {
+        single_comma: bool,
+    },
     KnownTypeU8,
     KnownTypeU16,
     KnownTypeU32,
@@ -438,9 +448,8 @@ variant![
 variant![
     pub enum FnOf {
         Method,
-        Function,
-        #[serde(rename(serialize = "trait method"))]
-        TraitMethod,
+        #[serde(rename(serialize = "associated function"))]
+        AssociatedFunction,
     }
 ];
 

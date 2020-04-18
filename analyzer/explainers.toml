@@ -325,7 +325,7 @@ keyword = "return"
 
 [help.ExprStruct]
 title = "Struct Instantiation"
-info = "An expression that builds an instance of a struct by listing the values of its fields."
+info = "An expression that builds an instance of a struct (or a struct variant of an enum) by listing the values of its fields."
 book = "ch05-01-defining-structs.html#defining-and-instantiating-structs"
 
 [help.ExprStructRest]
@@ -347,7 +347,7 @@ std = "ops/trait.Try.html"
 
 [help.ExprTuple]
 title = "Tuple Expression"
-info = "An expression that constructs a tuple."
+info = "An expression that constructs a tuple.{{if single_comma}} The trailing comma helps disambiguate tuples of length 1.{{endif}}"
 book = "ch03-02-data-types.html#the-tuple-type"
 
 [help.ExprUnitTuple]
@@ -455,18 +455,34 @@ info = """A struct pattern {{if bindings}}that introduces bindings through destr
 
 An struct pattern that ignores all its fields with `..` can even match non-struct enum variants.{{endif}}{{endif}}"""
 
+[help.PatUnit]
+title = "Unit Tuple Pattern"
+info = "A pattern that only matches the unit value."
+std = "primitive.unit.html"
+
 [help.PatTuple]
 title = "Tuple Pattern"
-info = "A tuple pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is a tuple of the same length.{{endif}}"
+info = """A tuple pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is a tuple of the same length.{{endif}}{{if single_comma}}
+
+The trailing comma helps disambiguate tuples of length 1.{{endif}}"""
 
 [help.PatTupleStruct]
 title = "Tuple Struct Pattern"
-info = "A pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is of a particular tuple struct type, and that can bind individual fields.{{endif}}"
+info = "A pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is of a particular tuple struct type (or enum tuple variant), and that can bind individual fields.{{endif}}"
 
-[help.PatWild]
+[help.PatWild-normal]
 title = "Wildcard Pattern"
 info = "The wildcard pattern `_`, that matches any value and discards it."
 book = "ch18-03-pattern-syntax.html#ignoring-an-entire-value-with-_"
+variant = "PatWild"
+pattern = "last_arm: false"
+
+[help.PatWild-catchall]
+title = "Wildcard Pattern"
+info = "The wildcard pattern `_`, matches any value and discards it, and acts like a final \"catchall\" in this `match` expression."
+book = "ch06-02-match.html#the-_-placeholder"
+variant = "PatWild"
+pattern = "last_arm: true"
 
 [help.PathSegmentSelf]
 title = "`self` Module"
@@ -536,19 +552,46 @@ info = "A module is a container for items. In this case the items are defined in
 keyword = "mod"
 book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
 
-[help.FnToken]
-title = "Function/method declaration"
-info = "This `fn` token is used to introduce the definition of the `{ name }` { of }."
-keyword = "fn"
-
-[help.TraitItemMethod]
-title = "Trait method"
-info = "A method inside a trait."
+[help.TraitItemMethod-method]
+variant = "TraitItemMethod"
+pattern = "of: FnOf::Method, .."
+title = "Trait Method"
+info = "A method declaration for the `{ trait_ }` trait{{if default}}, with a default implementation{{endif}}."
 book = "ch10-02-traits.html"
 
-[help.ImplItemMethod]
-title = "Type Method"
-info = "This is a method declaration for a type."
+[help.TraitItemMethod-fn]
+variant = "TraitItemMethod"
+pattern = "of: FnOf::AssociatedFunction, .."
+title = "Trait Associated Function"
+info = "An associated function declaration for the `{ trait_ }` trait{{if default}}, with a default implementation{{endif}}."
+book = "ch10-02-traits.html"
+
+[help.ImplItemMethod-method]
+variant = "ImplItemMethod"
+pattern = "of: FnOf::Method, trait_: None, .."
+title = "Method Declaration"
+info = "A method declaration for `{ self_ty }`."
+book = "ch05-03-method-syntax.html"
+
+[help.ImplItemMethod-method-trait]
+variant = "ImplItemMethod"
+pattern = "of: FnOf::Method, trait_: Some(..), .."
+title = "Method Implementation"
+info = "The implementation of a method from the `{ trait_ }` trait for `{ self_ty }`."
+book = "ch05-03-method-syntax.html"
+
+[help.ImplItemMethod-fn]
+variant = "ImplItemMethod"
+pattern = "of: FnOf::AssociatedFunction, trait_: None, .."
+title = "Associated Function"
+info = "An associated function declaration for `{ self_ty }`."
+book = "ch05-03-method-syntax.html"
+
+[help.ImplItemMethod-fn-trait]
+variant = "ImplItemMethod"
+pattern = "of: FnOf::AssociatedFunction, trait_: Some(..), .."
+title = "Associated Function Implementation"
+info = "The implementation of an associated function from the `{ trait_ }` trait for `{ self_ty }`."
 book = "ch05-03-method-syntax.html"
 
 [help.AsRename]
@@ -694,14 +737,17 @@ info = "An `impl` block that declares _intrinsic_ methods and other items for a 
 book = "ch05-03-method-syntax.html"
 keyword = "impl"
 variant = "ItemImpl"
-pattern = "trait_: false"
+pattern = "trait_: false, .."
 
 [help.ItemImpl-trait]
 title = "Trait Implementation Block"
-info = "An `impl` block that implements a trait for a given type."
+info = """{{if negative}}A negative{{else}}An{{endif}} `impl` block that
+{{if negative}}asserts that a trait is not implemented{{else}}implements a trait{{endif}} for a given type.{{if negative}}
+
+Negative implementations are an [experimental feature](https://github.com/rust-lang/rust/issues/13231).{{endif}}"""
 keyword = "impl"
 variant = "ItemImpl"
-pattern = "trait_: true"
+pattern = "trait_: true, .."
 
 [help.ItemImplForTrait]
 title = "Trait implementation"
@@ -1009,7 +1055,7 @@ info = "The plus sign `+` joins several bounds that a given type must fulfill."
 
 [help.TypeTuple]
 title = "Tuple Type"
-info = "The type of a _tuple_, an heterogeneous, finite list of types."
+info = "The type of a _tuple_, an heterogeneous, finite list of types.{{if single_comma}} The trailing comma helps disambiguate tuples of length 1.{{endif}}"
 book = "ch03-02-data-types.html#the-tuple-type"
 
 [help.TypeTupleUnit]

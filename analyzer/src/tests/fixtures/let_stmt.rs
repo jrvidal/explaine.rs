@@ -17,6 +17,6 @@ let <|>x: i32;
 
 ---
 span: [1, 4] => [1, 10]
-item: PatTuple bindings: Let
+item: PatTuple bindings: Let, single_comma: false
 ---
 let <|>(x, y): (A, B);

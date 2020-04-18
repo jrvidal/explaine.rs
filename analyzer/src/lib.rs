@@ -596,7 +596,16 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_expr_tuple(self, node: syn::ExprTuple) => {
         if !self.settled() {
-            return self.set_help(node, if node.elems.is_empty() { HelpItem::ExprUnitTuple } else { HelpItem::ExprTuple });
+            return self.set_help(
+                node,
+                if node.elems.is_empty() {
+                    HelpItem::ExprUnitTuple
+                } else {
+                    HelpItem::ExprTuple {
+                        single_comma: node.elems.len() == 1 && node.elems.trailing_punct()
+                    }
+                },
+            );
         }
     }];
     method![@attrs visit_expr_type(self, node: syn::ExprType) => {
@@ -720,76 +729,8 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
     }
     method![visit_fn_arg(self, node: syn::FnArg) {
-        loop {
-            let sig = if let Some(sig) = self.get_ancestor::<syn::Signature>(1) {
-                sig
-            } else {
-                break;
-            };
-
-            let is_first = sig
-                .inputs
-                .first()
-                .map(|arg| std::ptr::eq(arg, node))
-                .unwrap_or(false);
-            if !is_first {
-                break;
-            }
-
-            let pat = if let syn::FnArg::Typed(pat_type) = node {
-                pat_type
-            } else {
-                break;
-            };
-
-            let pat_ident = match &*pat.pat {
-                syn::Pat::Ident(pat_ident) => pat_ident,
-                _ => break,
-            };
-
-            let is_self = pat_ident.by_ref.is_none()
-                && pat_ident.subpat.is_none()
-                && pat_ident.ident == "self";
-
-            if !is_self {
-                break;
-            }
-
-            let mutability = pat_ident.mutability.is_some();
-
-            match &*pat.ty {
-                syn::Type::Path(type_path) if type_path.path.is_ident("Self") => {
-                    return self.set_help(
-                        node,
-                        HelpItem::ValueSelf {
-                            explicit: true,
-                            mutability,
-                        },
-                    )
-                }
-                syn::Type::Reference(type_reference) => match &*type_reference.elem {
-                    syn::Type::Path(type_ref_path) if type_ref_path.path.is_ident("Self") => {
-                        return self.set_help(
-                            node,
-                            if type_reference.mutability.is_some() {
-                                HelpItem::MutSelf {
-                                    explicit: true,
-                                    mutability,
-                                }
-                            } else {
-                                HelpItem::RefSelf {
-                                    explicit: true,
-                                    mutability,
-                                }
-                            },
-                        )
-                    }
-                    _ => {}
-                },
-                _ => return self.set_help(node, HelpItem::SpecialSelf { mutability }),
-            }
-
-            break;
+        if let Some(item) = self.get_ancestor::<syn::Signature>(1).and_then(|sig| receiver_help(sig)) {
+            return self.set_help(node, item);
         }
     }];
     method![visit_foreign_item(self, node: syn::ForeignItem)];
@@ -837,14 +778,27 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_impl_item_macro(self, node: syn::ImplItemMacro)];
     method![@attrs visit_impl_item_method(self, node: syn::ImplItemMethod) {
-        token![self, node.sig.ident, ImplItemMethod];
-        if self.within(node.sig.fn_token) {
-            if let Some(item_impl) = self.get_ancestor::<syn::ItemImpl>(2) {
-                return self.set_help(&node.sig.fn_token, HelpItem::FnToken {
-                    of: if item_impl.trait_.is_some() { FnOf::TraitMethod } else { FnOf::Method },
-                    name: node.sig.ident.to_string()
-                });
-            }
+        let is_method = receiver_help(&node.sig).is_some();
+        let trait_ = self.get_ancestor::<syn::ItemImpl>(2).and_then(|item| item.trait_.as_ref());
+
+        let of = if is_method {
+            FnOf::Method
+        } else {
+            FnOf::AssociatedFunction
+        };
+
+        if let Some(impl_) = self.get_ancestor::<syn::ItemImpl>(2) {
+            token![
+                self,
+                node.sig.fn_token => node.sig.ident,
+                * HelpItem::ImplItemMethod {
+                    of,
+                    // TODO: handle bang
+                    // TODO: better formatting
+                    trait_: trait_.map(|(_bang, path, _)| path.to_token_stream().to_string()),
+                    self_ty: (&*impl_.self_ty).to_token_stream().to_string()
+                }
+            ];
         }
     }];
     method![@attrs visit_impl_item_type(self, node: syn::ImplItemType) {
@@ -868,8 +822,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         return self.set_help_between(start, node.span(), HelpItem::ItemExternCrate);
     }];
     method![@attrs visit_item_fn(self, node: syn::ItemFn) {
-        token![self, node.sig.ident, ItemFn];
-        token![self, node.sig.fn_token, * HelpItem::FnToken { of: FnOf::Function, name: node.sig.ident.to_string() }];
+        token![self, node.sig.fn_token => node.sig.ident, ItemFn];
     }];
     method![@attrs visit_item_foreign_mod(self, node: syn::ItemForeignMod) {
         token![self, node.abi, ItemForeignModAbi];
@@ -880,7 +833,8 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             token![self, for_token, ItemImplForTrait];
         }
         token![self, node.impl_token, * HelpItem::ItemImpl {
-            trait_: node.trait_.is_some()
+            trait_: node.trait_.is_some(),
+            negative: node.trait_.as_ref().and_then(|(bang, _, _)| bang.as_ref()).is_some()
         }];
     }];
     method![@attrs visit_item_macro(self, node: syn::ItemMacro) {
@@ -1187,9 +1141,15 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
             token![self, pat, * HelpItem::PatRest { of: RestOf::Tuple }];
         }
 
-        return self.set_help(node, HelpItem::PatTuple {
-            bindings: pattern_bindings(&self)
-        });
+        let item = if node.elems.is_empty() {
+            HelpItem::PatUnit
+        } else {
+            HelpItem::PatTuple {
+                bindings: pattern_bindings(&self),
+                single_comma: node.elems.len() == 1 && node.elems.trailing_punct()
+            }
+        };
+        return self.set_help(node, item);
     }];
     method![@attrs visit_pat_tuple_struct(self, node: syn::PatTupleStruct) => {
         if self.settled() {
@@ -1206,8 +1166,19 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_pat_type(self, node: syn::PatType)];
     method![@attrs visit_pat_wild(self, node: syn::PatWild) @terminal {
-        // TODO: special case final, catch-all arm in a match pattern
-        return self.set_help(node, HelpItem::PatWild);
+        let last_arm = match (
+            self.get_ancestor::<syn::ExprMatch>(3),
+            self.get_ancestor::<syn::Arm>(2),
+        ) {
+            (Some(match_expr), Some(arm)) => match_expr
+                .arms
+                .last()
+                .map(|match_arm| std::ptr::eq(match_arm, arm))
+                .unwrap_or(false),
+            _ => false,
+        };
+
+        return self.set_help(node, HelpItem::PatWild { last_arm });
     }];
     // TODO:
     // * Fn patterns: Fn(A, B) -> C
@@ -1297,19 +1268,7 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }
     // OMITTED: handled in parents
     // fn visit_range_limits(&mut self, node: &'ast syn::RangeLimits) {
-    method![@attrs visit_receiver(self, node: syn::Receiver) @terminal {
-        let item = match (&node.reference, &node.mutability) {
-            (Some(_), Some(_)) => HelpItem::MutSelf { explicit: false, mutability: false },
-            (Some(_), None) => HelpItem::RefSelf { explicit: false, mutability: false },
-            (None, mutability) => {
-                HelpItem::ValueSelf {
-                    explicit: false,
-                    mutability: mutability.is_some()
-                }
-            }
-        };
-        return self.set_help(&node, item);
-    }];
+    method![@attrs visit_receiver(self, node: syn::Receiver)];
     method![visit_return_type(self, node: syn::ReturnType) {
         let rarrow = if let syn::ReturnType::Type(rarrow, _) = node {
             Some(rarrow)
@@ -1368,8 +1327,18 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
     }];
     method![@attrs visit_trait_item_macro(self, node: syn::TraitItemMacro)];
     method![@attrs visit_trait_item_method(self, node: syn::TraitItemMethod) {
-        token![self, node.sig.fn_token, * HelpItem::FnToken { of: FnOf::TraitMethod, name: node.sig.ident.to_string() }];
-        token![self, node.sig.ident, TraitItemMethod];
+        let of = if receiver_help(&node.sig).is_some() {
+            FnOf::Method
+        } else {
+            FnOf::AssociatedFunction
+        };
+        if let Some(trait_) = self.get_ancestor::<syn::ItemTrait>(2) {
+            token![
+                self,
+                node.sig.fn_token => node.sig.ident,
+                * HelpItem::TraitItemMethod { of, default: node.default.is_some(), trait_: trait_.ident.to_string() }
+            ];
+        }
     }];
     method![@attrs visit_trait_item_type(self, node: syn::TraitItemType) {
         token![self, node.type_token, TraitItemType];
@@ -1501,7 +1470,9 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
         }
     } => {
         if !self.settled() {
-            return self.set_help(node, HelpItem::TypeTuple);
+            return self.set_help(node, HelpItem::TypeTuple {
+                single_comma: node.elems.len() == 1 && node.elems.trailing_punct()
+            });
         }
     }];
     method![visit_un_op(self, node: syn::UnOp)];
@@ -1772,5 +1743,76 @@ fn raw_string_literal(mut literal: String, prefix: &str) -> Option<String> {
         })
     } else {
         None
+    }
+}
+
+fn receiver_help(sig: &syn::Signature) -> Option<HelpItem> {
+    let first = if let Some(arg) = sig.inputs.first() {
+        arg
+    } else {
+        return None;
+    };
+
+    match first {
+        syn::FnArg::Typed(pat_type) => {
+            let pat_ident = match &*pat_type.pat {
+                syn::Pat::Ident(pat_ident) => pat_ident,
+                _ => return None,
+            };
+
+            let is_self = pat_ident.by_ref.is_none()
+                && pat_ident.subpat.is_none()
+                && pat_ident.ident == "self";
+
+            if !is_self {
+                return None;
+            }
+
+            let mutability = pat_ident.mutability.is_some();
+
+            match &*pat_type.ty {
+                syn::Type::Path(type_path) if type_path.path.is_ident("Self") => {
+                    Some(HelpItem::ValueSelf {
+                        explicit: true,
+                        mutability,
+                    })
+                }
+                syn::Type::Reference(type_reference) => match &*type_reference.elem {
+                    syn::Type::Path(type_ref_path) if type_ref_path.path.is_ident("Self") => {
+                        if type_reference.mutability.is_some() {
+                            Some(HelpItem::MutSelf {
+                                explicit: true,
+                                mutability,
+                            })
+                        } else {
+                            Some(HelpItem::RefSelf {
+                                explicit: true,
+                                mutability,
+                            })
+                        }
+                    }
+                    _ => None,
+                },
+                _ => Some(HelpItem::SpecialSelf { mutability }),
+            }
+        }
+        syn::FnArg::Receiver(receiver) => {
+            let item = match (&receiver.reference, &receiver.mutability) {
+                (Some(_), Some(_)) => HelpItem::MutSelf {
+                    explicit: false,
+                    mutability: false,
+                },
+                (Some(_), None) => HelpItem::RefSelf {
+                    explicit: false,
+                    mutability: false,
+                },
+                (None, mutability) => HelpItem::ValueSelf {
+                    explicit: false,
+                    mutability: mutability.is_some(),
+                },
+            };
+
+            Some(item)
+        }
     }
 }
