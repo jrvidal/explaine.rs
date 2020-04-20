@@ -1,18 +1,39 @@
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
 use std::any::Any;
+#[cfg(feature = "dev")]
+use std::fmt::Debug;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 #[cfg(feature = "dev")]
 use std::fmt::Debug;
 
 mod help;
+pub mod ir;
+mod analysis;
 
 #[cfg(test)]
 mod tests;
 
+
+#[test]
+fn alternative() {
+    let source =
+r"fn x() { a::<A>(); }";
+    let line_info = source.lines().map(|l| l.len()).collect();
+    let file = syn::parse_str(source).unwrap();
+    let file = std::rc::Rc::new(file);
+    let mut visitor = ir::IrVisitor::new(std::rc::Rc::clone(&file), line_info);
+
+    let analyzer = visitor.visit();
+    println!("{:#?}", analyzer.locations);
+    let result = analyzer.analyze(ir::Location { line: 1, column: 11 });
+    println!("{:?}", result.is_some());
+}
+
 use crate::help::*;
 pub use help::HelpItem;
+pub use analysis::Analyzer;
 
 #[cfg(feature = "dev")]
 trait DynAncestor {

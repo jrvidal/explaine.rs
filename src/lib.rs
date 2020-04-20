@@ -69,7 +69,6 @@ impl From<TokenStream> for TokenIterator {
     }
 }
 
-#[cfg(feature = "dev")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = "logWasm")]
@@ -123,10 +122,9 @@ impl SessionResult {
 
 #[wasm_bindgen]
 pub struct Session {
-    file: syn::File,
-    tokens: TokenIterator,
-    top_level: IntoIter<usize>,
-    element: usize,
+    file: std::rc::Rc<syn::File>,
+    analyzer: analyzer::Analyzer,
+    element: usize
 }
 
 #[wasm_bindgen]
@@ -138,22 +136,15 @@ impl Session {
 
         let result = match parse_result {
             Ok(file) => {
-                let tokens = TokenStream::new().into();
-                let mut top_level_elements = vec![];
+                let file = std::rc::Rc::new(file);
 
-                top_level_elements.extend(file.attrs.iter().enumerate().map(|(i, _)| i));
-                top_level_elements.extend(
-                    file.items
-                        .iter()
-                        .enumerate()
-                        .map(|(i, _)| i + file.attrs.len()),
-                );
+                let line_info: Vec<_> = source.lines().map(|line| line.len()).collect();
+                let analyzer = analyzer::ir::IrVisitor::new(file.clone(), line_info).visit();
 
                 Ok(Session {
+                    analyzer,
                     file,
-                    tokens,
-                    top_level: top_level_elements.into_iter(),
-                    element: 0,
+                    element: 0
                 })
             }
             Err(err) => {
@@ -172,53 +163,68 @@ impl Session {
         let mut idx = 0;
 
         loop {
-            let span = match self.tokens.next() {
-                Some(span) => span,
-                None => match self.top_level.next() {
-                    Some(el) => {
-                        self.element = el;
-                        self.tokens = match el {
-                            _ if el < self.file.attrs.len() => {
-                                self.file.attrs[el].clone().to_token_stream().into()
-                            }
-                            _ => self.file.items[el - self.file.attrs.len()]
-                                .clone()
-                                .to_token_stream()
-                                .into(),
-                        };
-                        continue;
-                    }
-                    None => {
-                        self.top_level = vec![].into_iter();
-                        self.tokens = TokenIterator { elements: vec![] };
-                        break;
-                    }
-                },
-            };
+            // let span = match self.tokens.next() {
+            //     Some(span) => span,
+            //     None => match self.top_level.next() {
+            //         Some(el) => {
+            //             self.element = el;
+            //             self.tokens = match el {
+            //                 _ if el < self.file.attrs.len() => {
+            //                     self.file.attrs[el].clone().to_token_stream().into()
+            //                 }
+            //                 _ => self.file.items[el - self.file.attrs.len()]
+            //                     .clone()
+            //                     .to_token_stream()
+            //                     .into(),
+            //             };
+            //             continue;
+            //         }
+            //         None => {
+            //             self.top_level = vec![].into_iter();
+            //             self.tokens = TokenIterator { elements: vec![] };
+            //             break;
+            //         }
+            //     },
+            // };
 
-            let location = span.start();
+            // let location = span.start();
 
             let explanation = if let Some(explanation) = {
-                let visitor = IntersectionVisitor::new(
-                    location,
-                    #[cfg(feature = "dev")]
-                    log,
-                );
-                let result = visitor.visit_element(&self.file, self.element);
-                if let HelpItem::Unknown = result.help {
-                    None
+                let result = if let Some(result) = self.analyzer.analyze_item(self.element) {
+                    result
                 } else {
-                    Some(Explanation {
-                        item: result.help,
-                        start_line: result.item_location.0.line,
-                        start_column: result.item_location.0.column,
-                        end_line: result.item_location.1.line,
-                        end_column: result.item_location.1.column,
-                    })
-                }
+                    break;
+                };
+
+                result.map(|result| Explanation {
+                    item: result.help,
+                    start_line: result.start.line,
+                    start_column: result.start.column,
+                    end_line: result.end.line,
+                    end_column: result.end.column
+                })
+
+                // let visitor = IntersectionVisitor::new(
+                //     location,
+                //     #[cfg(feature = "dev")]
+                //     log,
+                // );
+                // let result = visitor.visit_element(&self.file, self.element);
+                // if let HelpItem::Unknown = result.help {
+                //     None
+                // } else {
+                //     Some(Explanation {
+                //         item: result.help,
+                //         start_line: result.item_location.0.line,
+                //         start_column: result.item_location.0.column,
+                //         end_line: result.item_location.1.line,
+                //         end_column: result.item_location.1.column,
+                //     })
+                // }
             } {
                 explanation
             } else {
+                self.element += 1;
                 continue;
             };
 
@@ -234,6 +240,7 @@ impl Session {
 
             idx += 4;
             count += 1;
+            self.element += 1;
 
             if count == max {
                 break;
@@ -244,25 +251,36 @@ impl Session {
     }
 
     #[wasm_bindgen]
-    pub fn explain(&self, line: usize, ch: usize) -> Option<Explanation> {
-        let location = LineColumn { line, column: ch };
-        let visitor = IntersectionVisitor::new(
-            location,
-            #[cfg(feature = "dev")]
-            log,
-        );
-        let result = visitor.visit(&self.file);
-        if let HelpItem::Unknown = result.help {
-            None
-        } else {
-            Some(Explanation {
-                item: result.help,
-                start_line: result.item_location.0.line,
-                start_column: result.item_location.0.column,
-                end_line: result.item_location.1.line,
-                end_column: result.item_location.1.column,
-            })
-        }
+    pub fn explain(&self, line: usize, column: usize) -> Option<Explanation> {
+        let location = LineColumn { line, column };
+        
+
+        self.analyzer.analyze(location.into())
+            .map(|result| Explanation {
+                    item: result.help,
+                    start_line: result.start.line,
+                    start_column: result.start.column,
+                    end_line: result.end.line,
+                    end_column: result.end.column
+                })
+
+        // let visitor = IntersectionVisitor::new(
+        //     location,
+        //     #[cfg(feature = "dev")]
+        //     log,
+        // );
+        // let result = visitor.visit(&self.file);
+        // if let HelpItem::Unknown = result.help {
+        //     None
+        // } else {
+        //     Some(Explanation {
+        //         item: result.help,
+        //         start_line: result.item_location.0.line,
+        //         start_column: result.item_location.0.column,
+        //         end_line: result.item_location.1.line,
+        //         end_column: result.item_location.1.column,
+        //     })
+        // }
     }
 }
 
