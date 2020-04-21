@@ -8,18 +8,19 @@ use syn::visit::Visit;
 #[cfg(feature = "dev")]
 use std::fmt::Debug;
 
+mod analysis;
 mod help;
 pub mod ir;
-mod analysis;
 
 #[cfg(test)]
 mod tests;
 
-
 #[test]
 fn alternative() {
-    let source =
-r"fn x() { a::<A>(); }";
+    let source = r"fn a() {
+//! a
+}
+";
     let line_info = source.lines().map(|l| l.len()).collect();
     let file = syn::parse_str(source).unwrap();
     let file = std::rc::Rc::new(file);
@@ -27,13 +28,16 @@ r"fn x() { a::<A>(); }";
 
     let analyzer = visitor.visit();
     println!("{:#?}", analyzer.locations);
-    let result = analyzer.analyze(ir::Location { line: 1, column: 11 });
+    let result = analyzer.analyze(ir::Location {
+        line: 1,
+        column: 11,
+    });
     println!("{:?}", result.is_some());
 }
 
 use crate::help::*;
-pub use help::HelpItem;
 pub use analysis::Analyzer;
+pub use help::HelpItem;
 
 #[cfg(feature = "dev")]
 trait DynAncestor {

@@ -124,7 +124,7 @@ impl SessionResult {
 pub struct Session {
     file: std::rc::Rc<syn::File>,
     analyzer: analyzer::Analyzer,
-    element: usize
+    element: usize,
 }
 
 #[wasm_bindgen]
@@ -144,7 +144,7 @@ impl Session {
                 Ok(Session {
                     analyzer,
                     file,
-                    element: 0
+                    element: 0,
                 })
             }
             Err(err) => {
@@ -201,7 +201,7 @@ impl Session {
                     start_line: result.start.line,
                     start_column: result.start.column,
                     end_line: result.end.line,
-                    end_column: result.end.column
+                    end_column: result.end.column,
                 })
 
                 // let visitor = IntersectionVisitor::new(
@@ -253,16 +253,16 @@ impl Session {
     #[wasm_bindgen]
     pub fn explain(&self, line: usize, column: usize) -> Option<Explanation> {
         let location = LineColumn { line, column };
-        
 
-        self.analyzer.analyze(location.into())
+        self.analyzer
+            .analyze(location.into())
             .map(|result| Explanation {
-                    item: result.help,
-                    start_line: result.start.line,
-                    start_column: result.start.column,
-                    end_line: result.end.line,
-                    end_column: result.end.column
-                })
+                item: result.help,
+                start_line: result.start.line,
+                start_column: result.start.column,
+                end_line: result.end.line,
+                end_column: result.end.column,
+            })
 
         // let visitor = IntersectionVisitor::new(
         //     location,
