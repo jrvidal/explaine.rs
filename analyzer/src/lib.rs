@@ -1050,7 +1050,6 @@ impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
                 }];
             }
         }
-
     }];
     method![visit_macro(self, node: syn::Macro) {
         if self.between_spans(node.path.span(), node.bang_token.span()) {

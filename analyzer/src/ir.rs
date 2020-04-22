@@ -9,7 +9,9 @@ use syn::visit::Visit;
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Copy, Debug)]
 pub struct Location {
+    /// 1-based
     pub line: usize,
+    /// 0-based
     pub column: usize,
 }
 
@@ -114,20 +116,6 @@ struct LocationData {
     blocked: Vec<Range>,
 }
 
-#[test]
-fn lowering() {
-    let source = r"fn x() { A { a, b } }";
-    let line_info = source.lines().map(|l| l.len()).collect();
-    let file = syn::parse_str(source).unwrap();
-    let file = Rc::new(file);
-    let mut visitor = IrVisitor::new(Rc::clone(&file), line_info);
-
-    let analyzer = visitor.visit();
-
-    // println!("{:#?}", visitor.id_to_data);
-    println!("{:#?}", analyzer.locations);
-}
-
 impl IrVisitor {
     pub fn new(file: Rc<syn::File>, line_info: Vec<usize>) -> Self {
         IrVisitor {
@@ -145,25 +133,26 @@ impl IrVisitor {
         let file = self.file.clone();
         self.visit_file(&file);
 
-        // TODO: kill
-        // println!("locations = {:#?}", self.locations);
+        #[cfg(feature = "dev")]
+        {
+            let clone: Vec<_> = self
+                .locations
+                .clone()
+                .into_iter()
+                .flat_map(|(_, data)| data.ranges.into_iter())
+                .collect();
 
-        // TODO: kill
-        let clone: Vec<_> = self
-            .locations
-            .clone()
-            .into_iter()
-            .flat_map(|(_, data)| data.ranges.into_iter())
-            .collect();
-
-        for (i, range) in clone.iter().take(clone.len() - 1).enumerate() {
-            for other in &clone[(i + 1)..] {
-                if range.1 <= other.0 || other.1 <= range.0 {
-                    continue;
+            for (i, range) in clone.iter().take(clone.len() - 1).enumerate() {
+                for other in &clone[(i + 1)..] {
+                    if range.1 <= other.0 || other.1 <= range.0 {
+                        continue;
+                    }
+                    panic!("Unexpected overlap between {:?} and {:?}", range, other);
                 }
-                panic!("Unexpected overlap between {:?} and {:?}", range, other);
             }
         }
+
+        // println!("locatoins = {:#?}", self.locations);
 
         let mut locations: Vec<_> = self
             .locations
@@ -207,11 +196,14 @@ impl IrVisitor {
     }
 
     fn prepare_precise_ranges(&mut self, node: &dyn Any, ranges: &[Range]) -> usize {
-        for range in ranges {
-            let (start, end) = range;
-            if start == end {
-                if node.downcast_ref::<syn::File>().is_none() {
-                    panic!("Unexpected start == end {:?}", start);
+        #[cfg(feature = "dev")]
+        {
+            for range in ranges {
+                let (start, end) = range;
+                if start == end {
+                    if node.downcast_ref::<syn::File>().is_none() {
+                        panic!("Unexpected start == end {:?}", start);
+                    }
                 }
             }
         }
@@ -272,30 +264,33 @@ impl IrVisitor {
                 return;
             };
 
-        let changed = IrVisitor::recalculate_location(
+        let _changed = IrVisitor::recalculate_location(
             &self.line_info[..],
             child,
             &mut ancestor_locations.ranges,
         );
 
-        if changed {
-            ancestor_locations.ranges.sort();
+        #[cfg(feature = "dev")]
+        {
+            if _changed {
+                ancestor_locations.ranges.sort();
 
-            let mut i = 0;
-            loop {
-                if i + 1 >= ancestor_locations.ranges.len() {
-                    break;
-                }
+                let mut i = 0;
+                loop {
+                    if i + 1 >= ancestor_locations.ranges.len() {
+                        break;
+                    }
 
-                let next = ancestor_locations.ranges[i + 1];
-                let el = &mut ancestor_locations.ranges[i];
+                    let next = ancestor_locations.ranges[i + 1];
+                    let el = &mut ancestor_locations.ranges[i];
 
-                if next.0 == el.1 {
-                    panic!("TODO This should not be necessary");
-                // el.1 = next.1;
-                // ancestor_locations.remove(i + 1);
-                } else {
-                    i += 1;
+                    if next.0 == el.1 {
+                        panic!("TODO This should not be necessary");
+                    // el.1 = next.1;
+                    // ancestor_locations.remove(i + 1);
+                    } else {
+                        i += 1;
+                    }
                 }
             }
         }
@@ -355,16 +350,9 @@ fn range_difference(parent: Range, child: Range, line_info: &[usize]) -> [Option
 
 macro_rules! visit {
     ($self:ident, $node:ident, $name:ident) => {
-        // println!("{}(..)", stringify!($name));
         let id = $self.prepare($node as &dyn Any, $node.span());
+        // println!("visit {:?} (id #{})", stringify!($name), id);
         $self.ancestors.push(id);
-        // println!(
-        //     "descending from {} with id #{} ({:?} -> {:?})",
-        //     stringify!($name),
-        //     id,
-        //     $node.span().start(),
-        //     $node.span().end()
-        // );
         syn::visit::$name($self, $node);
         let _ = $self.ancestors.pop();
     };
@@ -780,7 +768,6 @@ impl<'ast> Visit<'ast> for IrVisitor {
     }
     fn visit_macro(&mut self, i: &'ast syn::Macro) {
         // SPECIAL: SPAN OVERLAP
-        // println!("visit_macro");
         let item_parent_ident = self
             .ancestors
             .last()
@@ -794,8 +781,6 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_macro];
             return;
         };
-
-        // println!("ident_end {:?}", Location::from(ident_end));
 
         let ranges = [
             (i.span().start().into(), i.bang_token.span().end().into()),

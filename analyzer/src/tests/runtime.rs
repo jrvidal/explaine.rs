@@ -1,8 +1,7 @@
-use crate::{HelpItem, IntersectionVisitor};
-use proc_macro2::LineColumn;
+use crate::{ir::Location, HelpItem};
 use serde_yaml;
 use std::borrow::Cow;
-use std::str::FromStr;
+use std::{rc::Rc, str::FromStr};
 
 pub fn test_example(source: &str) {
     let lines: Vec<_> = source.lines().collect();
@@ -29,7 +28,7 @@ pub fn test_example(source: &str) {
 struct RunData {
     naked: bool,
     expected_item: HelpItem,
-    span: Option<(LineColumn, LineColumn)>,
+    span: Option<(Location, Location)>,
 }
 
 fn parse_run_data(lines: &[&str]) -> RunData {
@@ -46,11 +45,11 @@ fn parse_run_data(lines: &[&str]) -> RunData {
             let end: [usize; 2] =
                 serde_yaml::from_str(span_components[1].trim()).expect("span format");
             span = Some((
-                LineColumn {
+                Location {
                     line: start[0],
                     column: start[1],
                 },
-                LineColumn {
+                Location {
                     line: end[0],
                     column: end[1],
                 },
@@ -116,23 +115,30 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
     }
 
     let test_source = source_lines.join("\n");
+    let line_info = test_source.lines().map(|l| l.len()).collect();
     let file = syn::parse_file(&test_source).expect("invalid source");
-    let visitor = IntersectionVisitor::new(LineColumn {
+    let ir_visitor = crate::ir::IrVisitor::new(Rc::new(file), line_info);
+
+    let analyzer = ir_visitor.visit();
+
+    let result = if let Some(result) = analyzer.analyze(Location {
         line: line + 1 + offset,
         column,
-    });
-
-    let result = visitor.visit(&file);
+    }) {
+        result
+    } else {
+        panic!("Should find help (case #{})", case);
+    };
 
     assert_eq!(run_data.expected_item, result.help, "Case #{}", case);
     let adjusted = (
-        LineColumn {
-            line: result.item_location.0.line - offset,
-            ..result.item_location.0
+        Location {
+            line: result.start.line - offset,
+            ..result.start
         },
-        LineColumn {
-            line: result.item_location.1.line - offset,
-            ..result.item_location.1
+        Location {
+            line: result.end.line - offset,
+            ..result.end
         },
     );
     if let Some((start, end)) = run_data.span {
