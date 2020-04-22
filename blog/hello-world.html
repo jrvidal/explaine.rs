@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>explaine.rs</title>
+  <style>
+    body {
+      max-width: 880px;
+      margin: auto;
+      font: 400 16px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: #fdfdfd;
+    }
+
+    pre, code {
+      background: #eef;
+    }
+
+    pre {
+      padding: 4px 8px;
+    }
+
+    code {
+      padding: 2px 4px;
+    }
+  </style>
+</head>
+<body>
+<h1>Hello World</h1>
+<h4>2020-04-22</h4>
+<p>While staring at the keywords section in the <a href="https://doc.rust-lang.org/stable/std/#keywords">standard library</a>, I had a sort of epiphany: how difficult would it be to create an interactive tool to explore Rust's syntax? Wouldn't it be nice if we could help with all those pesky keywords and punctuation symbols while exploring real code?</p>
+<p>~100h and ~3000LOC later, I'm neck deep into <a href="https://jrvidal.github.io/explaine.rs/">explaine.rs</a>. Getting the punctuation and the keywords was easy, but things quickly spiraled out of control. Since <em>we're on it</em>, we could provide some contextual info, right? Right. Only the problem domain has expanded significantly and now I'm hacking together a sorta-compiler-frontend. Since <em>we're on it</em>, we could try to explore all the dark corners of Rust syntax, right? Ouch. I don't even know if <a href="https://jrvidal.github.io/explaine.rs/?code=struct+Foo%3B%0A%0Aimpl+Foo+%7B%0A%09fn+bark%28self%3A+%26Self%29+%7B%7D%0A%7D&amp;line=3&amp;ch=12">it</a> · <a href="https://jrvidal.github.io/explaine.rs/?code=fn+main%28%29+%7B%0A+%09let+x+%3D+0x1_2_Au32%3B+++%0A%7D&amp;line=1&amp;ch=16">will</a> · <a href="https://jrvidal.github.io/explaine.rs/?code=fn+main%28%29+%7B%0A%09for+mut+x+in+elems+%7B%7D%0A%7D&amp;line=1&amp;ch=9">ever</a> · <a href="https://jrvidal.github.io/explaine.rs/?code=fn+main%28%29+%7B%0A%09%27a%3A+loop+%7B%0A++++++++break+%27a+7%3B%0A++++%7D%0A%7D&amp;line=2&amp;ch=15">be</a> · <a href="https://jrvidal.github.io/explaine.rs/?code=fn+main%28%29+%7B%0A%09match+x+%7B%0A%09%09Foo+%40+y+%3D%3E+1%2C%0A++++++++_+%3D%3E+2%0A++++%7D%0A%7D&amp;line=3&amp;ch=8">done</a>.</p>
+<p>The UI itself is somewhat interesting. The &quot;analyzer&quot; is just an implementation of <a href="https://github.com/dtolnay/syn/">syn</a>'s visitor, compiled to WebAssembly. The playground then runs it from a Web Worker, to avoid blocking the main thread. As an extra optimization, we also try to pre-compute &quot;in the background&quot; all possible &quot;hitboxes&quot; in the code where a click would find some help, so we can render a hover effect on top of them efficiently. This pre-computation is unoptimized to the point of embarrassment though.</p>
+<p>The approach for the &quot;analysis&quot; is quite blunt. It traverses the syntax tree following the branch that contains the cursor position. At some point we either find a leaf we have something to say about, or on the way back up we have some fallback. For instance, if you select something uninteresting within a closure's body, it highlights the whole closure. This method is rather fragile and there's a ton of corner cases that have to be handled manually. For instance, a <code>mut</code> pattern has a general description:</p>
+<pre><code class="language-rust">match x {
+  // &quot;The `x` binding this pattern introduces is mutable...&quot;
+  Some(mut x) =&gt; {},
+  _ =&gt; {}
+}
+</code></pre>
+<p>But there are a few places where bindings can be introduced that are &quot;special&quot;, which merit a more elaborated response:</p>
+<pre><code class="language-rust">// A `let mut` statement that introduces the _mutable_ local variable `x`...
+let mut x;
+</code></pre>
+<p>I don't know much about ASTs and syntax analysis (it shows), so I suspect there's probably a better way of doing this. <code>rustc</code> or rust-analyzer lower the AST to some intermediate representation that might be more amenable to be inspected. However (a) that sounds like a lot of work (b) it <em>is</em> somehow working anyway, and more seriously (c) I worry that a more sophisticated approach could incur in code bloat, which is very undesirable for something that has to run on the web (And that it has to feel relatively light. I think rust-analyzer is close to being runnable on the web, but that's a much more heavyweight beast).</p>
+<p>Fun times.</p>
+<p><strong>_rvidal</strong>   <a href="https://twitter.com/_rvidal">🐦</a> · <a href="https://github.com/jrvidal">gh</a></p>
+
+</body>
+</html>
+
