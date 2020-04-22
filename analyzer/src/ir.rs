@@ -889,8 +889,20 @@ impl<'ast> Visit<'ast> for IrVisitor {
     fn visit_predicate_type(&mut self, i: &'ast syn::PredicateType) {
         visit![self, i, visit_predicate_type];
     }
-    fn visit_qself(&mut self, _i: &'ast syn::QSelf) {
+    fn visit_qself(&mut self, i: &'ast syn::QSelf) {
         // SPECIAL: NO SPAN
+        let end = if let Some(as_token) = i.as_token {
+            let span = as_token.span();
+            span.end()
+        } else {
+            i.gt_token.span().end()
+        };
+
+        let id = self.prepare_precise(i, (i.lt_token.span().start().into(), end.into()));
+
+        self.ancestors.push(id);
+        syn::visit::visit_qself(self, i);
+        let _ = self.ancestors.pop();
     }
     fn visit_range_limits(&mut self, _i: &'ast syn::RangeLimits) {
         // SPECIAL: NO SPAN

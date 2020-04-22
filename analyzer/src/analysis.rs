@@ -124,40 +124,40 @@ impl<'a> NodeAnalyzer<'a> {
         ];
         analyze![self, node, syn::Arm, visit_arm];
         analyze![self, node, syn::Attribute, visit_attribute];
-        analyze![self, node, syn::BareFnArg, visit_bare_fn_arg];
+        // analyze![self, node, syn::BareFnArg, visit_bare_fn_arg];
         analyze![self, node, syn::BinOp, visit_bin_op];
         analyze![self, node, syn::Binding, visit_binding];
-        analyze![self, node, syn::Block, visit_block];
+        // analyze![self, node, syn::Block, visit_block];
         analyze![self, node, syn::BoundLifetimes, visit_bound_lifetimes];
         analyze![self, node, syn::ConstParam, visit_const_param];
-        analyze![self, node, syn::Constraint, visit_constraint];
-        analyze![self, node, syn::Expr, visit_expr];
+        // analyze![self, node, syn::Constraint, visit_constraint];
+        // analyze![self, node, syn::Expr, visit_expr];
         analyze![self, node, syn::ExprArray, visit_expr_array];
         analyze![self, node, syn::ExprAssign, visit_expr_assign];
         analyze![self, node, syn::ExprAssignOp, visit_expr_assign_op];
         analyze![self, node, syn::ExprAsync, visit_expr_async];
         analyze![self, node, syn::ExprAwait, visit_expr_await];
-        analyze![self, node, syn::ExprBinary, visit_expr_binary];
-        analyze![self, node, syn::ExprBlock, visit_expr_block];
-        analyze![self, node, syn::ExprBox, visit_expr_box];
+        // analyze![self, node, syn::ExprBinary, visit_expr_binary];
+        // analyze![self, node, syn::ExprBlock, visit_expr_block];
+        // analyze![self, node, syn::ExprBox, visit_expr_box];
         analyze![self, node, syn::ExprBreak, visit_expr_break];
-        analyze![self, node, syn::ExprCall, visit_expr_call];
+        // analyze![self, node, syn::ExprCall, visit_expr_call];
         analyze![self, node, syn::ExprCast, visit_expr_cast];
         analyze![self, node, syn::ExprClosure, visit_expr_closure];
         analyze![self, node, syn::ExprContinue, visit_expr_continue];
         analyze![self, node, syn::ExprField, visit_expr_field];
         analyze![self, node, syn::ExprForLoop, visit_expr_for_loop];
-        analyze![self, node, syn::ExprGroup, visit_expr_group];
+        // analyze![self, node, syn::ExprGroup, visit_expr_group];
         analyze![self, node, syn::ExprIf, visit_expr_if];
         analyze![self, node, syn::ExprIndex, visit_expr_index];
-        analyze![self, node, syn::ExprLet, visit_expr_let];
-        analyze![self, node, syn::ExprLit, visit_expr_lit];
+        // analyze![self, node, syn::ExprLet, visit_expr_let];
+        // analyze![self, node, syn::ExprLit, visit_expr_lit];
         analyze![self, node, syn::ExprLoop, visit_expr_loop];
-        analyze![self, node, syn::ExprMacro, visit_expr_macro];
+        // analyze![self, node, syn::ExprMacro, visit_expr_macro];
         analyze![self, node, syn::ExprMatch, visit_expr_match];
-        analyze![self, node, syn::ExprMethodCall, visit_expr_method_call];
-        analyze![self, node, syn::ExprParen, visit_expr_paren];
-        analyze![self, node, syn::ExprPath, visit_expr_path];
+        // analyze![self, node, syn::ExprMethodCall, visit_expr_method_call];
+        // analyze![self, node, syn::ExprParen, visit_expr_paren];
+        // analyze![self, node, syn::ExprPath, visit_expr_path];
         analyze![self, node, syn::ExprRange, visit_expr_range];
         analyze![self, node, syn::ExprReference, visit_expr_reference];
         analyze![self, node, syn::ExprRepeat, visit_expr_repeat];
@@ -167,21 +167,21 @@ impl<'a> NodeAnalyzer<'a> {
         analyze![self, node, syn::ExprTryBlock, visit_expr_try_block];
         analyze![self, node, syn::ExprTuple, visit_expr_tuple];
         analyze![self, node, syn::ExprType, visit_expr_type];
-        analyze![self, node, syn::ExprUnary, visit_expr_unary];
+        // analyze![self, node, syn::ExprUnary, visit_expr_unary];
         analyze![self, node, syn::ExprUnsafe, visit_expr_unsafe];
         analyze![self, node, syn::ExprWhile, visit_expr_while];
         analyze![self, node, syn::ExprYield, visit_expr_yield];
         analyze![self, node, syn::Field, visit_field];
         analyze![self, node, syn::FieldPat, visit_field_pat];
         analyze![self, node, syn::FieldValue, visit_field_value];
-        analyze![self, node, syn::Fields, visit_fields];
-        analyze![self, node, syn::FieldsNamed, visit_fields_named];
-        analyze![self, node, syn::FieldsUnnamed, visit_fields_unnamed];
+        // analyze![self, node, syn::Fields, visit_fields];
+        // analyze![self, node, syn::FieldsNamed, visit_fields_named];
+        // analyze![self, node, syn::FieldsUnnamed, visit_fields_unnamed];
         analyze![self, node, syn::File, visit_file];
         analyze![self, node, syn::FnArg, visit_fn_arg];
-        analyze![self, node, syn::ForeignItem, visit_foreign_item];
-        analyze![self, node, syn::ForeignItemFn, visit_foreign_item_fn];
-        analyze![self, node, syn::ForeignItemMacro, visit_foreign_item_macro];
+        // analyze![self, node, syn::ForeignItem, visit_foreign_item];
+        // analyze![self, node, syn::ForeignItemFn, visit_foreign_item_fn];
+        // analyze![self, node, syn::ForeignItemMacro, visit_foreign_item_macro];
         analyze![
             self,
             node,
@@ -189,23 +189,18 @@ impl<'a> NodeAnalyzer<'a> {
             visit_foreign_item_static
         ];
         analyze![self, node, syn::ForeignItemType, visit_foreign_item_type];
-        analyze![self, node, syn::GenericArgument, visit_generic_argument];
-        analyze![
-            self,
-            node,
-            syn::GenericMethodArgument,
-            visit_generic_method_argument
-        ];
-        analyze![self, node, syn::GenericParam, visit_generic_param];
-        analyze![self, node, syn::Generics, visit_generics];
+        // analyze![self, node, syn::GenericArgument, visit_generic_argument];
+        // analyze![ self, node, syn::GenericMethodArgument, visit_generic_method_argument ];
+        // analyze![self, node, syn::GenericParam, visit_generic_param];
+        // analyze![self, node, syn::Generics, visit_generics];
         analyze![self, node, proc_macro2::Ident, visit_ident];
-        analyze![self, node, syn::ImplItem, visit_impl_item];
+        // analyze![self, node, syn::ImplItem, visit_impl_item];
         analyze![self, node, syn::ImplItemConst, visit_impl_item_const];
-        analyze![self, node, syn::ImplItemMacro, visit_impl_item_macro];
+        // analyze![self, node, syn::ImplItemMacro, visit_impl_item_macro];
         analyze![self, node, syn::ImplItemMethod, visit_impl_item_method];
         analyze![self, node, syn::ImplItemType, visit_impl_item_type];
-        analyze![self, node, syn::Index, visit_index];
-        analyze![self, node, syn::Item, visit_item];
+        // analyze![self, node, syn::Index, visit_index];
+        // analyze![self, node, syn::Item, visit_item];
         analyze![self, node, syn::ItemConst, visit_item_const];
         analyze![self, node, syn::ItemEnum, visit_item_enum];
         analyze![self, node, syn::ItemExternCrate, visit_item_extern_crate];
@@ -213,7 +208,7 @@ impl<'a> NodeAnalyzer<'a> {
         analyze![self, node, syn::ItemForeignMod, visit_item_foreign_mod];
         analyze![self, node, syn::ItemImpl, visit_item_impl];
         analyze![self, node, syn::ItemMacro, visit_item_macro];
-        analyze![self, node, syn::ItemMacro2, visit_item_macro2];
+        // analyze![self, node, syn::ItemMacro2, visit_item_macro2];
         analyze![self, node, syn::ItemMod, visit_item_mod];
         analyze![self, node, syn::ItemStatic, visit_item_static];
         analyze![self, node, syn::ItemStruct, visit_item_struct];
@@ -224,8 +219,8 @@ impl<'a> NodeAnalyzer<'a> {
         analyze![self, node, syn::ItemUse, visit_item_use];
         analyze![self, node, syn::Label, visit_label];
         analyze![self, node, syn::Lifetime, visit_lifetime];
-        analyze![self, node, syn::LifetimeDef, visit_lifetime_def];
-        analyze![self, node, syn::Lit, visit_lit];
+        // analyze![self, node, syn::LifetimeDef, visit_lifetime_def];
+        // analyze![self, node, syn::Lit, visit_lit];
         analyze![self, node, syn::LitBool, visit_lit_bool];
         analyze![self, node, syn::LitByte, visit_lit_byte];
         analyze![self, node, syn::LitByteStr, visit_lit_byte_str];
@@ -235,91 +230,75 @@ impl<'a> NodeAnalyzer<'a> {
         analyze![self, node, syn::LitStr, visit_lit_str];
         analyze![self, node, syn::Local, visit_local];
         analyze![self, node, syn::Macro, visit_macro];
-        analyze![self, node, syn::MacroDelimiter, visit_macro_delimiter];
-        analyze![self, node, syn::Member, visit_member];
-        analyze![self, node, syn::Meta, visit_meta];
-        analyze![self, node, syn::MetaList, visit_meta_list];
-        analyze![self, node, syn::MetaNameValue, visit_meta_name_value];
+        // analyze![self, node, syn::Member, visit_member];
         analyze![self, node, syn::MethodTurbofish, visit_method_turbofish];
-        analyze![self, node, syn::NestedMeta, visit_nested_meta];
-        analyze![
-            self,
-            node,
-            syn::ParenthesizedGenericArguments,
-            visit_parenthesized_generic_arguments
-        ];
-        analyze![self, node, syn::Pat, visit_pat];
+        // analyze![ self, node, syn::ParenthesizedGenericArguments, visit_parenthesized_generic_arguments ];
+        // analyze![self, node, syn::Pat, visit_pat];
         analyze![self, node, syn::PatBox, visit_pat_box];
         analyze![self, node, syn::PatIdent, visit_pat_ident];
-        analyze![self, node, syn::PatLit, visit_pat_lit];
-        analyze![self, node, syn::PatMacro, visit_pat_macro];
+        // analyze![self, node, syn::PatLit, visit_pat_lit];
+        // analyze![self, node, syn::PatMacro, visit_pat_macro];
         analyze![self, node, syn::PatOr, visit_pat_or];
-        analyze![self, node, syn::PatPath, visit_pat_path];
+        // analyze![self, node, syn::PatPath, visit_pat_path];
         analyze![self, node, syn::PatRange, visit_pat_range];
-        analyze![self, node, syn::PatReference, visit_pat_reference];
-        analyze![self, node, syn::PatRest, visit_pat_rest];
-        analyze![self, node, syn::PatSlice, visit_pat_slice];
+        // analyze![self, node, syn::PatReference, visit_pat_reference];
+        // analyze![self, node, syn::PatRest, visit_pat_rest];
+        // analyze![self, node, syn::PatSlice, visit_pat_slice];
         analyze![self, node, syn::PatStruct, visit_pat_struct];
         analyze![self, node, syn::PatTuple, visit_pat_tuple];
         analyze![self, node, syn::PatTupleStruct, visit_pat_tuple_struct];
-        analyze![self, node, syn::PatType, visit_pat_type];
+        // analyze![self, node, syn::PatType, visit_pat_type];
         analyze![self, node, syn::PatWild, visit_pat_wild];
         analyze![self, node, syn::Path, visit_path];
-        analyze![self, node, syn::PathArguments, visit_path_arguments];
+        // analyze![self, node, syn::PathArguments, visit_path_arguments];
         analyze![self, node, syn::PathSegment, visit_path_segment];
-        analyze![self, node, syn::PredicateEq, visit_predicate_eq];
-        analyze![self, node, syn::PredicateLifetime, visit_predicate_lifetime];
-        analyze![self, node, syn::PredicateType, visit_predicate_type];
+        // analyze![self, node, syn::PredicateEq, visit_predicate_eq];
+        // analyze![self, node, syn::PredicateLifetime, visit_predicate_lifetime];
+        // analyze![self, node, syn::PredicateType, visit_predicate_type];
         analyze![self, node, syn::QSelf, visit_qself];
-        analyze![self, node, syn::RangeLimits, visit_range_limits];
-        analyze![self, node, syn::Receiver, visit_receiver];
+        // analyze![self, node, syn::Receiver, visit_receiver];
         analyze![self, node, syn::ReturnType, visit_return_type];
         analyze![self, node, syn::Signature, visit_signature];
-        analyze![self, node, syn::Stmt, visit_stmt];
+        // analyze![self, node, syn::Stmt, visit_stmt];
         analyze![self, node, syn::TraitBound, visit_trait_bound];
-        analyze![
-            self,
-            node,
-            syn::TraitBoundModifier,
-            visit_trait_bound_modifier
-        ];
-        analyze![self, node, syn::TraitItem, visit_trait_item];
+        // analyze![ self, node, syn::TraitBoundModifier, visit_trait_bound_modifier ];
+        // analyze![self, node, syn::TraitItem, visit_trait_item];
         analyze![self, node, syn::TraitItemConst, visit_trait_item_const];
-        analyze![self, node, syn::TraitItemMacro, visit_trait_item_macro];
+        // analyze![self, node, syn::TraitItemMacro, visit_trait_item_macro];
         analyze![self, node, syn::TraitItemMethod, visit_trait_item_method];
         analyze![self, node, syn::TraitItemType, visit_trait_item_type];
-        analyze![self, node, syn::Type, visit_type];
+        // analyze![self, node, syn::Type, visit_type];
         analyze![self, node, syn::TypeArray, visit_type_array];
         analyze![self, node, syn::TypeBareFn, visit_type_bare_fn];
-        analyze![self, node, syn::TypeGroup, visit_type_group];
+        // analyze![self, node, syn::TypeGroup, visit_type_group];
         analyze![self, node, syn::TypeImplTrait, visit_type_impl_trait];
         analyze![self, node, syn::TypeInfer, visit_type_infer];
-        analyze![self, node, syn::TypeMacro, visit_type_macro];
+        // analyze![self, node, syn::TypeMacro, visit_type_macro];
         analyze![self, node, syn::TypeNever, visit_type_never];
-        analyze![self, node, syn::TypeParam, visit_type_param];
-        analyze![self, node, syn::TypeParamBound, visit_type_param_bound];
-        analyze![self, node, syn::TypeParen, visit_type_paren];
+        // analyze![self, node, syn::TypeParam, visit_type_param];
+        // analyze![self, node, syn::TypeParamBound, visit_type_param_bound];
+        // analyze![self, node, syn::TypeParen, visit_type_paren];
         analyze![self, node, syn::TypePath, visit_type_path];
         analyze![self, node, syn::TypePtr, visit_type_ptr];
         analyze![self, node, syn::TypeReference, visit_type_reference];
         analyze![self, node, syn::TypeSlice, visit_type_slice];
         analyze![self, node, syn::TypeTraitObject, visit_type_trait_object];
         analyze![self, node, syn::TypeTuple, visit_type_tuple];
-        analyze![self, node, syn::UnOp, visit_un_op];
+        // analyze![self, node, syn::UnOp, visit_un_op];
         analyze![self, node, syn::UseGlob, visit_use_glob];
         analyze![self, node, syn::UseGroup, visit_use_group];
         analyze![self, node, syn::UseName, visit_use_name];
         analyze![self, node, syn::UsePath, visit_use_path];
         analyze![self, node, syn::UseRename, visit_use_rename];
-        analyze![self, node, syn::UseTree, visit_use_tree];
-        analyze![self, node, syn::Variadic, visit_variadic];
+        // analyze![self, node, syn::UseTree, visit_use_tree];
+        // analyze![self, node, syn::Variadic, visit_variadic];
         analyze![self, node, syn::Variant, visit_variant];
         analyze![self, node, syn::VisCrate, visit_vis_crate];
         analyze![self, node, syn::VisPublic, visit_vis_public];
         analyze![self, node, syn::VisRestricted, visit_vis_restricted];
-        analyze![self, node, syn::Visibility, visit_visibility];
+        // analyze![self, node, syn::Visibility, visit_visibility];
         analyze![self, node, syn::WhereClause, visit_where_clause];
-        analyze![self, node, syn::WherePredicate, visit_where_predicate];
+        // analyze![self, node, syn::WherePredicate, visit_where_predicate];
     }
 
     fn attributes(&self, id: usize) -> Option<&[syn::Attribute]> {
@@ -563,26 +542,77 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help_between(start, end, HelpItem::DocBlock { outer });
         }
     }
-    fn visit_bare_fn_arg(&mut self, _: &syn::BareFnArg) {}
-    fn visit_bin_op(&mut self, _: &syn::BinOp) {}
-    fn visit_binding(&mut self, _: &syn::Binding) {}
-    fn visit_block(&mut self, _: &syn::Block) {}
-    fn visit_bound_lifetimes(&mut self, _: &syn::BoundLifetimes) {}
-    fn visit_const_param(&mut self, _: &syn::ConstParam) {}
-    fn visit_constraint(&mut self, _: &syn::Constraint) {}
-    fn visit_expr(&mut self, _: &syn::Expr) {}
+    fn visit_bin_op(&mut self, node: &syn::BinOp) {
+        use syn::BinOp::*;
+        let item = match node {
+            Add(..) => HelpItem::AddBinOp,
+            Sub(..) => HelpItem::SubBinOp,
+            Mul(..) => HelpItem::MulBinOp,
+            Div(..) => HelpItem::DivBinOp,
+            Rem(..) => HelpItem::RemBinOp,
+            And(..) => HelpItem::AndBinOp,
+            Or(..) => HelpItem::OrBinOp,
+            BitXor(..) => HelpItem::BitXorBinOp,
+            BitAnd(..) => HelpItem::BitAndBinOp,
+            BitOr(..) => HelpItem::BitOrBinOp,
+            Shl(..) => HelpItem::ShlBinOp,
+            Shr(..) => HelpItem::ShrBinOp,
+            Eq(..) => HelpItem::EqBinOp,
+            Lt(..) => HelpItem::LtBinOp,
+            Le(..) => HelpItem::LeBinOp,
+            Ne(..) => HelpItem::NeBinOp,
+            Ge(..) => HelpItem::GeBinOp,
+            Gt(..) => HelpItem::GtBinOp,
+            AddEq(..) => HelpItem::AddEqBinOp,
+            SubEq(..) => HelpItem::SubEqBinOp,
+            MulEq(..) => HelpItem::MulEqBinOp,
+            DivEq(..) => HelpItem::DivEqBinOp,
+            RemEq(..) => HelpItem::RemEqBinOp,
+            BitXorEq(..) => HelpItem::BitXorEqBinOp,
+            BitAndEq(..) => HelpItem::BitAndEqBinOp,
+            BitOrEq(..) => HelpItem::BitOrEqBinOp,
+            ShlEq(..) => HelpItem::ShlEqBinOp,
+            ShrEq(..) => HelpItem::ShrEqBinOp,
+        };
+
+        return self.set_help(node, item);
+    }
+    fn visit_binding(&mut self, node: &syn::Binding) {
+        return self.set_help(
+            node,
+            HelpItem::Binding {
+                ident: node.ident.to_string(),
+            },
+        );
+    }
+    fn visit_bound_lifetimes(&mut self, node: &syn::BoundLifetimes) {
+        return self.set_help(&node, HelpItem::BoundLifetimes);
+    }
+    fn visit_const_param(&mut self, node: &syn::ConstParam) {
+        token![self, node.const_token, ConstParam];
+    }
+    // EXAMPLE
+    // impl<P: Deref<Target: Eq>> Eq for Pin<P> {}
     fn visit_expr_array(&mut self, node: &syn::ExprArray) {
         if !self.has_ancestor::<syn::ExprReference>(2) {
             self.set_help(node, HelpItem::ExprArray)
         }
     }
-    fn visit_expr_assign(&mut self, _: &syn::ExprAssign) {}
-    fn visit_expr_assign_op(&mut self, _: &syn::ExprAssignOp) {}
-    fn visit_expr_async(&mut self, _: &syn::ExprAsync) {}
-    fn visit_expr_await(&mut self, _: &syn::ExprAwait) {}
-    fn visit_expr_binary(&mut self, _: &syn::ExprBinary) {}
-    fn visit_expr_block(&mut self, _: &syn::ExprBlock) {}
-    fn visit_expr_box(&mut self, _: &syn::ExprBox) {}
+    fn visit_expr_assign(&mut self, node: &syn::ExprAssign) {
+        // TODO: add context on the lvalue/place expression: deref, index, field access, etc.
+        return self.set_help(node, HelpItem::ExprAssign);
+    }
+    fn visit_expr_assign_op(&mut self, node: &syn::ExprAssignOp) {
+        // TODO: add context on the lvalue/place expression: deref, index, field access, etc.
+        return self.set_help(node, HelpItem::ExprAssignOp);
+    }
+    fn visit_expr_async(&mut self, node: &syn::ExprAsync) {
+        token![self, some node.capture, ExprAsyncMove];
+        return self.set_help(node, HelpItem::ExprAsync);
+    }
+    fn visit_expr_await(&mut self, node: &syn::ExprAwait) {
+        token![self, node.await_token, ExprAwait];
+    }
     fn visit_expr_break(&mut self, node: &syn::ExprBreak) {
         return self.set_help(
             &node,
@@ -592,11 +622,34 @@ impl<'a> NodeAnalyzer<'a> {
             },
         );
     }
-    fn visit_expr_call(&mut self, _: &syn::ExprCall) {}
-    fn visit_expr_cast(&mut self, _: &syn::ExprCast) {}
-    fn visit_expr_closure(&mut self, _: &syn::ExprClosure) {}
-    fn visit_expr_continue(&mut self, _: &syn::ExprContinue) {}
-    fn visit_expr_field(&mut self, _: &syn::ExprField) {}
+    fn visit_expr_cast(&mut self, node: &syn::ExprCast) {
+        token![self, node.as_token, AsCast];
+    }
+    fn visit_expr_closure(&mut self, node: &syn::ExprClosure) {
+        token![self, node.or1_token, ExprClosureArguments];
+        token![self, node.or2_token, ExprClosureArguments];
+        token![self, some node.asyncness, ExprClosureAsync];
+        token![self, some node.capture, ExprClosureMove];
+        token![self, some node.movability, ExprClosureStatic];
+        return self.set_help(node, HelpItem::ExprClosure);
+    }
+    fn visit_expr_continue(&mut self, node: &syn::ExprContinue) {
+        self.set_help(
+            node,
+            HelpItem::ExprContinue {
+                label: node.label.as_ref().map(|l| l.to_string()),
+            },
+        );
+    }
+    fn visit_expr_field(&mut self, node: &syn::ExprField) {
+        if let syn::Member::Unnamed(..) = node.member {
+            return self.set_help_between(
+                node.dot_token.span(),
+                node.member.span(),
+                HelpItem::ExprUnnamedField,
+            );
+        }
+    }
     fn visit_expr_for_loop(&mut self, node: &syn::ExprForLoop) {
         token![self, node.for_token, ExprForLoopToken];
         token![self, node.in_token, ExprForLoopToken];
@@ -626,20 +679,49 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }
     }
-    fn visit_expr_group(&mut self, _: &syn::ExprGroup) {}
-    fn visit_expr_if(&mut self, _: &syn::ExprIf) {}
-    fn visit_expr_index(&mut self, _: &syn::ExprIndex) {}
-    fn visit_expr_let(&mut self, _: &syn::ExprLet) {}
-    fn visit_expr_lit(&mut self, _: &syn::ExprLit) {}
+    fn visit_expr_if(&mut self, node: &syn::ExprIf) {
+        if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
+            if self.between_spans(node.if_token.span(), let_token.span()) {
+                return self.set_help_between(
+                    node.if_token.span(),
+                    let_token.span(),
+                    HelpItem::ExprIfLet,
+                );
+            }
+        } else {
+            token![self, node.if_token, ExprIf];
+        };
+        if let Some((else_token, _)) = node.else_branch {
+            token![self, else_token, Else];
+        }
+    }
+    fn visit_expr_index(&mut self, node: &syn::ExprIndex) {
+        let range = if let syn::Expr::Range(..) = &*node.index {
+            true
+        } else {
+            false
+        };
+
+        return self.set_help(node, HelpItem::ExprIndex { range });
+    }
     fn visit_expr_loop(&mut self, node: &syn::ExprLoop) {
         token![self, node.loop_token, ExprLoopToken];
     }
-    fn visit_expr_macro(&mut self, _: &syn::ExprMacro) {}
-    fn visit_expr_match(&mut self, _: &syn::ExprMatch) {}
-    fn visit_expr_method_call(&mut self, _: &syn::ExprMethodCall) {}
-    fn visit_expr_paren(&mut self, _: &syn::ExprParen) {}
-    fn visit_expr_path(&mut self, _: &syn::ExprPath) {}
-    fn visit_expr_range(&mut self, _: &syn::ExprRange) {}
+    fn visit_expr_match(&mut self, node: &syn::ExprMatch) {
+        token![self, node.match_token, ExprMatchToken];
+    }
+    fn visit_expr_range(&mut self, node: &syn::ExprRange) {
+        let from = node.from.is_some();
+        let to = node.to.is_some();
+        return match node.limits {
+            syn::RangeLimits::HalfOpen(..) => {
+                self.set_help(node, HelpItem::ExprRangeHalfOpen { from, to })
+            }
+            syn::RangeLimits::Closed(..) => {
+                self.set_help(node, HelpItem::ExprRangeClosed { from, to })
+            }
+        };
+    }
     fn visit_expr_reference(&mut self, node: &syn::ExprReference) {
         let item = if let syn::Expr::Array(_) = &*node.expr {
             HelpItem::ExprArraySlice
@@ -651,15 +733,59 @@ impl<'a> NodeAnalyzer<'a> {
 
         return self.set_help(node, item);
     }
-    fn visit_expr_repeat(&mut self, _: &syn::ExprRepeat) {}
-    fn visit_expr_return(&mut self, _: &syn::ExprReturn) {}
-    fn visit_expr_struct(&mut self, _: &syn::ExprStruct) {}
-    fn visit_expr_try(&mut self, _: &syn::ExprTry) {}
-    fn visit_expr_try_block(&mut self, _: &syn::ExprTryBlock) {}
-    fn visit_expr_tuple(&mut self, _: &syn::ExprTuple) {}
-    fn visit_expr_type(&mut self, _: &syn::ExprType) {}
-    fn visit_expr_unary(&mut self, _: &syn::ExprUnary) {}
-    fn visit_expr_unsafe(&mut self, _: &syn::ExprUnsafe) {}
+    fn visit_expr_repeat(&mut self, node: &syn::ExprRepeat) {
+        return self.set_help(
+            node,
+            HelpItem::ExprRepeat {
+                len: (&*node.len).to_token_stream().to_string(),
+            },
+        );
+    }
+    fn visit_expr_return(&mut self, node: &syn::ExprReturn) {
+        token![self, node.return_token, ExprReturn];
+    }
+    fn visit_expr_struct(&mut self, node: &syn::ExprStruct) {
+        if self.within(&node.path) {
+            return self.set_help(node, HelpItem::ExprStruct);
+        }
+
+        if let Some((dot2_token, rest)) = node
+            .dot2_token
+            .and_then(|t| node.rest.as_ref().map(|r| (t, r)))
+        {
+            if self.between_spans(dot2_token.span(), rest.span()) {
+                return self.set_help_between(
+                    dot2_token.span(),
+                    rest.span(),
+                    HelpItem::ExprStructRest,
+                );
+            }
+        }
+    }
+    fn visit_expr_try(&mut self, node: &syn::ExprTry) {
+        token![self, node.question_token, ExprTryQuestionMark];
+    }
+    fn visit_expr_try_block(&mut self, node: &syn::ExprTryBlock) {
+        token![self, node.try_token, ExprTryBlock];
+    }
+    fn visit_expr_tuple(&mut self, node: &syn::ExprTuple) {
+        return self.set_help(
+            node,
+            if node.elems.is_empty() {
+                HelpItem::ExprUnitTuple
+            } else {
+                HelpItem::ExprTuple {
+                    single_comma: node.elems.len() == 1 && node.elems.trailing_punct(),
+                }
+            },
+        );
+    }
+    fn visit_expr_type(&mut self, node: &syn::ExprType) {
+        return self.set_help(node, HelpItem::ExprType);
+    }
+    fn visit_expr_unsafe(&mut self, node: &syn::ExprUnsafe) {
+        token![self, node.unsafe_token, ExprUnsafe];
+    }
     fn visit_expr_while(&mut self, node: &syn::ExprWhile) {
         let while_let = if let syn::Expr::Let(..) = *node.cond {
             true
@@ -681,7 +807,9 @@ impl<'a> NodeAnalyzer<'a> {
             }
         ];
     }
-    fn visit_expr_yield(&mut self, _: &syn::ExprYield) {}
+    fn visit_expr_yield(&mut self, node: &syn::ExprYield) {
+        token![self, node.yield_token, ExprYield];
+    }
     fn visit_field(&mut self, node: &syn::Field) {
         let field_data = loop {
             if let Some(variant) = self.get_ancestor::<syn::Variant>(3) {
@@ -710,12 +838,50 @@ impl<'a> NodeAnalyzer<'a> {
             );
         }
     }
-    fn visit_field_pat(&mut self, _: &syn::FieldPat) {}
-    fn visit_field_value(&mut self, _: &syn::FieldValue) {}
-    fn visit_fields(&mut self, _: &syn::Fields) {}
-    fn visit_fields_named(&mut self, _: &syn::FieldsNamed) {}
-    fn visit_fields_unnamed(&mut self, _: &syn::FieldsUnnamed) {}
-    fn visit_file(&mut self, _: &syn::File) {}
+    fn visit_field_pat(&mut self, node: &syn::FieldPat) {
+        if let (syn::Member::Unnamed(..), syn::Pat::Ident(syn::PatIdent { ident, .. })) =
+            (&node.member, &*node.pat)
+        {
+            return self.set_help(
+                node,
+                HelpItem::FieldPatUnnamed {
+                    ident: ident.to_string(),
+                },
+            );
+        }
+
+        if let (None, syn::Pat::Ident(syn::PatIdent { ident, .. })) = (node.colon_token, &*node.pat)
+        {
+            return self.set_help(
+                node,
+                HelpItem::FieldPatShorthand {
+                    ident: ident.to_string(),
+                },
+            );
+        }
+    }
+    fn visit_field_value(&mut self, node: &syn::FieldValue) {
+        match (node.colon_token, &node.member) {
+            (None, syn::Member::Named(ident)) => {
+                return self.set_help(
+                    node,
+                    HelpItem::FieldValueShorthand {
+                        name: ident.to_string(),
+                    },
+                );
+            }
+            _ => {}
+        }
+
+        if let syn::Member::Unnamed(..) = node.member {
+            return self.set_help(node, HelpItem::FieldUnnamedValue);
+        }
+    }
+    fn visit_file(&mut self, node: &syn::File) {
+        // TODO: handle shebang in exploration
+        // TODO: assign proper span to shebang
+        token![self, some node.shebang, Shebang];
+    }
     fn visit_fn_arg(&mut self, node: &syn::FnArg) {
         if let Some(sig) = self.get_ancestor::<syn::Signature>(1) {
             if sig
@@ -730,15 +896,28 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }
     }
-    fn visit_foreign_item(&mut self, _: &syn::ForeignItem) {}
-    fn visit_foreign_item_fn(&mut self, _: &syn::ForeignItemFn) {}
-    fn visit_foreign_item_macro(&mut self, _: &syn::ForeignItemMacro) {}
-    fn visit_foreign_item_static(&mut self, _: &syn::ForeignItemStatic) {}
-    fn visit_foreign_item_type(&mut self, _: &syn::ForeignItemType) {}
-    fn visit_generic_argument(&mut self, _: &syn::GenericArgument) {}
-    fn visit_generic_method_argument(&mut self, _: &syn::GenericMethodArgument) {}
-    fn visit_generic_param(&mut self, _: &syn::GenericParam) {}
-    fn visit_generics(&mut self, _: &syn::Generics) {}
+    fn visit_foreign_item_static(&mut self, node: &syn::ForeignItemStatic) {
+        let end = node
+            .mutability
+            .as_ref()
+            .map(Spanned::span)
+            .unwrap_or_else(|| node.static_token.span());
+
+        if self.between_spans(node.static_token.span(), end) {
+            return self.set_help_between(
+                node.static_token.span(),
+                end,
+                if node.mutability.is_some() {
+                    HelpItem::StaticMut
+                } else {
+                    HelpItem::Static
+                },
+            );
+        }
+    }
+    fn visit_foreign_item_type(&mut self, node: &syn::ForeignItemType) {
+        token![self, node.type_token, ForeignItemType];
+    }
     fn visit_ident(&mut self, node: &proc_macro2::Ident) {
         let raw = node.to_string();
 
@@ -755,9 +934,9 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(node, HelpItem::RawIdent);
         }
     }
-    fn visit_impl_item(&mut self, _: &syn::ImplItem) {}
-    fn visit_impl_item_const(&mut self, _: &syn::ImplItemConst) {}
-    fn visit_impl_item_macro(&mut self, _: &syn::ImplItemMacro) {}
+    fn visit_impl_item_const(&mut self, node: &syn::ImplItemConst) {
+        token![self, node.const_token, ImplItemConst];
+    }
     fn visit_impl_item_method(&mut self, node: &syn::ImplItemMethod) {
         if !self.between(&node.sig.fn_token, &node.sig.ident) {
             return;
@@ -788,33 +967,138 @@ impl<'a> NodeAnalyzer<'a> {
                     self_ty,
                 },
             );
-            // token![
-            //     self,
-            //     node.sig.fn_token => node.sig.ident,
-            //     * HelpItem::ImplItemMethod {
-            //         of,
-            //     }
-            // ];
         }
     }
-    fn visit_impl_item_type(&mut self, _: &syn::ImplItemType) {}
-    fn visit_index(&mut self, _: &syn::Index) {}
-    fn visit_item(&mut self, _: &syn::Item) {}
-    fn visit_item_const(&mut self, _: &syn::ItemConst) {}
-    fn visit_item_enum(&mut self, _: &syn::ItemEnum) {}
-    fn visit_item_extern_crate(&mut self, _: &syn::ItemExternCrate) {}
-    fn visit_item_fn(&mut self, _: &syn::ItemFn) {}
-    fn visit_item_foreign_mod(&mut self, _: &syn::ItemForeignMod) {}
-    fn visit_item_impl(&mut self, _: &syn::ItemImpl) {}
-    fn visit_item_macro(&mut self, _: &syn::ItemMacro) {}
-    fn visit_item_macro2(&mut self, _: &syn::ItemMacro2) {}
-    fn visit_item_mod(&mut self, _: &syn::ItemMod) {}
-    fn visit_item_static(&mut self, _: &syn::ItemStatic) {}
-    fn visit_item_struct(&mut self, _: &syn::ItemStruct) {}
-    fn visit_item_trait(&mut self, _: &syn::ItemTrait) {}
-    fn visit_item_trait_alias(&mut self, _: &syn::ItemTraitAlias) {}
-    fn visit_item_type(&mut self, _: &syn::ItemType) {}
-    fn visit_item_union(&mut self, _: &syn::ItemUnion) {}
+    fn visit_impl_item_type(&mut self, node: &syn::ImplItemType) {
+        token![self, node.type_token, ImplItemType];
+    }
+    fn visit_item_const(&mut self, node: &syn::ItemConst) {
+        token![self, node.const_token, ItemConst];
+    }
+    fn visit_item_enum(&mut self, node: &syn::ItemEnum) {
+        token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
+            empty: node.variants.is_empty()
+        }];
+    }
+    fn visit_item_extern_crate(&mut self, node: &syn::ItemExternCrate) {
+        if let Some((as_token, _)) = node.rename {
+            token![self, as_token, AsRenameExternCrate];
+        }
+        let start = vis_span(&node.vis).unwrap_or_else(|| node.extern_token.span());
+        return self.set_help_between(start, node.span(), HelpItem::ItemExternCrate);
+    }
+    fn visit_item_fn(&mut self, node: &syn::ItemFn) {
+        token![self, node.sig.fn_token => node.sig.ident, ItemFn];
+    }
+    fn visit_item_foreign_mod(&mut self, node: &syn::ItemForeignMod) {
+        token![self, node.abi, ItemForeignModAbi];
+    }
+    fn visit_item_impl(&mut self, node: &syn::ItemImpl) {
+        token![self, some node.unsafety, ItemUnsafeImpl];
+        if let Some((_, _, for_token)) = node.trait_ {
+            token![self, for_token, ItemImplForTrait];
+        }
+        token![
+            self,
+            node.impl_token,
+            *HelpItem::ItemImpl {
+                trait_: node.trait_.is_some(),
+                negative: node
+                    .trait_
+                    .as_ref()
+                    .and_then(|(bang, _, _)| bang.as_ref())
+                    .is_some()
+            }
+        ];
+    }
+    fn visit_item_macro(&mut self, node: &syn::ItemMacro) {
+        if let Some(ident) = &node.ident {
+            if node.mac.path.is_ident("macro_rules") {
+                return self.set_help(
+                    node,
+                    HelpItem::ItemMacroRules {
+                        name: ident.to_string(),
+                    },
+                );
+            }
+        }
+    }
+    fn visit_item_mod(&mut self, node: &syn::ItemMod) {
+        if node.content.is_some() {
+            if self.between(&node.mod_token, &node.ident) {
+                return self.set_help_between(
+                    node.mod_token.span(),
+                    node.ident.span(),
+                    HelpItem::ItemInlineMod,
+                );
+            }
+        } else {
+            return self.set_help(&node, HelpItem::ItemExternMod);
+        }
+    }
+    fn visit_item_static(&mut self, node: &syn::ItemStatic) {
+        let end = node
+            .mutability
+            .as_ref()
+            .map(Spanned::span)
+            .unwrap_or_else(|| node.static_token.span());
+
+        if self.between_spans(node.static_token.span(), end) {
+            return self.set_help_between(
+                node.static_token.span(),
+                end,
+                if node.mutability.is_some() {
+                    HelpItem::StaticMut
+                } else {
+                    HelpItem::Static
+                },
+            );
+        }
+    }
+    fn visit_item_struct(&mut self, node: &syn::ItemStruct) {
+        let unit = match node.fields {
+            syn::Fields::Unit => true,
+            _ => false,
+        };
+        if self.between_spans(node.struct_token.span(), node.ident.span()) {
+            return self.set_help_between(
+                node.struct_token.span(),
+                node.ident.span(),
+                HelpItem::ItemStruct {
+                    unit,
+                    name: node.ident.to_string(),
+                },
+            );
+        }
+    }
+    fn visit_item_trait(&mut self, node: &syn::ItemTrait) {
+        token![self, some node.unsafety, ItemUnsafeTrait];
+        token![self, some node.auto_token, ItemAutoTrait];
+        token![self, node.trait_token, ItemTrait];
+        if let Some(colon_token) = node.colon_token {
+            if self.within(colon_token) {
+                let last = node
+                    .supertraits
+                    .last()
+                    .map(|t| t.span())
+                    .unwrap_or(colon_token.span());
+                return self.set_help_between(
+                    colon_token.span(),
+                    last,
+                    HelpItem::ItemTraitSupertraits,
+                );
+            }
+        }
+    }
+    fn visit_item_trait_alias(&mut self, node: &syn::ItemTraitAlias) {
+        token![self, node.trait_token, ItemTraitAlias];
+    }
+    fn visit_item_type(&mut self, node: &syn::ItemType) {
+        token![self, node.type_token => node.ident, ItemType];
+    }
+    fn visit_item_union(&mut self, node: &syn::ItemUnion) {
+        token![self, node.union_token, ItemUnion];
+    }
     fn visit_item_use(&mut self, node: &syn::ItemUse) {
         token![self, some node.leading_colon, PathLeadingColon];
         let start = vis_span(&node.vis).unwrap_or_else(|| node.use_token.span());
@@ -834,14 +1118,42 @@ impl<'a> NodeAnalyzer<'a> {
 
         return self.set_help(&node, HelpItem::Label { loop_of });
     }
-    fn visit_lifetime(&mut self, _: &syn::Lifetime) {}
-    fn visit_lifetime_def(&mut self, _: &syn::LifetimeDef) {}
-    fn visit_lit(&mut self, _: &syn::Lit) {}
-    fn visit_lit_bool(&mut self, _: &syn::LitBool) {}
-    fn visit_lit_byte(&mut self, _: &syn::LitByte) {}
-    fn visit_lit_byte_str(&mut self, _: &syn::LitByteStr) {}
-    fn visit_lit_char(&mut self, _: &syn::LitChar) {}
-    fn visit_lit_float(&mut self, _: &syn::LitFloat) {}
+    fn visit_lifetime(&mut self, node: &syn::Lifetime) {
+        if node.ident == "static" {
+            return self.set_help(node, HelpItem::StaticLifetime);
+        }
+    }
+    fn visit_lit_bool(&mut self, node: &syn::LitBool) {
+        return self.set_help(
+            node,
+            if node.value {
+                HelpItem::True
+            } else {
+                HelpItem::False
+            },
+        );
+    }
+    fn visit_lit_byte(&mut self, node: &syn::LitByte) {
+        return self.set_help(node, HelpItem::LitByte);
+    }
+    fn visit_lit_byte_str(&mut self, node: &syn::LitByteStr) {
+        let prefix = raw_string_literal(node.to_token_stream().to_string(), "br");
+        let raw = prefix.is_some();
+        return self.set_help(node, HelpItem::LitByteStr { raw, prefix });
+    }
+    fn visit_lit_char(&mut self, node: &syn::LitChar) {
+        return self.set_help(node, HelpItem::LitChar);
+    }
+    fn visit_lit_float(&mut self, node: &syn::LitFloat) {
+        let raw = node.to_string();
+        let suffix = Some(node.suffix())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        let separators = raw.chars().any(|c| c == '_');
+
+        return self.set_help(node, HelpItem::LitFloat { suffix, separators });
+    }
     fn visit_lit_int(&mut self, node: &syn::LitInt) {
         let raw = node.to_string();
 
@@ -868,7 +1180,11 @@ impl<'a> NodeAnalyzer<'a> {
             },
         );
     }
-    fn visit_lit_str(&mut self, _: &syn::LitStr) {}
+    fn visit_lit_str(&mut self, node: &syn::LitStr) {
+        let prefix = raw_string_literal(node.to_token_stream().to_string(), "r");
+        let raw = prefix.is_some();
+        return self.set_help(node, HelpItem::LitStr { raw, prefix });
+    }
     fn visit_local(&mut self, node: &syn::Local) {
         let ident_pat = match &node.pat {
             syn::Pat::Ident(pat) => Some(pat),
@@ -900,27 +1216,100 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }
     }
-    fn visit_macro(&mut self, _: &syn::Macro) {}
-    fn visit_macro_delimiter(&mut self, _: &syn::MacroDelimiter) {}
-    fn visit_member(&mut self, _: &syn::Member) {}
-    fn visit_meta(&mut self, _: &syn::Meta) {}
-    fn visit_meta_list(&mut self, _: &syn::MetaList) {}
-    fn visit_meta_name_value(&mut self, _: &syn::MetaNameValue) {}
-    fn visit_method_turbofish(&mut self, _: &syn::MethodTurbofish) {}
-    fn visit_nested_meta(&mut self, _: &syn::NestedMeta) {}
-    fn visit_parenthesized_generic_arguments(&mut self, _: &syn::ParenthesizedGenericArguments) {}
-    fn visit_pat(&mut self, _: &syn::Pat) {}
-    fn visit_pat_box(&mut self, _: &syn::PatBox) {}
-    fn visit_pat_ident(&mut self, _: &syn::PatIdent) {}
-    fn visit_pat_lit(&mut self, _: &syn::PatLit) {}
-    fn visit_pat_macro(&mut self, _: &syn::PatMacro) {}
-    fn visit_pat_or(&mut self, _: &syn::PatOr) {}
-    fn visit_pat_path(&mut self, _: &syn::PatPath) {}
-    fn visit_pat_range(&mut self, _: &syn::PatRange) {}
-    fn visit_pat_reference(&mut self, _: &syn::PatReference) {}
-    fn visit_pat_rest(&mut self, _: &syn::PatRest) {}
-    fn visit_pat_slice(&mut self, _: &syn::PatSlice) {}
-    fn visit_pat_struct(&mut self, _: &syn::PatStruct) {}
+    fn visit_macro(&mut self, node: &syn::Macro) {
+        if self
+            .get_ancestor::<syn::ItemMacro>(1)
+            .map(|item| item.ident.is_some())
+            .unwrap_or(false)
+        {
+            return;
+        }
+
+        if self.between_spans(node.path.span(), node.bang_token.span()) {
+            return self.set_help_between(
+                node.path.span(),
+                node.bang_token.span(),
+                HelpItem::Macro,
+            );
+        }
+        token![self, node.tokens, MacroTokens];
+    }
+    fn visit_method_turbofish(&mut self, node: &syn::MethodTurbofish) {
+        return self.set_help(node, HelpItem::Turbofish);
+    }
+    fn visit_pat_box(&mut self, node: &syn::PatBox) {
+        token![self, node.box_token, PatBox];
+    }
+    fn visit_pat_ident(&mut self, node: &syn::PatIdent) {
+        if let Some((at_token, subpat)) = &node.subpat {
+            if self.between(at_token, subpat) {
+                return self.set_help(
+                    node,
+                    HelpItem::PatIdentSubPat {
+                        ident: node.ident.to_string(),
+                    },
+                );
+            }
+        }
+
+        if node.mutability.is_some() && self.has_ancestor::<syn::FnArg>(3) {
+            return self.set_help(
+                node,
+                HelpItem::PatIdentMutableArg {
+                    ident: node.ident.to_string(),
+                },
+            );
+        }
+
+        let item = HelpItem::PatIdent {
+            mutability: node.mutability.is_some(),
+            by_ref: node.by_ref.is_some(),
+            ident: node.ident.to_string(),
+        };
+        match (node.by_ref, node.mutability) {
+            (Some(by_ref), Some(mutability)) => token![self, by_ref => mutability, * item],
+            (Some(by_ref), None) => token![self, by_ref, *item],
+            (None, Some(mutability)) => token![self, mutability, *item],
+            _ => {}
+        }
+    }
+    fn visit_pat_or(&mut self, node: &syn::PatOr) {
+        token![self, some node.leading_vert, PatOrLeading];
+        for pair in node.cases.pairs() {
+            token![self, some pair.punct(), PatOr];
+        }
+    }
+    fn visit_pat_range(&mut self, node: &syn::PatRange) {
+        return self.set_help(
+            node,
+            HelpItem::PatRange {
+                closed: if let syn::RangeLimits::Closed(..) = node.limits {
+                    true
+                } else {
+                    false
+                },
+            },
+        );
+    }
+    fn visit_pat_struct(&mut self, node: &syn::PatStruct) {
+        if node.fields.is_empty() {
+            token![self, some node.dot2_token, * HelpItem::PatStruct {
+                empty: true,
+                bindings: pattern_bindings(&self)
+            }];
+        }
+        token![self, some node.dot2_token, * HelpItem::PatRest {
+            of: RestOf::Struct
+        }];
+
+        return self.set_help(
+            node,
+            HelpItem::PatStruct {
+                empty: false,
+                bindings: pattern_bindings(&self),
+            },
+        );
+    }
     fn visit_pat_tuple(&mut self, node: &syn::PatTuple) {
         if self.get_ancestor::<syn::PatTupleStruct>(1).is_some() {
             return;
@@ -958,8 +1347,21 @@ impl<'a> NodeAnalyzer<'a> {
             },
         );
     }
-    fn visit_pat_type(&mut self, _: &syn::PatType) {}
-    fn visit_pat_wild(&mut self, _: &syn::PatWild) {}
+    fn visit_pat_wild(&mut self, node: &syn::PatWild) {
+        let last_arm = match (
+            self.get_ancestor::<syn::ExprMatch>(3),
+            self.get_ancestor::<syn::Arm>(2),
+        ) {
+            (Some(match_expr), Some(arm)) => match_expr
+                .arms
+                .last()
+                .map(|match_arm| std::ptr::eq(match_arm, arm))
+                .unwrap_or(false),
+            _ => false,
+        };
+
+        return self.set_help(node, HelpItem::PatWild { last_arm });
+    }
     fn visit_path(&mut self, node: &syn::Path) {
         let qself = loop {
             let ancestor = if let Some(ancestor) = self
@@ -999,14 +1401,35 @@ impl<'a> NodeAnalyzer<'a> {
             return;
         }
     }
-    fn visit_path_arguments(&mut self, _: &syn::PathArguments) {}
-    fn visit_path_segment(&mut self, _: &syn::PathSegment) {}
-    fn visit_predicate_eq(&mut self, _: &syn::PredicateEq) {}
-    fn visit_predicate_lifetime(&mut self, _: &syn::PredicateLifetime) {}
-    fn visit_predicate_type(&mut self, _: &syn::PredicateType) {}
-    fn visit_qself(&mut self, _: &syn::QSelf) {}
-    fn visit_range_limits(&mut self, _: &syn::RangeLimits) {}
-    fn visit_receiver(&mut self, _: &syn::Receiver) {}
+    fn visit_path_segment(&mut self, node: &syn::PathSegment) {
+        if node.ident == "super" {
+            return self.set_help(&node.ident, HelpItem::PathSegmentSuper);
+        }
+        if let syn::PathArguments::Parenthesized(..) = node.arguments {
+            return self.set_help(node, HelpItem::ParenthesizedGenericArguments);
+        }
+    }
+    // OPEN QUESTION: what is the purpose of the `<T>::foo()` syntax?
+    // If `T` has an intrinsic `foo()`, both:
+    // * T::foo()
+    // * <T>::foo()
+    // call it, regardless of whether there are additional `foo`s defined in traits.
+    // The only thing that I can fathom is that `T::foo()` assumes `T` is a valid
+    // path segment, and this is not always true:
+    // * <dyn Foo>::foo()
+    // * <&Foo>::foo()  ?
+    // * <_>::foo()   ?
+    fn visit_qself(&mut self, node: &syn::QSelf) {
+        return self.set_help_between(
+            node.lt_token.span(),
+            node.gt_token.span(),
+            if node.as_token.is_some() {
+                HelpItem::QSelfAsTrait
+            } else {
+                HelpItem::QSelf
+            },
+        );
+    }
     fn visit_return_type(&mut self, node: &syn::ReturnType) {
         let rarrow = if let syn::ReturnType::Type(rarrow, _) = node {
             Some(rarrow)
@@ -1027,47 +1450,220 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }];
     }
-    fn visit_signature(&mut self, _: &syn::Signature) {}
-    fn visit_stmt(&mut self, _: &syn::Stmt) {}
-    fn visit_trait_bound(&mut self, _: &syn::TraitBound) {}
-    fn visit_trait_bound_modifier(&mut self, _: &syn::TraitBoundModifier) {}
-    fn visit_trait_item(&mut self, _: &syn::TraitItem) {}
-    fn visit_trait_item_const(&mut self, _: &syn::TraitItemConst) {}
-    fn visit_trait_item_macro(&mut self, _: &syn::TraitItemMacro) {}
-    fn visit_trait_item_method(&mut self, _: &syn::TraitItemMethod) {}
-    fn visit_trait_item_type(&mut self, _: &syn::TraitItemType) {}
-    fn visit_type(&mut self, _: &syn::Type) {}
-    fn visit_type_array(&mut self, _: &syn::TypeArray) {}
+    fn visit_signature(&mut self, node: &syn::Signature) {
+        token![self, some node.asyncness, AsyncFn];
+        token![self, some node.constness, ConstFn];
+        token![self, some node.abi, FnAbi];
+        token![self, some node.unsafety, UnsafeFn];
+    }
+    fn visit_trait_bound(&mut self, node: &syn::TraitBound) {
+        if let Some((bound_lifetimes, lifetime, multiple)) = node
+            .lifetimes
+            .as_ref()
+            .filter(|bound_lifetimes| self.within(bound_lifetimes))
+            .and_then(|bound_lifetimes| {
+                bound_lifetimes
+                    .lifetimes
+                    .first()
+                    .map(|lt| (bound_lifetimes, lt, bound_lifetimes.lifetimes.len() > 1))
+            })
+        {
+            return self.set_help(
+                bound_lifetimes,
+                HelpItem::BoundLifetimesTraitBound {
+                    lifetime: format!("{}", lifetime.lifetime),
+                    multiple,
+                    ty: format!("{}", node.path.to_token_stream()),
+                },
+            );
+        }
+        if let syn::TraitBoundModifier::Maybe(..) = node.modifier {
+            return self.set_help(
+                node,
+                HelpItem::TraitBoundModifierQuestion {
+                    sized: node.path.is_ident("Sized"),
+                },
+            );
+        }
+    }
+    fn visit_trait_item_const(&mut self, node: &syn::TraitItemConst) {
+        token![self, node.const_token, TraitItemConst];
+    }
+    fn visit_trait_item_method(&mut self, node: &syn::TraitItemMethod) {
+        let of = if receiver_help(&node.sig).is_some() {
+            FnOf::Method
+        } else {
+            FnOf::AssociatedFunction
+        };
+        if !self.between(&node.sig.fn_token, &node.sig.ident) {
+            return;
+        }
+        if let Some(trait_) = self.get_ancestor::<syn::ItemTrait>(2) {
+            let trait_ = trait_.ident.to_string();
+            return self.set_help_between(
+                node.sig.fn_token.span(),
+                node.sig.ident.span(),
+                HelpItem::TraitItemMethod {
+                    of,
+                    default: node.default.is_some(),
+                    trait_,
+                },
+            );
+        }
+    }
+    fn visit_trait_item_type(&mut self, node: &syn::TraitItemType) {
+        token![self, node.type_token, TraitItemType];
+    }
+    fn visit_type_array(&mut self, node: &syn::TypeArray) {
+        if self.between_locations(node.span().start(), node.elem.span().start())
+            || self.between_spans(node.semi_token.span(), node.span())
+        {
+            return self.set_help(node, HelpItem::TypeArray);
+        }
+    }
     fn visit_type_bare_fn(&mut self, node: &syn::TypeBareFn) {
         token![self, some node.abi, TypeBareFnAbi];
         token![self, some node.unsafety, TypeBareUnsafeFn];
         token![self, some node.lifetimes, BoundLifetimesBareFnType];
         return self.set_help(node, HelpItem::TypeBareFn);
     }
-    fn visit_type_group(&mut self, _: &syn::TypeGroup) {}
-    fn visit_type_impl_trait(&mut self, _: &syn::TypeImplTrait) {}
-    fn visit_type_infer(&mut self, _: &syn::TypeInfer) {}
-    fn visit_type_macro(&mut self, _: &syn::TypeMacro) {}
-    fn visit_type_never(&mut self, _: &syn::TypeNever) {}
-    fn visit_type_param(&mut self, _: &syn::TypeParam) {}
-    fn visit_type_param_bound(&mut self, _: &syn::TypeParamBound) {}
-    fn visit_type_paren(&mut self, _: &syn::TypeParen) {}
-    fn visit_type_path(&mut self, _: &syn::TypePath) {}
-    fn visit_type_ptr(&mut self, _: &syn::TypePtr) {}
-    fn visit_type_reference(&mut self, _: &syn::TypeReference) {}
-    fn visit_type_slice(&mut self, _: &syn::TypeSlice) {}
-    fn visit_type_trait_object(&mut self, _: &syn::TypeTraitObject) {}
+    fn visit_type_impl_trait(&mut self, node: &syn::TypeImplTrait) {
+        token![self, node.impl_token, TypeImplTrait];
+    }
+    fn visit_type_infer(&mut self, node: &syn::TypeInfer) {
+        return self.set_help(node, HelpItem::TypeInfer);
+    }
+    fn visit_type_never(&mut self, node: &syn::TypeNever) {
+        return self.set_help(node, HelpItem::TypeNever);
+    }
+    fn visit_type_path(&mut self, node: &syn::TypePath) {
+        if let Some(item) = well_known_type(node) {
+            return self.set_help(node, item);
+        }
+    }
+    fn visit_type_ptr(&mut self, node: &syn::TypePtr) {
+        let end = node
+            .const_token
+            .map(|t| t.span())
+            .or_else(|| node.mutability.map(|t| t.span()));
+
+        if let Some(end) = end {
+            return self.set_help_between(
+                node.span(),
+                end,
+                if node.const_token.is_some() {
+                    HelpItem::TypeConstPtr
+                } else {
+                    HelpItem::TypeMutPtr
+                },
+            );
+        }
+    }
+    fn visit_type_reference(&mut self, node: &syn::TypeReference) {
+        if let syn::Type::Path(type_path) = &*node.elem {
+            if let Some(HelpItem::KnownTypeStr) = well_known_type(type_path) {
+                return self.set_help(
+                    node,
+                    HelpItem::KnownTypeStrSlice {
+                        mutability: node.mutability.is_some(),
+                    },
+                );
+            }
+        }
+        let last_span = node
+            .mutability
+            .map(|t| t.span())
+            .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
+            .unwrap_or_else(|| node.and_token.span());
+
+        if self.between_spans(node.and_token.span(), last_span) {
+            return self.set_help(
+                &node,
+                HelpItem::TypeReference {
+                    lifetime: node.lifetime.is_some(),
+                    mutable: node.mutability.is_some(),
+                    ty: format!("{}", node.elem.to_token_stream()),
+                },
+            );
+        }
+    }
+    fn visit_type_slice(&mut self, node: &syn::TypeSlice) {
+        return self.set_help(
+            node,
+            HelpItem::TypeSlice {
+                dynamic: self.get_ancestor::<syn::TypeReference>(2).is_some(),
+                ty: node.elem.to_token_stream().to_string(),
+            },
+        );
+    }
+    // Fun fact: a legacy trait object without `dyn` can probably only be recognized
+    // by compiling the code.
+    fn visit_type_trait_object(&mut self, node: &syn::TypeTraitObject) {
+        if let Some(plus_token) = node
+            .bounds
+            .pairs()
+            .filter_map(|pair| pair.punct().cloned())
+            .find(|punct| self.within(punct))
+        {
+            return self.set_help(&plus_token, HelpItem::TypeParamBoundAdd);
+        }
+
+        let ty = if let Some(syn::TypeParamBound::Trait(trait_bound)) = node.bounds.first() {
+            trait_bound
+        } else {
+            return;
+        };
+
+        let lifetime = node
+            .bounds
+            .iter()
+            .filter_map(|bound| match bound {
+                syn::TypeParamBound::Lifetime(lifetime) => Some(lifetime),
+                _ => None,
+            })
+            .next();
+
+        let multiple = node
+            .bounds
+            .iter()
+            .filter(|bound| match bound {
+                syn::TypeParamBound::Trait(..) => true,
+                _ => false,
+            })
+            .skip(1)
+            .next()
+            .is_some();
+
+        return self.set_help(
+            node,
+            HelpItem::TypeTraitObject {
+                lifetime: lifetime.map(|lt| format!("{}", lt)),
+                multiple,
+                dyn_: node.dyn_token.is_some(),
+                ty: format!("{}", ty.path.to_token_stream()),
+            },
+        );
+    }
     fn visit_type_tuple(&mut self, node: &syn::TypeTuple) {
         if node.elems.is_empty() {
             return self.set_help(node, HelpItem::TypeTupleUnit);
         }
-        return self.set_help(node, HelpItem::TypeTuple {
-            single_comma: node.elems.len() == 1 && node.elems.trailing_punct()
-        });
+        return self.set_help(
+            node,
+            HelpItem::TypeTuple {
+                single_comma: node.elems.len() == 1 && node.elems.trailing_punct(),
+            },
+        );
     }
-    fn visit_un_op(&mut self, _: &syn::UnOp) {}
-    fn visit_use_glob(&mut self, _: &syn::UseGlob) {}
-    fn visit_use_group(&mut self, _: &syn::UseGroup) {}
+    fn visit_use_glob(&mut self, node: &syn::UseGlob) {
+        return self.set_help(node, HelpItem::UseGlob);
+    }
+    fn visit_use_group(&mut self, node: &syn::UseGroup) {
+        if let Some(path) = self.get_ancestor::<syn::UsePath>(2) {
+            let parent = path.ident.to_string();
+            return self.set_help(node, HelpItem::UseGroup { parent });
+        }
+    }
     fn visit_use_name(&mut self, node: &syn::UseName) {
         if node.ident != "self" {
             return;
@@ -1105,9 +1701,9 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(&node.ident, HelpItem::PathSegmentSuper);
         }
     }
-    fn visit_use_rename(&mut self, _: &syn::UseRename) {}
-    fn visit_use_tree(&mut self, _: &syn::UseTree) {}
-    fn visit_variadic(&mut self, _: &syn::Variadic) {}
+    fn visit_use_rename(&mut self, node: &syn::UseRename) {
+        token![self, node.as_token, AsRename];
+    }
     fn visit_variant(&mut self, node: &syn::Variant) {
         if let Some((eq_token, discriminant)) = &node.discriminant {
             if self.between(&eq_token, &discriminant) {
@@ -1138,12 +1734,30 @@ impl<'a> NodeAnalyzer<'a> {
             },
         );
     }
-    fn visit_vis_crate(&mut self, _: &syn::VisCrate) {}
-    fn visit_vis_public(&mut self, _: &syn::VisPublic) {}
-    fn visit_vis_restricted(&mut self, _: &syn::VisRestricted) {}
-    fn visit_visibility(&mut self, _: &syn::Visibility) {}
-    fn visit_where_clause(&mut self, _: &syn::WhereClause) {}
-    fn visit_where_predicate(&mut self, _: &syn::WherePredicate) {}
+    fn visit_vis_crate(&mut self, node: &syn::VisCrate) {
+        return self.set_help(node, HelpItem::VisCrate);
+    }
+    fn visit_vis_public(&mut self, node: &syn::VisPublic) {
+        return self.set_help(node, HelpItem::VisPublic);
+    }
+    fn visit_vis_restricted(&mut self, node: &syn::VisRestricted) {
+        let path = match &*node.path {
+            path if path.is_ident("self") => VisRestrictedPath::Self_,
+            path if path.is_ident("super") => VisRestrictedPath::Super,
+            path if path.is_ident("crate") => VisRestrictedPath::Crate,
+            _ => VisRestrictedPath::Path,
+        };
+        return self.set_help(
+            node,
+            HelpItem::VisRestricted {
+                path,
+                in_: node.in_token.is_some(),
+            },
+        );
+    }
+    fn visit_where_clause(&mut self, node: &syn::WhereClause) {
+        token![self, node.where_token, WhereClause];
+    }
 }
 
 fn vis_span(vis: &syn::Visibility) -> Option<Span> {
@@ -1238,6 +1852,76 @@ fn pattern_bindings(analyzer: &NodeAnalyzer) -> Option<BindingOf> {
     }
 
     None
+}
+
+pub fn well_known_type(type_path: &syn::TypePath) -> Option<HelpItem> {
+    let path = &type_path.path;
+    if type_path.qself.is_some() || path.leading_colon.is_some() || path.segments.len() > 1 {
+        return None;
+    }
+
+    let ident = match path.segments.first() {
+        Some(segment) if segment.arguments.is_empty() => &segment.ident,
+        _ => return None,
+    };
+
+    if ident == "u8" {
+        Some(HelpItem::KnownTypeU8)
+    } else if ident == "u16" {
+        Some(HelpItem::KnownTypeU16)
+    } else if ident == "u32" {
+        Some(HelpItem::KnownTypeU32)
+    } else if ident == "u64" {
+        Some(HelpItem::KnownTypeU64)
+    } else if ident == "u128" {
+        Some(HelpItem::KnownTypeU128)
+    } else if ident == "usize" {
+        Some(HelpItem::KnownTypeUSize)
+    } else if ident == "i8" {
+        Some(HelpItem::KnownTypeI8)
+    } else if ident == "i16" {
+        Some(HelpItem::KnownTypeI16)
+    } else if ident == "i32" {
+        Some(HelpItem::KnownTypeI32)
+    } else if ident == "i64" {
+        Some(HelpItem::KnownTypeI64)
+    } else if ident == "i128" {
+        Some(HelpItem::KnownTypeI128)
+    } else if ident == "isize" {
+        Some(HelpItem::KnownTypeISize)
+    } else if ident == "char" {
+        Some(HelpItem::KnownTypeChar)
+    } else if ident == "bool" {
+        Some(HelpItem::KnownTypeBool)
+    } else if ident == "f32" {
+        Some(HelpItem::KnownTypeF32)
+    } else if ident == "f64" {
+        Some(HelpItem::KnownTypeF64)
+    } else if ident == "str" {
+        Some(HelpItem::KnownTypeStr)
+    } else {
+        None
+    }
+}
+
+fn raw_string_literal(mut literal: String, prefix: &str) -> Option<String> {
+    if literal.starts_with(prefix) {
+        for _ in 0..prefix.len() {
+            literal.remove(0);
+        }
+        let open = literal
+            .chars()
+            .enumerate()
+            .filter(|(_, c)| *c == '"')
+            .next();
+
+        open.map(|(idx, _)| {
+            literal.truncate(idx);
+            literal
+        })
+    } else {
+        None
+    }
 }
 
 fn receiver_help(sig: &syn::Signature) -> Option<HelpItem> {
