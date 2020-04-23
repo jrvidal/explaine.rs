@@ -3,6 +3,8 @@ use quote::ToTokens;
 use std::any::Any;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
+#[cfg(feature = "dev")]
+use std::fmt::Debug;
 
 mod help;
 
