@@ -11,7 +11,7 @@
   "private": true,
   "license": "UNLICENSED",
   "dependencies": {
-    "codemirror": "^5.52.2",
+    "codemirror": "^5.53.2",
     "normalize.css": "^8.0.1"
   },
   "devDependencies": {
