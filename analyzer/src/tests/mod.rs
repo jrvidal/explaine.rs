@@ -15,6 +15,7 @@ macro_rules! case {
 }
 
 case![arrays];
+case![bound_lifetimes];
 case![enums];
 case![fn_type];
 case![inner_doc_comment];
@@ -26,6 +27,11 @@ case![paths];
 case![qself];
 case![raw_ident];
 case![receiver];
+case![macros];
+case![type_reference];
+case![type_array];
+case![let_patterns];
 case![struct_field];
 case![tuple_struct_pat];
 case![unit];
+case![visibility];

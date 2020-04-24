@@ -1,5 +1,6 @@
 use crate::help::*;
 use crate::ir::{Location, Ptr, PtrData};
+use crate::syn_wrappers::{Syn, SynKind};
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
 use std::collections::HashMap;
@@ -11,20 +12,12 @@ pub struct Analyzer {
     pub(crate) locations: Vec<(usize, Location)>,
 }
 
-macro_rules! analyze {
-    ($self:ident, $node:ident, $ty:path, $method:ident) => {
-        if let Some(node) = $node.downcast::<$ty>() {
-            // println!("downcasted to {:?}", stringify!($ty));
-            $self.$method(node);
-            return;
-        }
-    };
-}
-
+// TODO: precompute ancestors list
 struct NodeAnalyzer<'a> {
     id: usize,
     location: Location,
     id_to_ptr: &'a HashMap<usize, PtrData>,
+    ancestors: &'a [(usize, Syn<'a>)],
     help: Option<((Location, Location), HelpItem)>,
 }
 
@@ -53,35 +46,57 @@ impl Analyzer {
             return None;
         };
 
-        // println!("found id #{}", id);
+        let ancestors = {
+            let mut ancestors = vec![];
+            let mut id = id;
 
-        let mut node = if let Some(node) = self.id_to_ptr.get(&id) {
-            node
-        } else {
-            return None;
+            while let Some(data) = self.id_to_ptr.get(&id) {
+                ancestors.push((id, data.ptr.as_syn()));
+                id = data.parent;
+            }
+
+            ancestors.reverse();
+
+            ancestors
         };
 
-        let mut node_analyzer = NodeAnalyzer {
-            location,
-            id_to_ptr: &self.id_to_ptr,
-            help: None,
-            id,
-        };
+        for (idx, &(node_id, node)) in ancestors.iter().enumerate() {
+            if node_id == id {
+                continue;
+            }
+            let mut node_analyzer = NodeAnalyzer {
+                location,
+                id_to_ptr: &self.id_to_ptr,
+                help: None,
+                id: node_id,
+                ancestors: &ancestors[0..idx],
+            };
 
-        loop {
-            node_analyzer.analyze_node(&node.ptr);
+            node_analyzer.analyze_node_first_pass(node);
 
             if let Some(((start, end), help)) = node_analyzer.help {
-                break Some(AnalysisResult { start, end, help });
-            }
-
-            if let Some(parent) = self.id_to_ptr.get(&node.parent) {
-                node_analyzer.id = node.parent;
-                node = parent;
-            } else {
-                break None;
+                return Some(AnalysisResult { start, end, help });
             }
         }
+
+        let mut ancestors = ancestors;
+        while let Some((id, node)) = ancestors.pop() {
+            let mut node_analyzer = NodeAnalyzer {
+                location,
+                id_to_ptr: &self.id_to_ptr,
+                help: None,
+                id,
+                ancestors: &ancestors[..],
+            };
+
+            node_analyzer.analyze_node(node);
+
+            if let Some(((start, end), help)) = node_analyzer.help {
+                return Some(AnalysisResult { start, end, help });
+            }
+        }
+
+        None
     }
 }
 
@@ -112,306 +127,205 @@ macro_rules! token {
     };
 }
 
+macro_rules! get_ancestor {
+    ($self:ident, $ty:ident, $depth:expr) => {
+        match $self.get_ancestor($depth) {
+            Some(Syn::$ty(node)) => Some(node),
+            _ => None,
+        }
+    };
+}
+
 impl<'a> NodeAnalyzer<'a> {
-    fn analyze_node(&mut self, node: &Ptr) {
-        // OMITTED: handled upstream
-        // analyze![self, node, syn::Abi, visit_abi];
-        analyze![
-            self,
-            node,
-            syn::AngleBracketedGenericArguments,
-            visit_angle_bracketed_generic_arguments
-        ];
-        analyze![self, node, syn::Arm, visit_arm];
-        analyze![self, node, syn::Attribute, visit_attribute];
-        // analyze![self, node, syn::BareFnArg, visit_bare_fn_arg];
-        analyze![self, node, syn::BinOp, visit_bin_op];
-        analyze![self, node, syn::Binding, visit_binding];
-        // analyze![self, node, syn::Block, visit_block];
-        analyze![self, node, syn::BoundLifetimes, visit_bound_lifetimes];
-        analyze![self, node, syn::ConstParam, visit_const_param];
-        // analyze![self, node, syn::Constraint, visit_constraint];
-        // analyze![self, node, syn::Expr, visit_expr];
-        analyze![self, node, syn::ExprArray, visit_expr_array];
-        analyze![self, node, syn::ExprAssign, visit_expr_assign];
-        analyze![self, node, syn::ExprAssignOp, visit_expr_assign_op];
-        analyze![self, node, syn::ExprAsync, visit_expr_async];
-        analyze![self, node, syn::ExprAwait, visit_expr_await];
-        // analyze![self, node, syn::ExprBinary, visit_expr_binary];
-        // analyze![self, node, syn::ExprBlock, visit_expr_block];
-        // analyze![self, node, syn::ExprBox, visit_expr_box];
-        analyze![self, node, syn::ExprBreak, visit_expr_break];
-        // analyze![self, node, syn::ExprCall, visit_expr_call];
-        analyze![self, node, syn::ExprCast, visit_expr_cast];
-        analyze![self, node, syn::ExprClosure, visit_expr_closure];
-        analyze![self, node, syn::ExprContinue, visit_expr_continue];
-        analyze![self, node, syn::ExprField, visit_expr_field];
-        analyze![self, node, syn::ExprForLoop, visit_expr_for_loop];
-        // analyze![self, node, syn::ExprGroup, visit_expr_group];
-        analyze![self, node, syn::ExprIf, visit_expr_if];
-        analyze![self, node, syn::ExprIndex, visit_expr_index];
-        // analyze![self, node, syn::ExprLet, visit_expr_let];
-        // analyze![self, node, syn::ExprLit, visit_expr_lit];
-        analyze![self, node, syn::ExprLoop, visit_expr_loop];
-        // analyze![self, node, syn::ExprMacro, visit_expr_macro];
-        analyze![self, node, syn::ExprMatch, visit_expr_match];
-        // analyze![self, node, syn::ExprMethodCall, visit_expr_method_call];
-        // analyze![self, node, syn::ExprParen, visit_expr_paren];
-        // analyze![self, node, syn::ExprPath, visit_expr_path];
-        analyze![self, node, syn::ExprRange, visit_expr_range];
-        analyze![self, node, syn::ExprReference, visit_expr_reference];
-        analyze![self, node, syn::ExprRepeat, visit_expr_repeat];
-        analyze![self, node, syn::ExprReturn, visit_expr_return];
-        analyze![self, node, syn::ExprStruct, visit_expr_struct];
-        analyze![self, node, syn::ExprTry, visit_expr_try];
-        analyze![self, node, syn::ExprTryBlock, visit_expr_try_block];
-        analyze![self, node, syn::ExprTuple, visit_expr_tuple];
-        analyze![self, node, syn::ExprType, visit_expr_type];
-        // analyze![self, node, syn::ExprUnary, visit_expr_unary];
-        analyze![self, node, syn::ExprUnsafe, visit_expr_unsafe];
-        analyze![self, node, syn::ExprWhile, visit_expr_while];
-        analyze![self, node, syn::ExprYield, visit_expr_yield];
-        analyze![self, node, syn::Field, visit_field];
-        analyze![self, node, syn::FieldPat, visit_field_pat];
-        analyze![self, node, syn::FieldValue, visit_field_value];
-        // analyze![self, node, syn::Fields, visit_fields];
-        // analyze![self, node, syn::FieldsNamed, visit_fields_named];
-        // analyze![self, node, syn::FieldsUnnamed, visit_fields_unnamed];
-        analyze![self, node, syn::File, visit_file];
-        analyze![self, node, syn::FnArg, visit_fn_arg];
-        // analyze![self, node, syn::ForeignItem, visit_foreign_item];
-        // analyze![self, node, syn::ForeignItemFn, visit_foreign_item_fn];
-        // analyze![self, node, syn::ForeignItemMacro, visit_foreign_item_macro];
-        analyze![
-            self,
-            node,
-            syn::ForeignItemStatic,
-            visit_foreign_item_static
-        ];
-        analyze![self, node, syn::ForeignItemType, visit_foreign_item_type];
-        // analyze![self, node, syn::GenericArgument, visit_generic_argument];
-        // analyze![ self, node, syn::GenericMethodArgument, visit_generic_method_argument ];
-        // analyze![self, node, syn::GenericParam, visit_generic_param];
-        // analyze![self, node, syn::Generics, visit_generics];
-        analyze![self, node, proc_macro2::Ident, visit_ident];
-        // analyze![self, node, syn::ImplItem, visit_impl_item];
-        analyze![self, node, syn::ImplItemConst, visit_impl_item_const];
-        // analyze![self, node, syn::ImplItemMacro, visit_impl_item_macro];
-        analyze![self, node, syn::ImplItemMethod, visit_impl_item_method];
-        analyze![self, node, syn::ImplItemType, visit_impl_item_type];
-        // analyze![self, node, syn::Index, visit_index];
-        // analyze![self, node, syn::Item, visit_item];
-        analyze![self, node, syn::ItemConst, visit_item_const];
-        analyze![self, node, syn::ItemEnum, visit_item_enum];
-        analyze![self, node, syn::ItemExternCrate, visit_item_extern_crate];
-        analyze![self, node, syn::ItemFn, visit_item_fn];
-        analyze![self, node, syn::ItemForeignMod, visit_item_foreign_mod];
-        analyze![self, node, syn::ItemImpl, visit_item_impl];
-        analyze![self, node, syn::ItemMacro, visit_item_macro];
-        // analyze![self, node, syn::ItemMacro2, visit_item_macro2];
-        analyze![self, node, syn::ItemMod, visit_item_mod];
-        analyze![self, node, syn::ItemStatic, visit_item_static];
-        analyze![self, node, syn::ItemStruct, visit_item_struct];
-        analyze![self, node, syn::ItemTrait, visit_item_trait];
-        analyze![self, node, syn::ItemTraitAlias, visit_item_trait_alias];
-        analyze![self, node, syn::ItemType, visit_item_type];
-        analyze![self, node, syn::ItemUnion, visit_item_union];
-        analyze![self, node, syn::ItemUse, visit_item_use];
-        analyze![self, node, syn::Label, visit_label];
-        analyze![self, node, syn::Lifetime, visit_lifetime];
-        // analyze![self, node, syn::LifetimeDef, visit_lifetime_def];
-        // analyze![self, node, syn::Lit, visit_lit];
-        analyze![self, node, syn::LitBool, visit_lit_bool];
-        analyze![self, node, syn::LitByte, visit_lit_byte];
-        analyze![self, node, syn::LitByteStr, visit_lit_byte_str];
-        analyze![self, node, syn::LitChar, visit_lit_char];
-        analyze![self, node, syn::LitFloat, visit_lit_float];
-        analyze![self, node, syn::LitInt, visit_lit_int];
-        analyze![self, node, syn::LitStr, visit_lit_str];
-        analyze![self, node, syn::Local, visit_local];
-        analyze![self, node, syn::Macro, visit_macro];
-        // analyze![self, node, syn::Member, visit_member];
-        analyze![self, node, syn::MethodTurbofish, visit_method_turbofish];
-        // analyze![ self, node, syn::ParenthesizedGenericArguments, visit_parenthesized_generic_arguments ];
-        // analyze![self, node, syn::Pat, visit_pat];
-        analyze![self, node, syn::PatBox, visit_pat_box];
-        analyze![self, node, syn::PatIdent, visit_pat_ident];
-        // analyze![self, node, syn::PatLit, visit_pat_lit];
-        // analyze![self, node, syn::PatMacro, visit_pat_macro];
-        analyze![self, node, syn::PatOr, visit_pat_or];
-        // analyze![self, node, syn::PatPath, visit_pat_path];
-        analyze![self, node, syn::PatRange, visit_pat_range];
-        // analyze![self, node, syn::PatReference, visit_pat_reference];
-        // analyze![self, node, syn::PatRest, visit_pat_rest];
-        // analyze![self, node, syn::PatSlice, visit_pat_slice];
-        analyze![self, node, syn::PatStruct, visit_pat_struct];
-        analyze![self, node, syn::PatTuple, visit_pat_tuple];
-        analyze![self, node, syn::PatTupleStruct, visit_pat_tuple_struct];
-        // analyze![self, node, syn::PatType, visit_pat_type];
-        analyze![self, node, syn::PatWild, visit_pat_wild];
-        analyze![self, node, syn::Path, visit_path];
-        // analyze![self, node, syn::PathArguments, visit_path_arguments];
-        analyze![self, node, syn::PathSegment, visit_path_segment];
-        // analyze![self, node, syn::PredicateEq, visit_predicate_eq];
-        // analyze![self, node, syn::PredicateLifetime, visit_predicate_lifetime];
-        // analyze![self, node, syn::PredicateType, visit_predicate_type];
-        analyze![self, node, syn::QSelf, visit_qself];
-        // analyze![self, node, syn::Receiver, visit_receiver];
-        analyze![self, node, syn::ReturnType, visit_return_type];
-        analyze![self, node, syn::Signature, visit_signature];
-        // analyze![self, node, syn::Stmt, visit_stmt];
-        analyze![self, node, syn::TraitBound, visit_trait_bound];
-        // analyze![ self, node, syn::TraitBoundModifier, visit_trait_bound_modifier ];
-        // analyze![self, node, syn::TraitItem, visit_trait_item];
-        analyze![self, node, syn::TraitItemConst, visit_trait_item_const];
-        // analyze![self, node, syn::TraitItemMacro, visit_trait_item_macro];
-        analyze![self, node, syn::TraitItemMethod, visit_trait_item_method];
-        analyze![self, node, syn::TraitItemType, visit_trait_item_type];
-        // analyze![self, node, syn::Type, visit_type];
-        analyze![self, node, syn::TypeArray, visit_type_array];
-        analyze![self, node, syn::TypeBareFn, visit_type_bare_fn];
-        // analyze![self, node, syn::TypeGroup, visit_type_group];
-        analyze![self, node, syn::TypeImplTrait, visit_type_impl_trait];
-        analyze![self, node, syn::TypeInfer, visit_type_infer];
-        // analyze![self, node, syn::TypeMacro, visit_type_macro];
-        analyze![self, node, syn::TypeNever, visit_type_never];
-        // analyze![self, node, syn::TypeParam, visit_type_param];
-        // analyze![self, node, syn::TypeParamBound, visit_type_param_bound];
-        // analyze![self, node, syn::TypeParen, visit_type_paren];
-        analyze![self, node, syn::TypePath, visit_type_path];
-        analyze![self, node, syn::TypePtr, visit_type_ptr];
-        analyze![self, node, syn::TypeReference, visit_type_reference];
-        analyze![self, node, syn::TypeSlice, visit_type_slice];
-        analyze![self, node, syn::TypeTraitObject, visit_type_trait_object];
-        analyze![self, node, syn::TypeTuple, visit_type_tuple];
-        // analyze![self, node, syn::UnOp, visit_un_op];
-        analyze![self, node, syn::UseGlob, visit_use_glob];
-        analyze![self, node, syn::UseGroup, visit_use_group];
-        analyze![self, node, syn::UseName, visit_use_name];
-        analyze![self, node, syn::UsePath, visit_use_path];
-        analyze![self, node, syn::UseRename, visit_use_rename];
-        // analyze![self, node, syn::UseTree, visit_use_tree];
-        // analyze![self, node, syn::Variadic, visit_variadic];
-        analyze![self, node, syn::Variant, visit_variant];
-        analyze![self, node, syn::VisCrate, visit_vis_crate];
-        analyze![self, node, syn::VisPublic, visit_vis_public];
-        analyze![self, node, syn::VisRestricted, visit_vis_restricted];
-        // analyze![self, node, syn::Visibility, visit_visibility];
-        analyze![self, node, syn::WhereClause, visit_where_clause];
-        // analyze![self, node, syn::WherePredicate, visit_where_predicate];
+    fn analyze_node_first_pass(&mut self, node: Syn) {
+        match node {
+            Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
+            _ => {}
+        }
     }
 
-    fn attributes(&self, id: usize) -> Option<&[syn::Attribute]> {
-        let data = if let Some(data) = self.id_to_ptr.get(&id) {
-            data
-        } else {
-            return None;
-        };
-
-        macro_rules! get_attr {
-            ($ptr:ident, $ty:path) => {
-                if let Some(node) = $ptr.ptr.downcast::<$ty>() {
-                    return Some(&node.attrs[..]);
-                }
-            };
+    fn analyze_node(&mut self, node: Syn) {
+        match node {
+            // OMITTED: handled upstream
+            Syn::Abi(_i) => { /* self.visit_abi(i) */ }
+            Syn::AngleBracketedGenericArguments(i) => {
+                self.visit_angle_bracketed_generic_arguments(i)
+            }
+            Syn::Arm(i) => self.visit_arm(i),
+            Syn::Attribute(i) => self.visit_attribute(i),
+            Syn::AttrStyle(_i) => { /* self.visit_attr_style(i) */ }
+            Syn::BareFnArg(_i) => { /* self.visit_bare_fn_arg(i) */ }
+            Syn::BinOp(i) => self.visit_bin_op(i),
+            Syn::Binding(i) => self.visit_binding(i),
+            Syn::Block(_i) => { /* self.visit_block(i) */ }
+            Syn::BoundLifetimes(_i) => { /* self.visit_bound_lifetimes(i) */ }
+            Syn::ConstParam(i) => self.visit_const_param(i),
+            Syn::Constraint(_i) => { /* self.visit_constraint(i) */ }
+            Syn::Expr(_i) => { /* self.visit_expr(i) */ }
+            Syn::ExprArray(i) => self.visit_expr_array(i),
+            Syn::ExprAssign(i) => self.visit_expr_assign(i),
+            Syn::ExprAssignOp(i) => self.visit_expr_assign_op(i),
+            Syn::ExprAsync(i) => self.visit_expr_async(i),
+            Syn::ExprAwait(i) => self.visit_expr_await(i),
+            Syn::ExprBinary(_i) => { /* self.visit_expr_binary(i) */ }
+            Syn::ExprBlock(_i) => { /* self.visit_expr_block(i) */ }
+            Syn::ExprBox(_i) => { /* self.visit_expr_box(i) */ }
+            Syn::ExprBreak(i) => self.visit_expr_break(i),
+            Syn::ExprCall(_i) => { /* self.visit_expr_call(i) */ }
+            Syn::ExprCast(i) => self.visit_expr_cast(i),
+            Syn::ExprClosure(i) => self.visit_expr_closure(i),
+            Syn::ExprContinue(i) => self.visit_expr_continue(i),
+            Syn::ExprField(i) => self.visit_expr_field(i),
+            Syn::ExprForLoop(i) => self.visit_expr_for_loop(i),
+            Syn::ExprGroup(_i) => { /* self.visit_expr_group(i) */ }
+            Syn::ExprIf(i) => self.visit_expr_if(i),
+            Syn::ExprIndex(i) => self.visit_expr_index(i),
+            Syn::ExprLet(_i) => { /* self.visit_expr_let(i) */ }
+            Syn::ExprLit(_i) => { /* self.visit_expr_lit(i) */ }
+            Syn::ExprLoop(i) => self.visit_expr_loop(i),
+            Syn::ExprMacro(_i) => { /* self.visit_expr_macro(i) */ }
+            Syn::ExprMatch(i) => self.visit_expr_match(i),
+            Syn::ExprMethodCall(_i) => { /* self.visit_expr_method_call(i) */ }
+            Syn::ExprParen(_i) => { /* self.visit_expr_paren(i) */ }
+            Syn::ExprPath(_i) => { /* self.visit_expr_path(i) */ }
+            Syn::ExprRange(i) => self.visit_expr_range(i),
+            Syn::ExprReference(i) => self.visit_expr_reference(i),
+            Syn::ExprRepeat(i) => self.visit_expr_repeat(i),
+            Syn::ExprReturn(i) => self.visit_expr_return(i),
+            Syn::ExprStruct(i) => self.visit_expr_struct(i),
+            Syn::ExprTry(i) => self.visit_expr_try(i),
+            Syn::ExprTryBlock(i) => self.visit_expr_try_block(i),
+            Syn::ExprTuple(i) => self.visit_expr_tuple(i),
+            Syn::ExprType(i) => self.visit_expr_type(i),
+            Syn::ExprUnary(_i) => { /* self.visit_expr_unary(i) */ }
+            Syn::ExprUnsafe(i) => self.visit_expr_unsafe(i),
+            Syn::ExprWhile(i) => self.visit_expr_while(i),
+            Syn::ExprYield(i) => self.visit_expr_yield(i),
+            Syn::Field(i) => self.visit_field(i),
+            Syn::FieldPat(i) => self.visit_field_pat(i),
+            Syn::FieldValue(i) => self.visit_field_value(i),
+            Syn::Fields(_i) => { /* self.visit_fields(i) */ }
+            Syn::FieldsNamed(_i) => { /* self.visit_fields_named(i) */ }
+            Syn::FieldsUnnamed(_i) => { /* self.visit_fields_unnamed(i) */ }
+            Syn::File(i) => self.visit_file(i),
+            Syn::FnArg(i) => self.visit_fn_arg(i),
+            Syn::ForeignItem(_i) => { /* self.visit_foreign_item(i) */ }
+            Syn::ForeignItemFn(_i) => { /* self.visit_foreign_item_fn(i) */ }
+            Syn::ForeignItemMacro(_i) => { /* self.visit_foreign_item_macro(i) */ }
+            Syn::ForeignItemStatic(i) => self.visit_foreign_item_static(i),
+            Syn::ForeignItemType(i) => self.visit_foreign_item_type(i),
+            Syn::GenericArgument(_i) => { /* self.visit_generic_argument(i) */ }
+            Syn::GenericMethodArgument(_i) => { /* self.visit_generic_method_argument(i) */ }
+            Syn::GenericParam(_i) => { /* self.visit_generic_param(i) */ }
+            Syn::Generics(_i) => { /* self.visit_generics(i) */ }
+            Syn::Ident(i) => self.visit_ident(i),
+            Syn::ImplItem(_i) => { /* self.visit_impl_item(i) */ }
+            Syn::ImplItemConst(i) => self.visit_impl_item_const(i),
+            Syn::ImplItemMacro(_i) => { /* self.visit_impl_item_macro(i) */ }
+            Syn::ImplItemMethod(i) => self.visit_impl_item_method(i),
+            Syn::ImplItemType(i) => self.visit_impl_item_type(i),
+            Syn::Index(_i) => { /* self.visit_index(i) */ }
+            Syn::Item(_i) => { /* self.visit_item(i) */ }
+            Syn::ItemConst(i) => self.visit_item_const(i),
+            Syn::ItemEnum(i) => self.visit_item_enum(i),
+            Syn::ItemExternCrate(i) => self.visit_item_extern_crate(i),
+            Syn::ItemFn(i) => self.visit_item_fn(i),
+            Syn::ItemForeignMod(i) => self.visit_item_foreign_mod(i),
+            Syn::ItemImpl(i) => self.visit_item_impl(i),
+            Syn::ItemMacro(i) => self.visit_item_macro(i),
+            Syn::ItemMacro2(_i) => { /* self.visit_item_macro2(i) */ }
+            Syn::ItemMod(i) => self.visit_item_mod(i),
+            Syn::ItemStatic(i) => self.visit_item_static(i),
+            Syn::ItemStruct(i) => self.visit_item_struct(i),
+            Syn::ItemTrait(i) => self.visit_item_trait(i),
+            Syn::ItemTraitAlias(i) => self.visit_item_trait_alias(i),
+            Syn::ItemType(i) => self.visit_item_type(i),
+            Syn::ItemUnion(i) => self.visit_item_union(i),
+            Syn::ItemUse(i) => self.visit_item_use(i),
+            Syn::Label(i) => self.visit_label(i),
+            Syn::Lifetime(i) => self.visit_lifetime(i),
+            Syn::LifetimeDef(_i) => { /* self.visit_lifetime_def(i) */ }
+            Syn::Lit(_i) => { /* self.visit_lit(i) */ }
+            Syn::LitBool(i) => self.visit_lit_bool(i),
+            Syn::LitByte(i) => self.visit_lit_byte(i),
+            Syn::LitByteStr(i) => self.visit_lit_byte_str(i),
+            Syn::LitChar(i) => self.visit_lit_char(i),
+            Syn::LitFloat(i) => self.visit_lit_float(i),
+            Syn::LitInt(i) => self.visit_lit_int(i),
+            Syn::LitStr(i) => self.visit_lit_str(i),
+            Syn::Local(i) => self.visit_local(i),
+            Syn::Macro(i) => self.visit_macro(i),
+            Syn::Member(_i) => { /* self.visit_member(i) */ }
+            Syn::MethodTurbofish(i) => self.visit_method_turbofish(i),
+            Syn::ParenthesizedGenericArguments(_i) => { /* self.visit_parenthesized_generic_arguments(i) */
+            }
+            Syn::Pat(_i) => { /* self.visit_pat(i) */ }
+            Syn::PatBox(i) => self.visit_pat_box(i),
+            Syn::PatIdent(i) => self.visit_pat_ident(i),
+            Syn::PatLit(_i) => { /* self.visit_pat_lit(i) */ }
+            Syn::PatMacro(_i) => { /* self.visit_pat_macro(i) */ }
+            Syn::PatOr(i) => self.visit_pat_or(i),
+            Syn::PatPath(_i) => { /* self.visit_pat_path(i) */ }
+            Syn::PatRange(i) => self.visit_pat_range(i),
+            Syn::PatReference(_i) => { /* self.visit_pat_reference(i) */ }
+            Syn::PatRest(_i) => { /* self.visit_pat_rest(i) */ }
+            Syn::PatSlice(_i) => { /* self.visit_pat_slice(i) */ }
+            Syn::PatStruct(i) => self.visit_pat_struct(i),
+            Syn::PatTuple(i) => self.visit_pat_tuple(i),
+            Syn::PatTupleStruct(i) => self.visit_pat_tuple_struct(i),
+            Syn::PatType(_i) => { /* self.visit_pat_type(i) */ }
+            Syn::PatWild(i) => self.visit_pat_wild(i),
+            Syn::Path(i) => self.visit_path(i),
+            Syn::PathArguments(_i) => { /* self.visit_path_arguments(i) */ }
+            Syn::PathSegment(i) => self.visit_path_segment(i),
+            Syn::PredicateEq(_i) => { /* self.visit_predicate_eq(i) */ }
+            Syn::PredicateLifetime(_i) => { /* self.visit_predicate_lifetime(i) */ }
+            Syn::PredicateType(i) => self.visit_predicate_type(i),
+            Syn::QSelf(i) => self.visit_qself(i),
+            Syn::Receiver(_i) => { /* self.visit_receiver(i) */ }
+            Syn::ReturnType(i) => self.visit_return_type(i),
+            Syn::Signature(i) => self.visit_signature(i),
+            Syn::Stmt(_i) => { /* self.visit_stmt(i) */ }
+            Syn::TraitBound(i) => self.visit_trait_bound(i),
+            Syn::TraitBoundModifier(_i) => { /* self.visit_trait_bound_modifier(i) */ }
+            Syn::TraitItem(_i) => { /* self.visit_trait_item(i) */ }
+            Syn::TraitItemConst(i) => self.visit_trait_item_const(i),
+            Syn::TraitItemMacro(_i) => { /* self.visit_trait_item_macro(i) */ }
+            Syn::TraitItemMethod(i) => self.visit_trait_item_method(i),
+            Syn::TraitItemType(i) => self.visit_trait_item_type(i),
+            Syn::Type(_i) => { /* self.visit_type(i) */ }
+            Syn::TypeArray(i) => self.visit_type_array(i),
+            Syn::TypeBareFn(i) => self.visit_type_bare_fn(i),
+            Syn::TypeGroup(_i) => { /* self.visit_type_group(i) */ }
+            Syn::TypeImplTrait(i) => self.visit_type_impl_trait(i),
+            Syn::TypeInfer(i) => self.visit_type_infer(i),
+            Syn::TypeMacro(_i) => { /* self.visit_type_macro(i) */ }
+            Syn::TypeNever(i) => self.visit_type_never(i),
+            Syn::TypeParam(_i) => { /* self.visit_type_param(i) */ }
+            Syn::TypeParamBound(_i) => { /* self.visit_type_param_bound(i) */ }
+            Syn::TypeParen(_i) => { /* self.visit_type_paren(i) */ }
+            Syn::TypePath(i) => self.visit_type_path(i),
+            Syn::TypePtr(i) => self.visit_type_ptr(i),
+            Syn::TypeReference(i) => self.visit_type_reference(i),
+            Syn::TypeSlice(i) => self.visit_type_slice(i),
+            Syn::TypeTraitObject(i) => self.visit_type_trait_object(i),
+            Syn::TypeTuple(i) => self.visit_type_tuple(i),
+            Syn::UnOp(_i) => { /* self.visit_un_op(i) */ }
+            Syn::UseGlob(i) => self.visit_use_glob(i),
+            Syn::UseGroup(i) => self.visit_use_group(i),
+            Syn::UseName(i) => self.visit_use_name(i),
+            Syn::UsePath(i) => self.visit_use_path(i),
+            Syn::UseRename(i) => self.visit_use_rename(i),
+            Syn::UseTree(_i) => { /* self.visit_use_tree(i) */ }
+            Syn::Variadic(_i) => { /* self.visit_variadic(i) */ }
+            Syn::Variant(i) => self.visit_variant(i),
+            Syn::VisCrate(i) => self.visit_vis_crate(i),
+            Syn::VisPublic(i) => self.visit_vis_public(i),
+            Syn::VisRestricted(_i) => { /* self.visit_vis_restricted(i) */ }
+            Syn::Visibility(_i) => { /* self.visit_visibility(i) */ }
+            Syn::WhereClause(i) => self.visit_where_clause(i),
+            Syn::WherePredicate(_i) => { /* self.visit_where_predicate(i) */ }
         }
-
-        get_attr![data, syn::Arm];
-        get_attr![data, syn::BareFnArg];
-        get_attr![data, syn::ConstParam];
-        get_attr![data, syn::ExprArray];
-        get_attr![data, syn::ExprAssign];
-        get_attr![data, syn::ExprAssignOp];
-        get_attr![data, syn::ExprAsync];
-        get_attr![data, syn::ExprAwait];
-        get_attr![data, syn::ExprBinary];
-        get_attr![data, syn::ExprBlock];
-        get_attr![data, syn::ExprBox];
-        get_attr![data, syn::ExprBreak];
-        get_attr![data, syn::ExprCall];
-        get_attr![data, syn::ExprCast];
-        get_attr![data, syn::ExprClosure];
-        get_attr![data, syn::ExprContinue];
-        get_attr![data, syn::ExprField];
-        get_attr![data, syn::ExprForLoop];
-        get_attr![data, syn::ExprGroup];
-        get_attr![data, syn::ExprIf];
-        get_attr![data, syn::ExprIndex];
-        get_attr![data, syn::ExprLet];
-        get_attr![data, syn::ExprLit];
-        get_attr![data, syn::ExprLoop];
-        get_attr![data, syn::ExprMacro];
-        get_attr![data, syn::ExprMatch];
-        get_attr![data, syn::ExprMethodCall];
-        get_attr![data, syn::ExprParen];
-        get_attr![data, syn::ExprPath];
-        get_attr![data, syn::ExprRange];
-        get_attr![data, syn::ExprReference];
-        get_attr![data, syn::ExprRepeat];
-        get_attr![data, syn::ExprReturn];
-        get_attr![data, syn::ExprStruct];
-        get_attr![data, syn::ExprTry];
-        get_attr![data, syn::ExprTryBlock];
-        get_attr![data, syn::ExprTuple];
-        get_attr![data, syn::ExprType];
-        get_attr![data, syn::ExprUnary];
-        get_attr![data, syn::ExprUnsafe];
-        get_attr![data, syn::ExprWhile];
-        get_attr![data, syn::ExprYield];
-        get_attr![data, syn::Field];
-        get_attr![data, syn::FieldPat];
-        get_attr![data, syn::FieldValue];
-        get_attr![data, syn::File];
-        get_attr![data, syn::ForeignItemFn];
-        get_attr![data, syn::ForeignItemMacro];
-        get_attr![data, syn::ForeignItemStatic];
-        get_attr![data, syn::ForeignItemType];
-        get_attr![data, syn::ImplItemConst];
-        get_attr![data, syn::ImplItemMacro];
-        get_attr![data, syn::ImplItemMethod];
-        get_attr![data, syn::ImplItemType];
-        get_attr![data, syn::ItemConst];
-        get_attr![data, syn::ItemEnum];
-        get_attr![data, syn::ItemExternCrate];
-        get_attr![data, syn::ItemFn];
-        get_attr![data, syn::ItemForeignMod];
-        get_attr![data, syn::ItemImpl];
-        get_attr![data, syn::ItemMacro];
-        get_attr![data, syn::ItemMacro2];
-        get_attr![data, syn::ItemMod];
-        get_attr![data, syn::ItemStatic];
-        get_attr![data, syn::ItemStruct];
-        get_attr![data, syn::ItemTrait];
-        get_attr![data, syn::ItemTraitAlias];
-        get_attr![data, syn::ItemType];
-        get_attr![data, syn::ItemUnion];
-        get_attr![data, syn::ItemUse];
-        get_attr![data, syn::LifetimeDef];
-        get_attr![data, syn::Local];
-        get_attr![data, syn::PatBox];
-        get_attr![data, syn::PatIdent];
-        get_attr![data, syn::PatLit];
-        get_attr![data, syn::PatMacro];
-        get_attr![data, syn::PatOr];
-        get_attr![data, syn::PatPath];
-        get_attr![data, syn::PatRange];
-        get_attr![data, syn::PatReference];
-        get_attr![data, syn::PatSlice];
-        get_attr![data, syn::PatStruct];
-        get_attr![data, syn::PatTuple];
-        get_attr![data, syn::PatTupleStruct];
-        get_attr![data, syn::PatType];
-        get_attr![data, syn::PatWild];
-        get_attr![data, syn::Receiver];
-        get_attr![data, syn::TraitItemConst];
-        get_attr![data, syn::TraitItemMacro];
-        get_attr![data, syn::TraitItemMethod];
-        get_attr![data, syn::TraitItemType];
-        get_attr![data, syn::TypeParam];
-        get_attr![data, syn::Variadic];
-        get_attr![data, syn::Variant];
-
-        None
     }
 
     fn set_help<S: Spanned>(&mut self, node: S, item: HelpItem) {
@@ -450,31 +364,17 @@ impl<'a> NodeAnalyzer<'a> {
         )
     }
 
-    fn has_ancestor<T: 'static>(&self, ancestor: usize) -> bool {
-        self.get_ancestor::<T>(ancestor).is_some()
+    fn has_ancestor(&self, ancestor: usize, kind: SynKind) -> bool {
+        self.get_ancestor(ancestor)
+            .map(|node| node.kind() == kind)
+            .unwrap_or(false)
     }
 
-    fn get_ancestor<T: 'static>(&self, ancestor: usize) -> Option<&T> {
-        let mut id = self.id;
-
-        // println!("get_ancestor(#{})", id);
-
-        for _ in 0..ancestor {
-            id = if let Some(parent_id) = self.id_to_ptr.get(&id).map(|data| data.parent) {
-                // dbg!(parent_id);
-                parent_id
-            } else {
-                // println!("bailing out");
-                return None;
-            }
-        }
-
-        // println!("trying with #{}", id);
-        self.id_to_ptr
-            .get(&id)
-            .and_then(|data| data.ptr.downcast::<T>())
+    fn get_ancestor(&self, ancestor: usize) -> Option<Syn> {
+        self.ancestors
+            .get(self.ancestors.len() - ancestor)
+            .map(|(_, node)| *node)
     }
-
     //============= VISIT METHODS
 
     fn visit_angle_bracketed_generic_arguments(
@@ -498,11 +398,16 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(&node, HelpItem::Attribute { outer });
         }
 
-        let attributes = self
+        let parent = self
             .id_to_ptr
             .get(&self.id)
             .map(|data| data.parent)
-            .and_then(|parent_id| self.attributes(parent_id))
+            .and_then(|parent_id| self.id_to_ptr.get(&parent_id))
+            .map(|data| data.ptr.as_syn());
+
+        let attributes = parent
+            .as_ref()
+            .and_then(|parent| parent.attributes())
             .unwrap_or(&[]);
 
         let bounds = if attributes.len() > 0 {
@@ -585,16 +490,13 @@ impl<'a> NodeAnalyzer<'a> {
             },
         );
     }
-    fn visit_bound_lifetimes(&mut self, node: &syn::BoundLifetimes) {
-        return self.set_help(&node, HelpItem::BoundLifetimes);
-    }
     fn visit_const_param(&mut self, node: &syn::ConstParam) {
         token![self, node.const_token, ConstParam];
     }
     // EXAMPLE
     // impl<P: Deref<Target: Eq>> Eq for Pin<P> {}
     fn visit_expr_array(&mut self, node: &syn::ExprArray) {
-        if !self.has_ancestor::<syn::ExprReference>(2) {
+        if !self.has_ancestor(2, SynKind::ExprReference) {
             self.set_help(node, HelpItem::ExprArray)
         }
     }
@@ -787,40 +689,37 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.unsafe_token, ExprUnsafe];
     }
     fn visit_expr_while(&mut self, node: &syn::ExprWhile) {
-        let while_let = if let syn::Expr::Let(..) = *node.cond {
-            true
+        let let_token = if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
+            Some(let_token)
         } else {
-            false
+            None
         };
 
         token![self, some node.label, * HelpItem::Label {
-            loop_of: if while_let { LoopOf::WhileLet } else { LoopOf::While },
+            loop_of: if let_token.is_some() { LoopOf::WhileLet } else { LoopOf::While },
         }];
 
-        token![
-            self,
-            node.while_token,
-            *if while_let {
-                HelpItem::ExprWhileLet
-            } else {
-                HelpItem::ExprWhile
+        match let_token {
+            Some(let_token) => {
+                token![self, node.while_token => let_token, ExprWhileLet];
             }
-        ];
+            None => token![self, node.while_token, ExprWhile],
+        }
     }
     fn visit_expr_yield(&mut self, node: &syn::ExprYield) {
         token![self, node.yield_token, ExprYield];
     }
     fn visit_field(&mut self, node: &syn::Field) {
         let field_data = loop {
-            if let Some(variant) = self.get_ancestor::<syn::Variant>(3) {
+            if let Some(variant) = get_ancestor![self, Variant, 3] {
                 break Some((FieldOf::Variant, variant.ident.to_string()));
             }
 
-            if let Some(item_struct) = self.get_ancestor::<syn::ItemStruct>(3) {
+            if let Some(item_struct) = get_ancestor![self, ItemStruct, 3] {
                 break Some((FieldOf::Struct, item_struct.ident.to_string()));
             }
 
-            if let Some(item_union) = self.get_ancestor::<syn::ItemUnion>(2) {
+            if let Some(item_union) = get_ancestor![self, ItemUnion, 2] {
                 break Some((FieldOf::Union, item_union.ident.to_string()));
             }
 
@@ -883,7 +782,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, some node.shebang, Shebang];
     }
     fn visit_fn_arg(&mut self, node: &syn::FnArg) {
-        if let Some(sig) = self.get_ancestor::<syn::Signature>(1) {
+        if let Some(sig) = get_ancestor![self, Signature, 1] {
             if sig
                 .inputs
                 .first()
@@ -943,9 +842,7 @@ impl<'a> NodeAnalyzer<'a> {
         }
 
         let is_method = receiver_help(&node.sig).is_some();
-        let trait_ = self
-            .get_ancestor::<syn::ItemImpl>(2)
-            .and_then(|item| item.trait_.as_ref());
+        let trait_ = get_ancestor![self, ItemImpl, 2].and_then(|item| item.trait_.as_ref());
 
         let of = if is_method {
             FnOf::Method
@@ -953,7 +850,7 @@ impl<'a> NodeAnalyzer<'a> {
             FnOf::AssociatedFunction
         };
 
-        if let Some(impl_) = self.get_ancestor::<syn::ItemImpl>(2) {
+        if let Some(impl_) = get_ancestor![self, ItemImpl, 2] {
             // TODO: handle bang
             // TODO: better formatting
             let trait_ = trait_.map(|(_bang, path, _)| path.to_token_stream().to_string());
@@ -984,8 +881,7 @@ impl<'a> NodeAnalyzer<'a> {
         if let Some((as_token, _)) = node.rename {
             token![self, as_token, AsRenameExternCrate];
         }
-        let start = vis_span(&node.vis).unwrap_or_else(|| node.extern_token.span());
-        return self.set_help_between(start, node.span(), HelpItem::ItemExternCrate);
+        token![self, node.extern_token, ItemExternCrate];
     }
     fn visit_item_fn(&mut self, node: &syn::ItemFn) {
         token![self, node.sig.fn_token => node.sig.ident, ItemFn];
@@ -1105,11 +1001,11 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help_between(start, node.span(), HelpItem::ItemUse);
     }
     fn visit_label(&mut self, node: &syn::Label) {
-        let loop_of = if self.get_ancestor::<syn::ExprLoop>(1).is_some() {
+        let loop_of = if get_ancestor![self, ExprLoop, 1].is_some() {
             LoopOf::Loop
-        } else if self.get_ancestor::<syn::ExprForLoop>(1).is_some() {
+        } else if get_ancestor![self, ExprForLoop, 1].is_some() {
             LoopOf::For
-        } else if self.get_ancestor::<syn::ExprBlock>(1).is_some() {
+        } else if get_ancestor![self, ExprBlock, 1].is_some() {
             LoopOf::Block
         } else {
             // Handled in ExprWhile
@@ -1155,6 +1051,10 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help(node, HelpItem::LitFloat { suffix, separators });
     }
     fn visit_lit_int(&mut self, node: &syn::LitInt) {
+        if self.has_ancestor(4, SynKind::TypeArray) {
+            return;
+        }
+
         let raw = node.to_string();
 
         let suffix = Some(node.suffix())
@@ -1217,8 +1117,7 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     fn visit_macro(&mut self, node: &syn::Macro) {
-        if self
-            .get_ancestor::<syn::ItemMacro>(1)
+        if get_ancestor![self, ItemMacro, 1]
             .map(|item| item.ident.is_some())
             .unwrap_or(false)
         {
@@ -1252,7 +1151,14 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }
 
-        if node.mutability.is_some() && self.has_ancestor::<syn::FnArg>(3) {
+        // Handle upstream
+        if self.has_ancestor(2, SynKind::Local)
+            || (self.has_ancestor(4, SynKind::Local) && self.has_ancestor(2, SynKind::PatType))
+        {
+            return;
+        }
+
+        if node.mutability.is_some() && self.has_ancestor(3, SynKind::FnArg) {
             return self.set_help(
                 node,
                 HelpItem::PatIdentMutableArg {
@@ -1311,7 +1217,7 @@ impl<'a> NodeAnalyzer<'a> {
         );
     }
     fn visit_pat_tuple(&mut self, node: &syn::PatTuple) {
-        if self.get_ancestor::<syn::PatTupleStruct>(1).is_some() {
+        if get_ancestor![self, PatTupleStruct, 1].is_some() {
             return;
         }
 
@@ -1349,8 +1255,8 @@ impl<'a> NodeAnalyzer<'a> {
     }
     fn visit_pat_wild(&mut self, node: &syn::PatWild) {
         let last_arm = match (
-            self.get_ancestor::<syn::ExprMatch>(3),
-            self.get_ancestor::<syn::Arm>(2),
+            get_ancestor![self, ExprMatch, 3],
+            get_ancestor![self, Arm, 2],
         ) {
             (Some(match_expr), Some(arm)) => match_expr
                 .arms
@@ -1369,22 +1275,17 @@ impl<'a> NodeAnalyzer<'a> {
                 .get(&self.id)
                 .and_then(|data| self.id_to_ptr.get(&data.parent))
             {
-                ancestor
+                ancestor.ptr.as_syn()
             } else {
                 return;
             };
 
-            if let Some(expr_path) = ancestor.ptr.downcast::<syn::ExprPath>() {
-                break &expr_path.qself;
-            }
-            if let Some(type_path) = ancestor.ptr.downcast::<syn::TypePath>() {
-                break &type_path.qself;
-            }
-            if let Some(pat_path) = ancestor.ptr.downcast::<syn::PatPath>() {
-                break &pat_path.qself;
-            }
-
-            break &None;
+            break match ancestor {
+                Syn::ExprPath(expr_path) => &expr_path.qself,
+                Syn::TypePath(type_path) => &type_path.qself,
+                Syn::PatPath(pat_path) => &pat_path.qself,
+                _ => &None,
+            };
         };
 
         let simple_qself = qself
@@ -1396,7 +1297,7 @@ impl<'a> NodeAnalyzer<'a> {
             self,
             node.leading_colon.filter(|_| simple_qself),
             node.segments.first().map(|s| &s.ident),
-            node.segments.len() == 1 && self.has_ancestor::<syn::ExprPath>(1),
+            node.segments.len() == 1 && self.has_ancestor(1, SynKind::ExprPath),
         ) {
             return;
         }
@@ -1408,6 +1309,9 @@ impl<'a> NodeAnalyzer<'a> {
         if let syn::PathArguments::Parenthesized(..) = node.arguments {
             return self.set_help(node, HelpItem::ParenthesizedGenericArguments);
         }
+    }
+    fn visit_predicate_type(&mut self, node: &syn::PredicateType) {
+        token![self, node.lifetimes, BoundLifetimes];
     }
     // OPEN QUESTION: what is the purpose of the `<T>::foo()` syntax?
     // If `T` has an intrinsic `foo()`, both:
@@ -1438,11 +1342,11 @@ impl<'a> NodeAnalyzer<'a> {
         };
 
         token![self, some rarrow, * HelpItem::RArrow {
-            return_of: if self.get_ancestor::<syn::TypeBareFn>(1).is_some() {
+            return_of: if get_ancestor![self, TypeBareFn, 1].is_some() {
                 ReturnOf::BareFunctionType
-            } else if self.get_ancestor::<syn::ExprClosure>(1).is_some() {
+            } else if get_ancestor![self, ExprClosure, 1].is_some() {
                 ReturnOf::Closure
-            } else if self.get_ancestor::<syn::ParenthesizedGenericArguments>(1).is_some() {
+            } else if get_ancestor![self, ParenthesizedGenericArguments, 1].is_some() {
                 ReturnOf::FnTrait
             } else {
                 // TODO: distinguish methods
@@ -1498,7 +1402,7 @@ impl<'a> NodeAnalyzer<'a> {
         if !self.between(&node.sig.fn_token, &node.sig.ident) {
             return;
         }
-        if let Some(trait_) = self.get_ancestor::<syn::ItemTrait>(2) {
+        if let Some(trait_) = get_ancestor![self, ItemTrait, 2] {
             let trait_ = trait_.ident.to_string();
             return self.set_help_between(
                 node.sig.fn_token.span(),
@@ -1538,6 +1442,12 @@ impl<'a> NodeAnalyzer<'a> {
     }
     fn visit_type_path(&mut self, node: &syn::TypePath) {
         if let Some(item) = well_known_type(node) {
+            // SHORTCUT
+            if let HelpItem::KnownTypeStr = item {
+                if self.has_ancestor(2, SynKind::TypeReference) {
+                    return;
+                }
+            }
             return self.set_help(node, item);
         }
     }
@@ -1588,10 +1498,16 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     fn visit_type_slice(&mut self, node: &syn::TypeSlice) {
-        return self.set_help(
-            node,
+        let (dynamic, start) = if let Some(type_ref) = get_ancestor![self, TypeReference, 2] {
+            (true, type_ref.span())
+        } else {
+            (false, node.span())
+        };
+        return self.set_help_between(
+            start,
+            node.span(),
             HelpItem::TypeSlice {
-                dynamic: self.get_ancestor::<syn::TypeReference>(2).is_some(),
+                dynamic,
                 ty: node.elem.to_token_stream().to_string(),
             },
         );
@@ -1659,7 +1575,7 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help(node, HelpItem::UseGlob);
     }
     fn visit_use_group(&mut self, node: &syn::UseGroup) {
-        if let Some(path) = self.get_ancestor::<syn::UsePath>(2) {
+        if let Some(path) = get_ancestor![self, UsePath, 2] {
             let parent = path.ident.to_string();
             return self.set_help(node, HelpItem::UseGroup { parent });
         }
@@ -1669,11 +1585,11 @@ impl<'a> NodeAnalyzer<'a> {
             return;
         }
 
-        if self.get_ancestor::<syn::UseGroup>(2).is_none() {
+        if get_ancestor![self, UseGroup, 2].is_none() {
             return;
         }
 
-        let parent = if let Some(path) = self.get_ancestor::<syn::UsePath>(4) {
+        let parent = if let Some(path) = get_ancestor![self, UsePath, 4] {
             path.ident.to_string()
         } else {
             return;
@@ -1685,11 +1601,11 @@ impl<'a> NodeAnalyzer<'a> {
         let mut root_path = true;
 
         for i in (2..).step_by(2) {
-            if self.get_ancestor::<syn::UseGroup>(i).is_some() {
+            if get_ancestor![self, UseGroup, i].is_some() {
                 continue;
             }
 
-            root_path = self.get_ancestor::<syn::ItemUse>(i).is_some();
+            root_path = get_ancestor![self, ItemUse, i].is_some();
             break;
         }
 
@@ -1716,7 +1632,7 @@ impl<'a> NodeAnalyzer<'a> {
                 );
             }
         }
-        let name = if let Some(item_enum) = self.get_ancestor::<syn::ItemEnum>(1) {
+        let name = if let Some(item_enum) = get_ancestor![self, ItemEnum, 1] {
             item_enum.ident.to_string()
         } else {
             return;
@@ -1740,7 +1656,7 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_vis_public(&mut self, node: &syn::VisPublic) {
         return self.set_help(node, HelpItem::VisPublic);
     }
-    fn visit_vis_restricted(&mut self, node: &syn::VisRestricted) {
+    fn visit_vis_restricted_first_pass(&mut self, node: &syn::VisRestricted) {
         let path = match &*node.path {
             path if path.is_ident("self") => VisRestrictedPath::Self_,
             path if path.is_ident("super") => VisRestrictedPath::Super,
@@ -1808,18 +1724,19 @@ fn special_path_help(
                                 break None;
                             };
 
-                            let ptr = if let Some(data) = analyzer.id_to_ptr.get(&id) {
-                                &data.ptr
+                            let node = if let Some(data) = analyzer.id_to_ptr.get(&id) {
+                                data.ptr.as_syn()
                             } else {
                                 break None;
                             };
 
-                            if let Some(method) = ptr.downcast::<syn::ImplItemMethod>() {
-                                break Some(method.sig.ident.to_string());
-                            }
-                            if let Some(method) = ptr.downcast::<syn::TraitItemMethod>() {
-                                break Some(method.sig.ident.to_string());
-                            }
+                            let sig = match node {
+                                Syn::ImplItemMethod(method) => &method.sig,
+                                Syn::TraitItemMethod(method) => &method.sig,
+                                _ => break None,
+                            };
+
+                            break Some(sig.ident.to_string());
                         };
 
                         HelpItem::ReceiverPath { method }
@@ -1842,12 +1759,12 @@ fn special_path_help(
 }
 
 fn pattern_bindings(analyzer: &NodeAnalyzer) -> Option<BindingOf> {
-    if analyzer.has_ancestor::<syn::Local>(2)
-        || (analyzer.has_ancestor::<syn::Local>(4) && analyzer.has_ancestor::<syn::PatType>(2))
+    if analyzer.has_ancestor(2, SynKind::Local)
+        || (analyzer.has_ancestor(4, SynKind::Local) && analyzer.has_ancestor(2, SynKind::PatType))
     {
         return Some(BindingOf::Let);
     }
-    if analyzer.has_ancestor::<syn::FnArg>(4) {
+    if analyzer.has_ancestor(4, SynKind::FnArg) {
         return Some(BindingOf::Arg);
     }
 

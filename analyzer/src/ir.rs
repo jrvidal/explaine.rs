@@ -1,5 +1,5 @@
+use crate::syn_wrappers::{Syn, SynKind};
 use proc_macro2::Span;
-use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::ptr::NonNull;
@@ -67,20 +67,21 @@ impl From<proc_macro2::LineColumn> for Location {
 #[derive(Clone)]
 pub(crate) struct Ptr {
     owner: Pin<Rc<syn::File>>,
-    ptr: NonNull<dyn Any>,
+    ptr: NonNull<()>,
+    kind: SynKind,
 }
 
 impl Ptr {
-    fn new(owner: &Pin<Rc<syn::File>>, node: &dyn Any) -> Self {
+    fn new(owner: &Pin<Rc<syn::File>>, node: Syn) -> Self {
         Ptr {
             owner: owner.clone(),
-            ptr: unsafe { NonNull::new_unchecked(node as *const _ as *mut _) },
+            kind: (&node).into(),
+            ptr: unsafe { NonNull::new_unchecked(node.data() as *mut _) },
         }
     }
 
-    pub fn downcast<T: 'static>(&self) -> Option<&T> {
-        let any: &dyn Any = unsafe { self.ptr.as_ref() };
-        any.downcast_ref::<T>()
+    pub fn as_syn(&self) -> Syn {
+        unsafe { Syn::from_raw(self.ptr.as_ptr() as *const _, self.kind) }
     }
 }
 
@@ -184,18 +185,18 @@ pub(crate) struct PtrData {
 }
 
 impl IrVisitor {
-    fn prepare(&mut self, node: &dyn Any, span: Span) -> usize {
+    fn prepare(&mut self, node: Syn, span: Span) -> usize {
         let start: Location = span.start().into();
         let end: Location = span.end().into();
         self.prepare_precise(node, (start, end))
     }
 
     #[inline(never)]
-    fn prepare_precise(&mut self, node: &dyn Any, (start, end): Range) -> usize {
+    fn prepare_precise(&mut self, node: Syn, (start, end): Range) -> usize {
         self.prepare_precise_ranges(node, &[(start, end)])
     }
 
-    fn prepare_precise_ranges(&mut self, node: &dyn Any, ranges: &[Range]) -> usize {
+    fn prepare_precise_ranges(&mut self, node: Syn, ranges: &[Range]) -> usize {
         #[cfg(feature = "dev")]
         {
             for range in ranges {
@@ -350,7 +351,7 @@ fn range_difference(parent: Range, child: Range, line_info: &[usize]) -> [Option
 
 macro_rules! visit {
     ($self:ident, $node:ident, $name:ident) => {
-        let id = $self.prepare($node as &dyn Any, $node.span());
+        let id = $self.prepare(Syn::from($node), $node.span());
         // println!("visit {:?} (id #{})", stringify!($name), id);
         $self.ancestors.push(id);
         syn::visit::$name($self, $node);
@@ -380,7 +381,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_attribute];
             return;
         }
-        let id = self.prepare(i as &dyn Any, i.span());
+        let id = self.prepare(i.into(), i.span());
         if let Some(data) = self
             .ancestors
             .last()
@@ -563,7 +564,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_field_pat];
             return;
         }
-        let id = self.prepare(i, i.span());
+        let id = self.prepare(i.into(), i.span());
         self.ancestors.push(id);
         for attr in &i.attrs {
             self.visit_attribute(attr);
@@ -577,7 +578,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_field_value];
             return;
         }
-        let id = self.prepare(i, i.span());
+        let id = self.prepare(i.into(), i.span());
         self.ancestors.push(id);
         for attr in &i.attrs {
             self.visit_attribute(attr);
@@ -652,14 +653,14 @@ impl<'ast> Visit<'ast> for IrVisitor {
             _ => &[],
         };
 
-        let id = self.prepare_precise_ranges(i, ranges);
+        let id = self.prepare_precise_ranges(i.into(), ranges);
         self.ancestors.push(id);
         syn::visit::visit_generics(self, i);
         let _ = self.ancestors.pop();
     }
     fn visit_ident(&mut self, i: &'ast proc_macro2::Ident) {
         // SPECIAL: DO NOT VISIT
-        let _ = self.prepare(i, i.span());
+        let _ = self.prepare(i.into(), i.span());
     }
     fn visit_impl_item(&mut self, i: &'ast syn::ImplItem) {
         visit![self, i, visit_impl_item];
@@ -772,7 +773,13 @@ impl<'ast> Visit<'ast> for IrVisitor {
             .ancestors
             .last()
             .and_then(|id| self.id_to_ptr.get(id))
-            .and_then(|data| data.ptr.downcast::<syn::ItemMacro>())
+            .and_then(|data| {
+                if let Syn::ItemMacro(i) = data.ptr.as_syn() {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
             .and_then(|item_macro| item_macro.ident.as_ref());
 
         let ident_end = if let Some(ident) = item_parent_ident {
@@ -787,7 +794,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             (ident_end.into(), i.span().end().into()),
         ];
 
-        let id = self.prepare_precise_ranges(i, &ranges);
+        let id = self.prepare_precise_ranges(i.into(), &ranges);
         self.ancestors.push(id);
         syn::visit::visit_macro(self, i);
         let _ = self.ancestors.pop();
@@ -798,20 +805,20 @@ impl<'ast> Visit<'ast> for IrVisitor {
     fn visit_member(&mut self, i: &'ast syn::Member) {
         visit![self, i, visit_member];
     }
-    fn visit_meta(&mut self, i: &'ast syn::Meta) {
-        visit![self, i, visit_meta];
+    fn visit_meta(&mut self, _i: &'ast syn::Meta) {
+        //SPECIAL: OMITTED
     }
-    fn visit_meta_list(&mut self, i: &'ast syn::MetaList) {
-        visit![self, i, visit_meta_list];
+    fn visit_meta_list(&mut self, _i: &'ast syn::MetaList) {
+        //SPECIAL: OMITTED
     }
-    fn visit_meta_name_value(&mut self, i: &'ast syn::MetaNameValue) {
-        visit![self, i, visit_meta_name_value];
+    fn visit_meta_name_value(&mut self, _i: &'ast syn::MetaNameValue) {
+        //SPECIAL: OMITTED
     }
     fn visit_method_turbofish(&mut self, i: &'ast syn::MethodTurbofish) {
         visit![self, i, visit_method_turbofish];
     }
-    fn visit_nested_meta(&mut self, i: &'ast syn::NestedMeta) {
-        visit![self, i, visit_nested_meta];
+    fn visit_nested_meta(&mut self, _i: &'ast syn::NestedMeta) {
+        //SPECIAL: OMITTED
     }
     fn visit_parenthesized_generic_arguments(
         &mut self,
@@ -898,7 +905,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             i.gt_token.span().end()
         };
 
-        let id = self.prepare_precise(i, (i.lt_token.span().start().into(), end.into()));
+        let id = self.prepare_precise(i.into(), (i.lt_token.span().start().into(), end.into()));
 
         self.ancestors.push(id);
         syn::visit::visit_qself(self, i);
