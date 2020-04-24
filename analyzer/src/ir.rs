@@ -99,7 +99,7 @@ impl std::cmp::PartialEq<Ptr> for Ptr {
 
 impl std::cmp::Eq for Ptr {}
 
-type Range = (Location, Location);
+pub type Range = (Location, Location);
 
 pub struct IrVisitor {
     counter: usize,
@@ -153,8 +153,6 @@ impl IrVisitor {
             }
         }
 
-        // println!("locatoins = {:#?}", self.locations);
-
         let mut locations: Vec<_> = self
             .locations
             .into_iter()
@@ -167,7 +165,7 @@ impl IrVisitor {
 
         let locations: Vec<_> = locations
             .into_iter()
-            .map(|(id, range)| (id, range.0))
+            .map(|(id, range)| (id, range))
             .collect();
 
         crate::analysis::Analyzer {
@@ -202,8 +200,11 @@ impl IrVisitor {
             for range in ranges {
                 let (start, end) = range;
                 if start == end {
-                    if node.downcast_ref::<syn::File>().is_none() {
-                        panic!("Unexpected start == end {:?}", start);
+                    match node {
+                        Syn::File(..) => {}
+                        _ => {
+                            panic!("Unexpected start == end {:?}", start);
+                        }
                     }
                 }
             }
@@ -352,7 +353,6 @@ fn range_difference(parent: Range, child: Range, line_info: &[usize]) -> [Option
 macro_rules! visit {
     ($self:ident, $node:ident, $name:ident) => {
         let id = $self.prepare(Syn::from($node), $node.span());
-        // println!("visit {:?} (id #{})", stringify!($name), id);
         $self.ancestors.push(id);
         syn::visit::$name($self, $node);
         let _ = $self.ancestors.pop();

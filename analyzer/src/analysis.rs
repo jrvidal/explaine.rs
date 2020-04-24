@@ -1,5 +1,5 @@
 use crate::help::*;
-use crate::ir::{Location, Ptr, PtrData};
+use crate::ir::{Location, Ptr, PtrData, Range};
 use crate::syn_wrappers::{Syn, SynKind};
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
@@ -9,7 +9,7 @@ use syn::spanned::Spanned;
 pub struct Analyzer {
     pub(crate) id_to_ptr: HashMap<usize, PtrData>,
     pub(crate) ptr_to_id: HashMap<Ptr, usize>,
-    pub(crate) locations: Vec<(usize, Location)>,
+    pub(crate) locations: Vec<(usize, Range)>,
 }
 
 // TODO: precompute ancestors list
@@ -18,7 +18,7 @@ struct NodeAnalyzer<'a> {
     location: Location,
     id_to_ptr: &'a HashMap<usize, PtrData>,
     ancestors: &'a [(usize, Syn<'a>)],
-    help: Option<((Location, Location), HelpItem)>,
+    help: Option<(Range, HelpItem)>,
 }
 
 pub struct AnalysisResult {
@@ -29,23 +29,48 @@ pub struct AnalysisResult {
 
 impl Analyzer {
     pub fn analyze_item(&self, item: usize) -> Option<Option<AnalysisResult>> {
-        self.locations.get(item).map(|(_, loc)| self.analyze(*loc))
+        self.locations
+            .get(item)
+            .map(|(_, range)| self.analyze(range.0))
     }
 
     pub fn analyze(&self, location: Location) -> Option<AnalysisResult> {
-        // println!("{:?}, {:#?}", location, self.locations);
-        let result = self
+        let idx = self
             .locations
-            .binary_search_by(|(_, loc)| loc.cmp(&location))
+            .binary_search_by(|(_, range)| range.0.cmp(&location))
             .map(|idx| Some(idx))
-            .unwrap_or_else(|err| if err == 0 { None } else { Some(err - 1) });
+            .unwrap_or_else(|err| if err == 0 { None } else { Some(err - 1) })?;
 
-        let id = if let Some((id, _)) = result.and_then(|idx| self.locations.get(idx)) {
-            *id
+        let (&id, &range) = if let Some((id, range)) = self.locations.get(idx) {
+            (id, range)
         } else {
             return None;
         };
 
+        if let Some(result) = self.analyze2(id, location) {
+            return Some(result);
+        }
+
+        if location == range.0 && idx > 0 {
+            if let Some(&(prev_id, prev_range)) = self.locations.get(idx - 1) {
+                if prev_range.1 == range.0 {
+                    return self.analyze2(prev_id, location);
+                }
+            }
+        }
+
+        if location == range.1 {
+            if let Some(&(next_id, next_range)) = self.locations.get(idx + 1) {
+                if next_range.0 == range.1 {
+                    return self.analyze2(next_id, location);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn analyze2(&self, id: usize, location: Location) -> Option<AnalysisResult> {
         let ancestors = {
             let mut ancestors = vec![];
             let mut id = id;
@@ -1714,30 +1739,16 @@ fn special_path_help(
                 analyzer.set_help(
                     &ident,
                     if can_be_receiver {
-                        let mut id = analyzer.id;
-                        let method = loop {
-                            id = if let Some(parent) =
-                                analyzer.id_to_ptr.get(&id).map(|data| data.parent)
-                            {
-                                parent
-                            } else {
-                                break None;
-                            };
-
-                            let node = if let Some(data) = analyzer.id_to_ptr.get(&id) {
-                                data.ptr.as_syn()
-                            } else {
-                                break None;
-                            };
-
-                            let sig = match node {
-                                Syn::ImplItemMethod(method) => &method.sig,
-                                Syn::TraitItemMethod(method) => &method.sig,
-                                _ => break None,
-                            };
-
-                            break Some(sig.ident.to_string());
-                        };
+                        let method = analyzer
+                            .ancestors
+                            .iter()
+                            .rev()
+                            .find_map(|(_, node)| match node {
+                                Syn::ImplItemMethod(method) => Some(&method.sig),
+                                Syn::TraitItemMethod(method) => Some(&method.sig),
+                                _ => None,
+                            })
+                            .map(|sig| sig.ident.to_string());
 
                         HelpItem::ReceiverPath { method }
                     } else {

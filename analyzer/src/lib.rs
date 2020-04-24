@@ -66,7 +66,7 @@ impl<T: Any> DynAncestor for T {
     }
 }
 
-pub struct IntersectionVisitor<'ast> {
+struct IntersectionVisitor<'ast> {
     /// The location for the help request
     location: LineColumn,
     /// The contextual help we return
@@ -81,7 +81,7 @@ pub struct IntersectionVisitor<'ast> {
     log: fn(&str),
 }
 
-pub struct VisitorResult {
+struct VisitorResult {
     pub help: HelpItem,
     pub item_location: (LineColumn, LineColumn),
 }

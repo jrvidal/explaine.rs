@@ -1,7 +1,5 @@
-use analyzer::{HelpItem, IntersectionVisitor};
+use analyzer::{ir::IrVisitor, Analyzer, HelpItem};
 use proc_macro2::{token_stream::IntoIter as TreeIter, LineColumn, Span, TokenStream, TokenTree};
-use quote::ToTokens;
-use std::vec::IntoIter;
 
 mod utils;
 
@@ -122,8 +120,7 @@ impl SessionResult {
 
 #[wasm_bindgen]
 pub struct Session {
-    file: std::rc::Rc<syn::File>,
-    analyzer: analyzer::Analyzer,
+    analyzer: Analyzer,
     element: usize,
 }
 
@@ -139,11 +136,10 @@ impl Session {
                 let file = std::rc::Rc::new(file);
 
                 let line_info: Vec<_> = source.lines().map(|line| line.len()).collect();
-                let analyzer = analyzer::ir::IrVisitor::new(file.clone(), line_info).visit();
+                let analyzer = IrVisitor::new(file.clone(), line_info).visit();
 
                 Ok(Session {
                     analyzer,
-                    file,
                     element: 0,
                 })
             }
