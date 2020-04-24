@@ -1,0 +1,18 @@
+body {
+  max-width: 880px;
+  margin: auto;
+  font: 400 16px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #fdfdfd;
+}
+
+pre, code {
+  background: #eef;
+}
+
+pre {
+  padding: 4px 8px;
+}
+
+code {
+  padding: 2px 4px;
+}
