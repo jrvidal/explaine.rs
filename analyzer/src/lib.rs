@@ -35,7 +35,7 @@ fn alternative() {
 }
 
 use crate::help::*;
-pub use analysis::Analyzer;
+pub use analysis::{Analyzer, ExplorationIterator, ExplorationState};
 pub use help::HelpItem;
 
 #[cfg(feature = "dev")]

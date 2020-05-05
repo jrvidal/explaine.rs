@@ -1,33 +1,36 @@
-use analyzer::{ir::IrVisitor, Analyzer, HelpItem};
-use proc_macro2::{token_stream::IntoIter as TreeIter, LineColumn, Span, TokenStream, TokenTree};
+use analyzer::{ir::IrVisitor, Analyzer, ExplorationIterator, ExplorationState, HelpItem};
+use proc_macro2::{
+    token_stream::IntoIter as TokenStreamIter, LineColumn, Span, TokenStream, TokenTree,
+};
+use quote::ToTokens;
 
 mod utils;
 
 use wasm_bindgen::prelude::*;
 
-struct TokenIterator {
-    elements: Vec<TokenIteratorElement>,
+struct SpanIterator {
+    elements: Vec<SpanIteratorElement>,
 }
 
-enum TokenIteratorElement {
+enum SpanIteratorElement {
     Span(Span),
-    Tree(TreeIter),
+    Tree(TokenStreamIter),
 }
 
-impl Iterator for TokenIterator {
+impl Iterator for SpanIterator {
     type Item = Span;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(element) = self.elements.pop() {
             let mut tree_iter = match element {
-                TokenIteratorElement::Tree(iter) => iter,
-                TokenIteratorElement::Span(span) => {
+                SpanIteratorElement::Tree(iter) => iter,
+                SpanIteratorElement::Span(span) => {
                     return Some(span);
                 }
             };
 
             let tree = if let Some(tree) = tree_iter.next() {
-                self.elements.push(TokenIteratorElement::Tree(tree_iter));
+                self.elements.push(SpanIteratorElement::Tree(tree_iter));
                 tree
             } else {
                 continue;
@@ -49,9 +52,9 @@ impl Iterator for TokenIterator {
             let span_open = group.span_open();
             let span_close = group.span_close();
 
-            self.elements.push(TokenIteratorElement::Span(span_close));
+            self.elements.push(SpanIteratorElement::Span(span_close));
             self.elements
-                .push(TokenIteratorElement::Tree(group.stream().into_iter()));
+                .push(SpanIteratorElement::Tree(group.stream().into_iter()));
             return Some(span_open);
         }
 
@@ -59,10 +62,10 @@ impl Iterator for TokenIterator {
     }
 }
 
-impl From<TokenStream> for TokenIterator {
+impl From<TokenStream> for SpanIterator {
     fn from(stream: TokenStream) -> Self {
-        TokenIterator {
-            elements: vec![TokenIteratorElement::Tree(stream.into_iter())],
+        SpanIterator {
+            elements: vec![SpanIteratorElement::Tree(stream.into_iter())],
         }
     }
 }
@@ -121,7 +124,8 @@ impl SessionResult {
 #[wasm_bindgen]
 pub struct Session {
     analyzer: Analyzer,
-    element: usize,
+    tokens: SpanIterator,
+    state: ExplorationState,
 }
 
 #[wasm_bindgen]
@@ -140,7 +144,8 @@ impl Session {
 
                 Ok(Session {
                     analyzer,
-                    element: 0,
+                    tokens: file.to_token_stream().into(),
+                    state: ExplorationState::default(),
                 })
             }
             Err(err) => {
@@ -158,35 +163,17 @@ impl Session {
         let mut count = 0;
         let mut idx = 0;
 
+        let source = (&mut self.tokens).map(|span| span.start().into());
+
+        let mut exploration_iterator = ExplorationIterator {
+            analyzer: &self.analyzer,
+            state: self.state.clone(),
+            source,
+        };
+
         loop {
-            // let span = match self.tokens.next() {
-            //     Some(span) => span,
-            //     None => match self.top_level.next() {
-            //         Some(el) => {
-            //             self.element = el;
-            //             self.tokens = match el {
-            //                 _ if el < self.file.attrs.len() => {
-            //                     self.file.attrs[el].clone().to_token_stream().into()
-            //                 }
-            //                 _ => self.file.items[el - self.file.attrs.len()]
-            //                     .clone()
-            //                     .to_token_stream()
-            //                     .into(),
-            //             };
-            //             continue;
-            //         }
-            //         None => {
-            //             self.top_level = vec![].into_iter();
-            //             self.tokens = TokenIterator { elements: vec![] };
-            //             break;
-            //         }
-            //     },
-            // };
-
-            // let location = span.start();
-
             let explanation = if let Some(explanation) = {
-                let result = if let Some(result) = self.analyzer.analyze_item(self.element) {
+                let result = if let Some(result) = exploration_iterator.next() {
                     result
                 } else {
                     break;
@@ -199,28 +186,9 @@ impl Session {
                     end_line: result.end.line,
                     end_column: result.end.column,
                 })
-
-                // let visitor = IntersectionVisitor::new(
-                //     location,
-                //     #[cfg(feature = "dev")]
-                //     log,
-                // );
-                // let result = visitor.visit_element(&self.file, self.element);
-                // if let HelpItem::Unknown = result.help {
-                //     None
-                // } else {
-                //     Some(Explanation {
-                //         item: result.help,
-                //         start_line: result.item_location.0.line,
-                //         start_column: result.item_location.0.column,
-                //         end_line: result.item_location.1.line,
-                //         end_column: result.item_location.1.column,
-                //     })
-                // }
             } {
                 explanation
             } else {
-                self.element += 1;
                 continue;
             };
 
@@ -236,13 +204,13 @@ impl Session {
 
             idx += 4;
             count += 1;
-            self.element += 1;
 
             if count == max {
                 break;
             }
         }
 
+        self.state = exploration_iterator.state;
         count
     }
 
@@ -259,24 +227,6 @@ impl Session {
                 end_line: result.end.line,
                 end_column: result.end.column,
             })
-
-        // let visitor = IntersectionVisitor::new(
-        //     location,
-        //     #[cfg(feature = "dev")]
-        //     log,
-        // );
-        // let result = visitor.visit(&self.file);
-        // if let HelpItem::Unknown = result.help {
-        //     None
-        // } else {
-        //     Some(Explanation {
-        //         item: result.help,
-        //         start_line: result.item_location.0.line,
-        //         start_column: result.item_location.0.column,
-        //         end_line: result.item_location.1.line,
-        //         end_column: result.item_location.1.column,
-        //     })
-        // }
     }
 }
 

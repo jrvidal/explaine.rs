@@ -6,13 +6,34 @@ use quote::ToTokens;
 use std::collections::HashMap;
 use syn::spanned::Spanned;
 
+#[derive(Default, Clone)]
+pub struct ExplorationState {
+    location_index: usize,
+}
+
+pub struct ExplorationIterator<'a, I> {
+    pub analyzer: &'a Analyzer,
+    pub state: ExplorationState,
+    pub source: I,
+}
+
+impl<'a, I: Iterator<Item = Location>> Iterator for ExplorationIterator<'a, I> {
+    type Item = Option<AnalysisResult>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.source.next().and_then(|location| {
+            self.analyzer
+                .analyze_for_exploration(&mut self.state, location)
+        })
+    }
+}
+
 pub struct Analyzer {
     pub(crate) id_to_ptr: HashMap<usize, PtrData>,
     pub(crate) ptr_to_id: HashMap<Ptr, usize>,
     pub(crate) locations: Vec<(usize, Range)>,
 }
 
-// TODO: precompute ancestors list
 struct NodeAnalyzer<'a> {
     id: usize,
     location: Location,
@@ -28,10 +49,25 @@ pub struct AnalysisResult {
 }
 
 impl Analyzer {
-    pub fn analyze_item(&self, item: usize) -> Option<Option<AnalysisResult>> {
-        self.locations
-            .get(item)
-            .map(|(_, range)| self.analyze(range.0))
+    fn analyze_for_exploration(
+        &self,
+        state: &mut ExplorationState,
+        location: Location,
+    ) -> Option<Option<AnalysisResult>> {
+        let &(id, range) = self.locations.get(state.location_index)?;
+
+        if range.0 <= location && location <= range.1 {
+            return Some(self.analyze_at_location(id, location, state.location_index, range));
+        }
+
+        for (idx, &(id, range)) in self.locations[state.location_index..].iter().enumerate() {
+            if range.0 <= location && location <= range.1 {
+                state.location_index = idx;
+                return Some(self.analyze_at_location(id, location, state.location_index, range));
+            }
+        }
+
+        None
     }
 
     pub fn analyze(&self, location: Location) -> Option<AnalysisResult> {
@@ -47,22 +83,42 @@ impl Analyzer {
             return None;
         };
 
-        if let Some(result) = self.analyze2(id, location) {
+        self.analyze_at_location(id, location, idx, range)
+    }
+
+    fn analyze_at_location(
+        &self,
+        id: usize,
+        location: Location,
+        idx: usize,
+        range: Range,
+    ) -> Option<AnalysisResult> {
+        if let Some(result) = self.analyze_node_at_location(id, location) {
             return Some(result);
         }
 
         if location == range.0 && idx > 0 {
-            if let Some(&(prev_id, prev_range)) = self.locations.get(idx - 1) {
-                if prev_range.1 == range.0 {
-                    return self.analyze2(prev_id, location);
+            if let Some(&(prev_id, _)) = self
+                .locations
+                .get(idx - 1)
+                .filter(|(_, prev_range)| prev_range.1 == range.0)
+            {
+                let result = self.analyze_node_at_location(prev_id, location);
+                if result.is_some() {
+                    return result;
                 }
             }
         }
 
         if location == range.1 {
-            if let Some(&(next_id, next_range)) = self.locations.get(idx + 1) {
-                if next_range.0 == range.1 {
-                    return self.analyze2(next_id, location);
+            if let Some(&(next_id, _)) = self
+                .locations
+                .get(idx + 1)
+                .filter(|(_, next_range)| next_range.0 == range.1)
+            {
+                let result = self.analyze_node_at_location(next_id, location);
+                if result.is_some() {
+                    return result;
                 }
             }
         }
@@ -70,7 +126,7 @@ impl Analyzer {
         None
     }
 
-    pub fn analyze2(&self, id: usize, location: Location) -> Option<AnalysisResult> {
+    fn analyze_node_at_location(&self, id: usize, location: Location) -> Option<AnalysisResult> {
         let ancestors = {
             let mut ancestors = vec![];
             let mut id = id;
