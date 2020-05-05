@@ -2,7 +2,7 @@ import * as messages from "./messages";
 import renderer, { pure } from "./renderer";
 import { addClass, removeClass, compareLocations } from "./util";
 import worker from "./worker-client";
-import { reportHit, reportError } from "./logging";
+import { reportHit } from "./logging";
 
 import { TextMarker, Editor } from "codemirror";
 

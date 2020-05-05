@@ -6,19 +6,33 @@ export const log = self.__PRODUCTION__
 export const logInfo = self.__PRODUCTION__
   ? () => {}
   : (...args) => console.info(...args);
-export const logError = (...args) => console.error(...args);
 
 export const reportHit = __ANALYTICS_URL__
   ? () => fetch(__ANALYTICS_URL__, { method: "POST" })
   : () => {};
 
-export const reportError = __ANALYTICS_URL__
-  ? (kind, data) =>
-      fetch(__ANALYTICS_URL__, {
-        method: "POST",
-        body: JSON.stringify({ kind, ...data }),
-      })
-  : (kind, data) => logError(JSON.parse(JSON.stringify({ ...data, kind })));
+export const reportError = (kind, e) => {
+  const actualError = (e && e.error) || e;
+  const errorData = JSON.stringify({
+    kind,
+    nativeError: actualError instanceof Error,
+    line: e && e.lineno,
+    column: e && e.colno,
+    message: (e && e.message) || (actualError && actualError.message),
+    filename: e && e.filename,
+    stack: actualError && actualError.stack,
+    raw: e,
+  });
+
+  if (__ANALYTICS_URL__) {
+    fetch(__ANALYTICS_URL__, {
+      method: "POST",
+      body: errorData,
+    });
+  } else {
+    console.error(JSON.parse(errorData));
+  }
+};
 
 if (!self.__PRODUCTION__) {
   if (self.window != null) {
@@ -54,12 +68,5 @@ export const handleLogging = (data) => {
 };
 
 self.addEventListener("error", (e) => {
-  reportError(typeof window != null ? "window.onerror" : "self.onerror", {
-    line: e && e.lineno,
-    column: e && e.colno,
-    message: e && e.message,
-    filename: e && e.filename,
-    stack: e && e.error && e.error.stack,
-    raw: e,
-  });
+  reportError(typeof window != null ? "window.onerror" : "self.onerror", e);
 });

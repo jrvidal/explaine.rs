@@ -17,10 +17,7 @@ export default function worker({
 
   worker.onerror = (e) => reportError("worker.onerror", e);
 
-  ((worker as any) as MessagePort).onmessageerror = (e) =>
-    reportError("onmessageerror", {
-      error: e,
-    });
+  ((worker as any) as MessagePort).onmessageerror = (e) => reportError("onmessageerror", e);
 
   worker.onmessage = (e) => {
     const { data } = e;

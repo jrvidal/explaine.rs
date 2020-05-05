@@ -20,9 +20,5 @@ export function setInStorage(key: string, value: any) {
 }
 
 function reportStorageError(error: Error) {
-  reportError("storage", {
-    raw: error,
-    message: error.message,
-    stack: error.stack,
-  });
+  reportError("storage", error);
 }

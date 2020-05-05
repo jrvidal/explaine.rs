@@ -15,10 +15,7 @@ const state = {
 wasm_bindgen(wasmUrl)
   .then(() => postMessage({ type: messages.READY }))
   .catch((e) =>
-    reportError("wasm_bindgen", {
-      error: e,
-      message: e && e.message,
-    })
+    reportError("wasm_bindgen", e)
   );
 
 self.onmessage = (e) => {
