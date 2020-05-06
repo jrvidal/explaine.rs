@@ -566,7 +566,7 @@ const debouncedCompile = debounce(
       type: messages.COMPILE,
       source,
     }),
-  128
+  512
 );
 
 function doCompile() {
@@ -577,6 +577,7 @@ function doCompile() {
   if (code.trim() === "") {
     setState({ compilation: { ...initialCompilation, state: SUCCESS } });
   } else {
+    postToWorker({ type: messages.STOP_COMPILATION });
     debouncedCompile(cm.getValue());
   }
 
@@ -709,20 +710,6 @@ function getMark(location: Span, className = "highlighted") {
   });
 }
 
-function debounce<T>(fn: (arg: T) => void, delay: number) {
-  let enqueued: number | null = null;
-  let lastArg: T | null = null;
-  const wrapped = () => fn(lastArg!!);
-
-  return (arg: T) => {
-    lastArg = arg;
-    if (enqueued != null) {
-      window.clearTimeout(enqueued);
-    }
-    enqueued = window.setTimeout(wrapped, delay);
-  };
-}
-
 function memoize<T>(fn: any, memoizer: (prev: T, next: T) => boolean) {
   let last: any = {};
 
@@ -784,4 +771,135 @@ function withinRange(loc: Location, start: Location, end: Location) {
 
 if (!self.__PRODUCTION__) {
   (window as any).nonUiState = nonUiState;
+}
+
+// Copy&paste from lodash
+function debounce(
+  func: (...args: any) => void,
+  wait: number,
+  options: any = undefined
+): (...args: any) => void {
+  let lastArgs: any;
+  let lastThis: any;
+  let maxWait: any;
+  let result: any;
+  let timerId: number | undefined;
+  let lastCallTime: any;
+
+  var lastInvokeTime = 0,
+    leading = false,
+    maxing = false,
+    trailing = true;
+
+  if (options != null) {
+    leading = !!options.leading;
+    maxing = "maxWait" in options;
+    maxWait = maxing ? Math.max(Number(options.maxWait) || 0, wait) : maxWait;
+    trailing = "trailing" in options ? !!options.trailing : trailing;
+  }
+
+  function invokeFunc(time: number) {
+    var args = lastArgs,
+      thisArg = lastThis;
+
+    lastArgs = lastThis = undefined;
+    lastInvokeTime = time;
+    result = func.apply(thisArg, args);
+    return result;
+  }
+
+  function leadingEdge(time: number) {
+    // Reset any `maxWait` timer.
+    lastInvokeTime = time;
+    // Start the timer for the trailing edge.
+    timerId = window.setTimeout(timerExpired, wait);
+    // Invoke the leading edge.
+    return leading ? invokeFunc(time) : result;
+  }
+
+  function remainingWait(time: number) {
+    var timeSinceLastCall = time - lastCallTime,
+      timeSinceLastInvoke = time - lastInvokeTime,
+      timeWaiting = wait - timeSinceLastCall;
+
+    return maxing
+      ? Math.min(timeWaiting, maxWait - timeSinceLastInvoke)
+      : timeWaiting;
+  }
+
+  function shouldInvoke(time: number) {
+    var timeSinceLastCall = time - lastCallTime,
+      timeSinceLastInvoke = time - lastInvokeTime;
+
+    // Either this is the first call, activity has stopped and we're at the
+    // trailing edge, the system time has gone backwards and we're treating
+    // it as the trailing edge, or we've hit the `maxWait` limit.
+    return (
+      lastCallTime === undefined ||
+      timeSinceLastCall >= wait ||
+      timeSinceLastCall < 0 ||
+      (maxing && timeSinceLastInvoke >= maxWait)
+    );
+  }
+
+  function timerExpired() {
+    var time = Date.now();
+    if (shouldInvoke(time)) {
+      return trailingEdge(time);
+    }
+    // Restart the timer.
+    timerId = window.setTimeout(timerExpired, remainingWait(time));
+  }
+
+  function trailingEdge(time: number) {
+    timerId = undefined;
+
+    // Only invoke if we have `lastArgs` which means `func` has been
+    // debounced at least once.
+    if (trailing && lastArgs) {
+      return invokeFunc(time);
+    }
+    lastArgs = lastThis = undefined;
+    return result;
+  }
+
+  function cancel() {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+    lastInvokeTime = 0;
+    lastArgs = lastCallTime = lastThis = timerId = undefined;
+  }
+
+  function flush() {
+    return timerId === undefined ? result : trailingEdge(Date.now());
+  }
+
+  function debounced(this: any) {
+    var time = Date.now(),
+      isInvoking = shouldInvoke(time);
+
+    lastArgs = arguments;
+    lastThis = this;
+    lastCallTime = time;
+
+    if (isInvoking) {
+      if (timerId === undefined) {
+        return leadingEdge(lastCallTime);
+      }
+      if (maxing) {
+        // Handle invocations in a tight loop.
+        clearTimeout(timerId);
+        timerId = window.setTimeout(timerExpired, wait);
+        return invokeFunc(lastCallTime);
+      }
+    }
+    if (timerId === undefined) {
+      timerId = window.setTimeout(timerExpired, wait);
+    }
+    return result;
+  }
+  debounced.cancel = cancel;
+  debounced.flush = flush;
+  return debounced;
 }

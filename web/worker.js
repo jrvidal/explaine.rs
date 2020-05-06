@@ -5,6 +5,9 @@ import { logInfo, reportError, handleLogging } from "./logging";
 
 logInfo("workerMain");
 
+let instance;
+let isMain = true;
+
 const state = {
   source: null,
   session: null,
@@ -12,25 +15,36 @@ const state = {
   exploration: null,
 };
 
-wasm_bindgen(wasmUrl)
-  .then(() => postMessage({ type: messages.READY }))
-  .catch((e) =>
-    reportError("wasm_bindgen", e)
-  );
-
 self.onmessage = (e) => {
   const { data } = e;
-  logInfo("Worker received", data.type, data);
+  logInfo(isMain ? "Main" : "Secondary", "worker received", data.type, data);
   switch (data.type) {
+    case messages.MAIN_LOAD:
+      compileWasm(null);
+      return;
+    case messages.SECONDARY_LOAD:
+      isMain = false;
+      compileWasm(data.compiledModule);
+      return;
+    case messages.STOP_COMPILATION:
+      if (!isMain && state.session) {
+        state.session.free();
+        state.session = null;
+      }
+      return;
     case messages.COMPILE:
       compile(data.source);
-      break;
+      return;
     case messages.EXPLAIN:
-      explain(data.location);
-      break;
+      if (isMain) {
+        explain(data.location);
+      }
+      return;
     case messages.ELABORATE:
-      elaborate(data.location);
-      break;
+      if (isMain) {
+        elaborate(data.location);
+      }
+      return;
     default:
       if (!self.__PRODUCTION__) {
         if (handleLogging(data)) {
@@ -41,12 +55,24 @@ self.onmessage = (e) => {
   }
 };
 
+function compileWasm(compiledModule) {
+  wasm_bindgen(compiledModule || wasmUrl)
+    .then(() => {
+      instance = wasm_bindgen;
+      postMessage({
+        type: messages.READY,
+        compiledModule: wasm_bindgen.__wbindgen_wasm_module,
+      });
+    })
+    .catch((e) => reportError("wasm_bindgen", e));
+}
+
 function compile(source) {
   if (state.session) {
     state.session.free();
     state.session = null;
   }
-  const result = wasm_bindgen.Session.new(source);
+  const result = instance.Session.new(source);
   const errorMsg = result.error_message();
   const location = result.error_location();
 
@@ -68,8 +94,12 @@ function compile(source) {
 
   state.session = result.session();
   state.error = error;
-  notifySession();
-  exploreLoop(state.session, true);
+
+  if (isMain) {
+    notifySession();
+  } else {
+    exploreLoop(state.session, true);
+  }
 }
 
 function notifySession() {
@@ -85,14 +115,14 @@ function exploreLoop(session, init = false) {
     return;
   }
 
-  const LENGTH = 5;
-  const DELAY = 16;
+  const LENGTH = 500;
 
   if (init) {
     state.exploration = {
       buffer: new self.Uint32Array(LENGTH * 4),
       result: [],
       byStart: new Map(),
+      start: Date.now(),
     };
   }
 
@@ -123,7 +153,7 @@ function exploreLoop(session, init = false) {
     }
   }
 
-  if (written < LENGTH) {
+  if (written === 0) {
     logInfo("Exploration finished...");
     postMessage({
       type: messages.EXPLORATION,
@@ -132,7 +162,7 @@ function exploreLoop(session, init = false) {
     return;
   }
 
-  setTimeout(() => exploreLoop(session), DELAY);
+  setImmediate(() => exploreLoop(session));
 }
 
 function explain(location) {
@@ -188,3 +218,24 @@ function explanationLocation(explanation) {
       }
     : null;
 }
+
+const setImmediate = (() => {
+  let callbacks = new Map();
+  let count = 0;
+
+  let channel = new MessageChannel();
+
+  channel.port1.onmessage = (event) => {
+    let id = event.data;
+    let callback = callbacks.get(id);
+    callbacks.delete(id);
+    callback();
+  };
+
+  return (fn) => {
+    let id = count;
+    callbacks.set(id, fn);
+    count++;
+    channel.port2.postMessage(id);
+  };
+})();

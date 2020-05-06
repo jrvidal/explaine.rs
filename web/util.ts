@@ -43,3 +43,14 @@ export function compareLocations(locA: Location, locB: Location) {
     return 0;
   }
 }
+
+export function defer<T>() {
+  let resolve: (value: T) => void = null as any;
+  let reject: (reason: any) => void = null as any;
+  let promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}

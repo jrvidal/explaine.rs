@@ -40,9 +40,7 @@ export default function codemirror({
     return { cm, codemirrorEl };
   });
 
-  cmPromise.catch((e) =>
-    reportError("cmPromise", e)
-  );
+  cmPromise.catch((e) => reportError("cmPromise", e));
 
   return cmPromise;
 }

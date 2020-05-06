@@ -1,40 +1,74 @@
 import AnalyzerWorker from "worker-loader!./worker.js";
-import { READY } from "./messages";
+import { READY, SECONDARY_LOAD, MAIN_LOAD } from "./messages";
 import { logInfo, reportError } from "./logging";
+import { defer } from "./util";
 
 export default function worker({
   onMessage,
 }: {
   onMessage: (message: any) => void;
 }) {
-  const worker: Worker = new AnalyzerWorker();
+  const mainWorker: Worker = new AnalyzerWorker();
+  const secondaryWorker: Worker = new AnalyzerWorker();
 
-  let resolveWorkerIsReady: () => void;
+  let {
+    promise: mainWorkerIsReadyPromise,
+    resolve: resolveMainWorkerIsReady,
+  } = defer();
+  let {
+    promise: secondaryWorkerIsReadyPromise,
+    resolve: resolveSecondaryWorkerIsReady,
+  } = defer();
 
-  let workerIsReadyPromise = new Promise((res) => {
-    resolveWorkerIsReady = res;
-  });
+  let workerIsReadyPromise = Promise.all([
+    mainWorkerIsReadyPromise,
+    secondaryWorkerIsReadyPromise,
+  ]);
 
-  worker.onerror = (e) => reportError("worker.onerror", e);
+  mainWorker.onerror = (e) => reportError("mainworker.onerror", e);
+  ((mainWorker as any) as MessagePort).onmessageerror = (e) =>
+    reportError("mainworker.onmessageerror", e);
+  secondaryWorker.onerror = (e) => reportError("secondaryworker.onerror", e);
+  ((secondaryWorker as any) as MessagePort).onmessageerror = (e) =>
+    reportError("secondaryworker.onmessageerror", e);
 
-  ((worker as any) as MessagePort).onmessageerror = (e) => reportError("onmessageerror", e);
-
-  worker.onmessage = (e) => {
+  mainWorker.onmessage = (e) => {
     const { data } = e;
     logInfo("Window received", data.type, data);
     if (data.type === READY) {
-      resolveWorkerIsReady();
+      resolveMainWorkerIsReady(null);
+      secondaryWorker.postMessage({
+        type: SECONDARY_LOAD,
+        compiledModule: data.compiledModule,
+      });
+      return;
+    }
+    onMessage(data);
+  };
+
+  secondaryWorker.onmessage = (e) => {
+    const { data } = e;
+    logInfo("Window received", data.type, data);
+    if (data.type === READY) {
+      resolveSecondaryWorkerIsReady(null);
       return;
     }
     onMessage(data);
   };
 
   if (!self.__PRODUCTION__) {
-    (window as any).worker = worker;
+    (window as any).worker = mainWorker;
   }
 
+  mainWorker.postMessage({
+    type: MAIN_LOAD,
+  });
+
   return {
-    postMessage: (data: any) => worker.postMessage(data),
+    postMessage: (data: any) => {
+      mainWorker.postMessage(data);
+      secondaryWorker.postMessage(data);
+    },
     ready: workerIsReadyPromise,
   };
 }
