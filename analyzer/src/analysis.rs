@@ -1,5 +1,5 @@
 use crate::help::*;
-use crate::ir::{Location, Ptr, PtrData, Range};
+use crate::ir::{Location, NodeId, PtrData, Range};
 use crate::syn_wrappers::{Syn, SynKind};
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
@@ -29,16 +29,15 @@ impl<'a, I: Iterator<Item = Location>> Iterator for ExplorationIterator<'a, I> {
 }
 
 pub struct Analyzer {
-    pub(crate) id_to_ptr: HashMap<usize, PtrData>,
-    pub(crate) ptr_to_id: HashMap<Ptr, usize>,
-    pub(crate) locations: Vec<(usize, Range)>,
+    pub(crate) id_to_ptr: HashMap<NodeId, PtrData>,
+    pub(crate) locations: Vec<(NodeId, Range)>,
 }
 
 struct NodeAnalyzer<'a> {
-    id: usize,
+    id: NodeId,
     location: Location,
-    id_to_ptr: &'a HashMap<usize, PtrData>,
-    ancestors: &'a [(usize, Syn<'a>)],
+    id_to_ptr: &'a HashMap<NodeId, PtrData>,
+    ancestors: &'a [(NodeId, Syn<'a>)],
     help: Option<(Range, HelpItem)>,
 }
 
@@ -88,7 +87,7 @@ impl Analyzer {
 
     fn analyze_at_location(
         &self,
-        id: usize,
+        id: NodeId,
         location: Location,
         idx: usize,
         range: Range,
@@ -126,7 +125,7 @@ impl Analyzer {
         None
     }
 
-    fn analyze_node_at_location(&self, id: usize, location: Location) -> Option<AnalysisResult> {
+    fn analyze_node_at_location(&self, id: NodeId, location: Location) -> Option<AnalysisResult> {
         let ancestors = {
             let mut ancestors = vec![];
             let mut id = id;
@@ -435,7 +434,7 @@ impl<'a> NodeAnalyzer<'a> {
 
     fn between_locations(&self, start: LineColumn, end: LineColumn) -> bool {
         let loc = self.location;
-        super::within_locations(
+        within_locations(
             LineColumn {
                 line: loc.line,
                 column: loc.column,
@@ -1981,4 +1980,9 @@ fn receiver_help(sig: &syn::Signature) -> Option<HelpItem> {
             Some(item)
         }
     }
+}
+
+pub fn within_locations(loc: LineColumn, start: LineColumn, end: LineColumn) -> bool {
+    (start.line < loc.line || (start.line == loc.line && start.column <= loc.column))
+        && (loc.line < end.line || (loc.line == end.line && loc.column <= end.column))
 }

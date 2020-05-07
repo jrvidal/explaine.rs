@@ -1,4 +1,4 @@
-use analyzer::{ir::IrVisitor, Analyzer, ExplorationIterator, ExplorationState, HelpItem};
+use analyzer::{Analyzer, ExplorationIterator, ExplorationState, HelpItem, IrVisitor};
 use proc_macro2::{
     token_stream::IntoIter as TokenStreamIter, LineColumn, Span, TokenStream, TokenTree,
 };

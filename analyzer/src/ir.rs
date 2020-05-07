@@ -1,11 +1,19 @@
 use crate::syn_wrappers::{Syn, SynKind};
 use proc_macro2::Span;
 use std::collections::{HashMap, HashSet};
-use std::pin::Pin;
 use std::ptr::NonNull;
 use std::rc::Rc;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct NodeId(usize);
+
+impl From<usize> for NodeId {
+    fn from(n: usize) -> Self {
+        NodeId(n)
+    }
+}
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Copy, Debug)]
 pub struct Location {
@@ -66,13 +74,13 @@ impl From<proc_macro2::LineColumn> for Location {
 
 #[derive(Clone)]
 pub(crate) struct Ptr {
-    owner: Pin<Rc<syn::File>>,
+    owner: Rc<syn::File>,
     ptr: NonNull<()>,
     kind: SynKind,
 }
 
 impl Ptr {
-    fn new(owner: &Pin<Rc<syn::File>>, node: Syn) -> Self {
+    fn new(owner: Rc<syn::File>, node: Syn) -> Self {
         Ptr {
             owner: owner.clone(),
             kind: (&node).into(),
@@ -103,11 +111,10 @@ pub type Range = (Location, Location);
 
 pub struct IrVisitor {
     counter: usize,
-    file: Pin<Rc<syn::File>>,
-    id_to_ptr: HashMap<usize, PtrData>,
-    ptr_to_id: HashMap<Ptr, usize>,
-    locations: HashMap<usize, LocationData>,
-    ancestors: Vec<usize>,
+    file: Rc<syn::File>,
+    id_to_ptr: HashMap<NodeId, PtrData>,
+    locations: HashMap<NodeId, LocationData>,
+    ancestors: Vec<NodeId>,
     line_info: Vec<usize>,
 }
 
@@ -122,9 +129,8 @@ impl IrVisitor {
         IrVisitor {
             counter: 1,
             id_to_ptr: Default::default(),
-            ptr_to_id: Default::default(),
             ancestors: vec![],
-            file: Pin::new(file),
+            file,
             locations: Default::default(),
             line_info,
         }
@@ -171,30 +177,29 @@ impl IrVisitor {
         crate::analysis::Analyzer {
             locations,
             id_to_ptr: self.id_to_ptr,
-            ptr_to_id: self.ptr_to_id,
         }
     }
 }
 
 pub(crate) struct PtrData {
-    pub parent: usize,
+    pub parent: NodeId,
     pub ptr: Ptr,
-    pub children: HashSet<usize>,
+    pub children: HashSet<NodeId>,
 }
 
 impl IrVisitor {
-    fn prepare(&mut self, node: Syn, span: Span) -> usize {
+    fn prepare(&mut self, node: Syn, span: Span) -> NodeId {
         let start: Location = span.start().into();
         let end: Location = span.end().into();
         self.prepare_precise(node, (start, end))
     }
 
     #[inline(never)]
-    fn prepare_precise(&mut self, node: Syn, (start, end): Range) -> usize {
+    fn prepare_precise(&mut self, node: Syn, (start, end): Range) -> NodeId {
         self.prepare_precise_ranges(node, &[(start, end)])
     }
 
-    fn prepare_precise_ranges(&mut self, node: Syn, ranges: &[Range]) -> usize {
+    fn prepare_precise_ranges(&mut self, node: Syn, ranges: &[Range]) -> NodeId {
         #[cfg(feature = "dev")]
         {
             for range in ranges {
@@ -209,15 +214,13 @@ impl IrVisitor {
                 }
             }
         }
-        let ptr = Ptr::new(&self.file, node);
+        let ptr = Ptr::new(self.file.clone(), node);
 
-        let id = self.counter;
+        let id = self.counter.into();
         self.counter += 1;
 
-        self.ptr_to_id.insert(ptr.clone(), id);
-
         let mut data = PtrData {
-            parent: 0,
+            parent: NodeId(0),
             children: Default::default(),
             ptr: ptr.clone(),
         };
@@ -258,7 +261,7 @@ impl IrVisitor {
         id
     }
 
-    fn steal_ancestor_locations(&mut self, ancestor_id: usize, child: Range) {
+    fn steal_ancestor_locations(&mut self, ancestor_id: NodeId, child: Range) {
         let ancestor_locations =
             if let Some(ancestor_locations) = self.locations.get_mut(&ancestor_id) {
                 ancestor_locations
@@ -1059,642 +1062,3 @@ impl<'ast> Visit<'ast> for IrVisitor {
         visit![self, i, visit_where_predicate];
     }
 }
-
-// pub struct IntersectionVisitor<'ast> {
-//     file: &'ast Pin<Rc<syn::File>>,
-//     location: Location,
-//     ptr_to_id: &'ast HashMap<Ptr, usize>,
-//     lineage: Vec<usize>,
-// }
-
-// impl<'ast> IntersectionVisitor<'ast> {
-//     #[inline(never)]
-//     fn intersect(&mut self, span: Span, node: &dyn Any, skip_check: bool) -> bool {
-//         if !skip_check {
-//             let start: Location = span.start().into();
-//             let end: Location = span.end().into();
-
-//             if !(start <= self.location && self.location <= end) {
-//                 return false;
-//             }
-//         }
-
-//         self.prepare(node)
-//     }
-
-//     fn prepare(&mut self, node: &dyn Any) -> bool {
-//         let ptr = Ptr::new(&self.file, node);
-//         let id = if let Some(id) = self.ptr_to_id.get(&ptr) {
-//             *id
-//         } else {
-//             return false;
-//         };
-
-//         self.lineage.push(id);
-
-//         true
-//     }
-// }
-
-// macro_rules! intersect {
-//     ($self:ident, $node:ident, $name:ident) => {
-//         if $self.intersect($node.span(), $node, false) {
-//             syn::visit::$name($self, $node);
-//         }
-//     };
-//     (@passthrough, $self:ident, $node:ident, $name:ident) => {
-//         if $self.intersect($node.span(), $node, true) {
-//             syn::visit::$name($self, $node);
-//         }
-//     };
-// }
-
-// impl<'ast> Visit<'ast> for IntersectionVisitor<'ast> {
-//     fn visit_abi(&mut self, i: &'ast syn::Abi) {
-//         intersect![self, i, visit_abi];
-//     }
-//     fn visit_angle_bracketed_generic_arguments(
-//         &mut self,
-//         i: &'ast syn::AngleBracketedGenericArguments,
-//     ) {
-//         intersect![self, i, visit_angle_bracketed_generic_arguments];
-//     }
-//     fn visit_arm(&mut self, i: &'ast syn::Arm) {
-//         intersect![self, i, visit_arm];
-//     }
-//     fn visit_attr_style(&mut self, _i: &'ast syn::AttrStyle) {
-//         // OMITTED: we'll handle it on attribute themselves
-//     }
-//     fn visit_attribute(&mut self, i: &'ast syn::Attribute) {
-//         intersect![self, i, visit_attribute];
-//     }
-//     fn visit_bare_fn_arg(&mut self, i: &'ast syn::BareFnArg) {
-//         intersect![self, i, visit_bare_fn_arg];
-//     }
-//     fn visit_bin_op(&mut self, i: &'ast syn::BinOp) {
-//         intersect![self, i, visit_bin_op];
-//     }
-//     fn visit_binding(&mut self, i: &'ast syn::Binding) {
-//         intersect![self, i, visit_binding];
-//     }
-//     fn visit_block(&mut self, i: &'ast syn::Block) {
-//         intersect![self, i, visit_block];
-//     }
-//     fn visit_bound_lifetimes(&mut self, i: &'ast syn::BoundLifetimes) {
-//         intersect![self, i, visit_bound_lifetimes];
-//     }
-//     fn visit_const_param(&mut self, i: &'ast syn::ConstParam) {
-//         intersect![self, i, visit_const_param];
-//     }
-//     fn visit_constraint(&mut self, i: &'ast syn::Constraint) {
-//         intersect![self, i, visit_constraint];
-//     }
-//     fn visit_data(&mut self, _i: &'ast syn::Data) {
-//         // OMITTED: not our use case
-//     }
-//     fn visit_data_enum(&mut self, _i: &'ast syn::DataEnum) {
-//         // OMITTED: not our use case
-//     }
-//     fn visit_data_struct(&mut self, _i: &'ast syn::DataStruct) {
-//         // OMITTED: not our use case
-//     }
-//     fn visit_data_union(&mut self, _i: &'ast syn::DataUnion) {
-//         // OMITTED: not our use case
-//     }
-//     fn visit_derive_input(&mut self, _i: &'ast syn::DeriveInput) {
-//         // OMITTED: not our use case
-//     }
-//     fn visit_expr(&mut self, i: &'ast syn::Expr) {
-//         intersect![self, i, visit_expr];
-//     }
-//     fn visit_expr_array(&mut self, i: &'ast syn::ExprArray) {
-//         intersect![@passthrough, self, i, visit_expr_array];
-//     }
-//     fn visit_expr_assign(&mut self, i: &'ast syn::ExprAssign) {
-//         intersect![@passthrough, self, i, visit_expr_assign];
-//     }
-//     fn visit_expr_assign_op(&mut self, i: &'ast syn::ExprAssignOp) {
-//         intersect![@passthrough, self, i, visit_expr_assign_op];
-//     }
-//     fn visit_expr_async(&mut self, i: &'ast syn::ExprAsync) {
-//         intersect![@passthrough, self, i, visit_expr_async];
-//     }
-//     fn visit_expr_await(&mut self, i: &'ast syn::ExprAwait) {
-//         intersect![@passthrough, self, i, visit_expr_await];
-//     }
-//     fn visit_expr_binary(&mut self, i: &'ast syn::ExprBinary) {
-//         intersect![@passthrough, self, i, visit_expr_binary];
-//     }
-//     fn visit_expr_block(&mut self, i: &'ast syn::ExprBlock) {
-//         intersect![@passthrough, self, i, visit_expr_block];
-//     }
-//     fn visit_expr_box(&mut self, i: &'ast syn::ExprBox) {
-//         intersect![@passthrough, self, i, visit_expr_box];
-//     }
-//     fn visit_expr_break(&mut self, i: &'ast syn::ExprBreak) {
-//         intersect![@passthrough, self, i, visit_expr_break];
-//     }
-//     fn visit_expr_call(&mut self, i: &'ast syn::ExprCall) {
-//         intersect![@passthrough, self, i, visit_expr_call];
-//     }
-//     fn visit_expr_cast(&mut self, i: &'ast syn::ExprCast) {
-//         intersect![@passthrough, self, i, visit_expr_cast];
-//     }
-//     fn visit_expr_closure(&mut self, i: &'ast syn::ExprClosure) {
-//         intersect![@passthrough, self, i, visit_expr_closure];
-//     }
-//     fn visit_expr_continue(&mut self, i: &'ast syn::ExprContinue) {
-//         intersect![@passthrough, self, i, visit_expr_continue];
-//     }
-//     fn visit_expr_field(&mut self, i: &'ast syn::ExprField) {
-//         intersect![@passthrough, self, i, visit_expr_field];
-//     }
-//     fn visit_expr_for_loop(&mut self, i: &'ast syn::ExprForLoop) {
-//         intersect![@passthrough, self, i, visit_expr_for_loop];
-//     }
-//     fn visit_expr_group(&mut self, i: &'ast syn::ExprGroup) {
-//         intersect![@passthrough, self, i, visit_expr_group];
-//     }
-//     fn visit_expr_if(&mut self, i: &'ast syn::ExprIf) {
-//         intersect![@passthrough, self, i, visit_expr_if];
-//     }
-//     fn visit_expr_index(&mut self, i: &'ast syn::ExprIndex) {
-//         intersect![@passthrough, self, i, visit_expr_index];
-//     }
-//     fn visit_expr_let(&mut self, i: &'ast syn::ExprLet) {
-//         intersect![@passthrough, self, i, visit_expr_let];
-//     }
-//     fn visit_expr_lit(&mut self, i: &'ast syn::ExprLit) {
-//         intersect![@passthrough, self, i, visit_expr_lit];
-//     }
-//     fn visit_expr_loop(&mut self, i: &'ast syn::ExprLoop) {
-//         intersect![@passthrough, self, i, visit_expr_loop];
-//     }
-//     fn visit_expr_macro(&mut self, i: &'ast syn::ExprMacro) {
-//         intersect![@passthrough, self, i, visit_expr_macro];
-//     }
-//     fn visit_expr_match(&mut self, i: &'ast syn::ExprMatch) {
-//         intersect![@passthrough, self, i, visit_expr_match];
-//     }
-//     fn visit_expr_method_call(&mut self, i: &'ast syn::ExprMethodCall) {
-//         intersect![@passthrough, self, i, visit_expr_method_call];
-//     }
-//     fn visit_expr_paren(&mut self, i: &'ast syn::ExprParen) {
-//         intersect![@passthrough, self, i, visit_expr_paren];
-//     }
-//     fn visit_expr_path(&mut self, i: &'ast syn::ExprPath) {
-//         intersect![@passthrough, self, i, visit_expr_path];
-//     }
-//     fn visit_expr_range(&mut self, i: &'ast syn::ExprRange) {
-//         intersect![@passthrough, self, i, visit_expr_range];
-//     }
-//     fn visit_expr_reference(&mut self, i: &'ast syn::ExprReference) {
-//         intersect![@passthrough, self, i, visit_expr_reference];
-//     }
-//     fn visit_expr_repeat(&mut self, i: &'ast syn::ExprRepeat) {
-//         intersect![@passthrough, self, i, visit_expr_repeat];
-//     }
-//     fn visit_expr_return(&mut self, i: &'ast syn::ExprReturn) {
-//         intersect![@passthrough, self, i, visit_expr_return];
-//     }
-//     fn visit_expr_struct(&mut self, i: &'ast syn::ExprStruct) {
-//         intersect![@passthrough, self, i, visit_expr_struct];
-//     }
-//     fn visit_expr_try(&mut self, i: &'ast syn::ExprTry) {
-//         intersect![@passthrough, self, i, visit_expr_try];
-//     }
-//     fn visit_expr_try_block(&mut self, i: &'ast syn::ExprTryBlock) {
-//         intersect![@passthrough, self, i, visit_expr_try_block];
-//     }
-//     fn visit_expr_tuple(&mut self, i: &'ast syn::ExprTuple) {
-//         intersect![@passthrough, self, i, visit_expr_tuple];
-//     }
-//     fn visit_expr_type(&mut self, i: &'ast syn::ExprType) {
-//         intersect![@passthrough, self, i, visit_expr_type];
-//     }
-//     fn visit_expr_unary(&mut self, i: &'ast syn::ExprUnary) {
-//         intersect![@passthrough, self, i, visit_expr_unary];
-//     }
-//     fn visit_expr_unsafe(&mut self, i: &'ast syn::ExprUnsafe) {
-//         intersect![@passthrough, self, i, visit_expr_unsafe];
-//     }
-//     fn visit_expr_while(&mut self, i: &'ast syn::ExprWhile) {
-//         intersect![@passthrough, self, i, visit_expr_while];
-//     }
-//     fn visit_expr_yield(&mut self, i: &'ast syn::ExprYield) {
-//         intersect![@passthrough, self, i, visit_expr_yield];
-//     }
-//     fn visit_field(&mut self, i: &'ast syn::Field) {
-//         intersect![self, i, visit_field];
-//     }
-//     fn visit_field_pat(&mut self, i: &'ast syn::FieldPat) {
-//         intersect![self, i, visit_field_pat];
-//     }
-//     fn visit_field_value(&mut self, i: &'ast syn::FieldValue) {
-//         intersect![self, i, visit_field_value];
-//     }
-//     fn visit_fields(&mut self, i: &'ast syn::Fields) {
-//         intersect![self, i, visit_fields];
-//     }
-//     fn visit_fields_named(&mut self, i: &'ast syn::FieldsNamed) {
-//         intersect![self, i, visit_fields_named];
-//     }
-//     fn visit_fields_unnamed(&mut self, i: &'ast syn::FieldsUnnamed) {
-//         intersect![self, i, visit_fields_unnamed];
-//     }
-//     fn visit_file(&mut self, i: &'ast syn::File) {
-//         intersect![self, i, visit_file];
-//     }
-//     fn visit_fn_arg(&mut self, i: &'ast syn::FnArg) {
-//         intersect![self, i, visit_fn_arg];
-//     }
-//     fn visit_foreign_item(&mut self, i: &'ast syn::ForeignItem) {
-//         intersect![self, i, visit_foreign_item];
-//     }
-//     fn visit_foreign_item_fn(&mut self, i: &'ast syn::ForeignItemFn) {
-//         intersect![self, i, visit_foreign_item_fn];
-//     }
-//     fn visit_foreign_item_macro(&mut self, i: &'ast syn::ForeignItemMacro) {
-//         intersect![self, i, visit_foreign_item_macro];
-//     }
-//     fn visit_foreign_item_static(&mut self, i: &'ast syn::ForeignItemStatic) {
-//         intersect![self, i, visit_foreign_item_static];
-//     }
-//     fn visit_foreign_item_type(&mut self, i: &'ast syn::ForeignItemType) {
-//         intersect![self, i, visit_foreign_item_type];
-//     }
-//     fn visit_generic_argument(&mut self, i: &'ast syn::GenericArgument) {
-//         intersect![self, i, visit_generic_argument];
-//     }
-//     fn visit_generic_method_argument(&mut self, i: &'ast syn::GenericMethodArgument) {
-//         intersect![self, i, visit_generic_method_argument];
-//     }
-//     fn visit_generic_param(&mut self, i: &'ast syn::GenericParam) {
-//         intersect![self, i, visit_generic_param];
-//     }
-//     fn visit_generics(&mut self, i: &'ast syn::Generics) {
-//         let span = i.span();
-//         let start: Location = span.start().into();
-//         let end: Location = span.end().into();
-
-//         let mut intersects = start <= self.location && self.location <= end;
-
-//         // The span of a generic node does _not_ cover all the children.
-//         if !intersects {
-//             let span = i.where_clause.span();
-//             let start: Location = span.start().into();
-//             let end: Location = span.end().into();
-//             intersects = start <= self.location && self.location <= end;
-//         }
-
-//         if intersects && self.prepare(i) {
-//             syn::visit::visit_generics(self, i);
-//         }
-//     }
-//     fn visit_ident(&mut self, i: &'ast proc_macro2::Ident) {
-//         intersect![self, i, visit_ident];
-//     }
-//     fn visit_impl_item(&mut self, i: &'ast syn::ImplItem) {
-//         intersect![self, i, visit_impl_item];
-//     }
-//     fn visit_impl_item_const(&mut self, i: &'ast syn::ImplItemConst) {
-//         intersect![self, i, visit_impl_item_const];
-//     }
-//     fn visit_impl_item_macro(&mut self, i: &'ast syn::ImplItemMacro) {
-//         intersect![self, i, visit_impl_item_macro];
-//     }
-//     fn visit_impl_item_method(&mut self, i: &'ast syn::ImplItemMethod) {
-//         intersect![self, i, visit_impl_item_method];
-//     }
-//     fn visit_impl_item_type(&mut self, i: &'ast syn::ImplItemType) {
-//         intersect![self, i, visit_impl_item_type];
-//     }
-//     fn visit_index(&mut self, i: &'ast syn::Index) {
-//         intersect![self, i, visit_index];
-//     }
-//     fn visit_item(&mut self, i: &'ast syn::Item) {
-//         intersect![self, i, visit_item];
-//     }
-//     fn visit_item_const(&mut self, i: &'ast syn::ItemConst) {
-//         intersect![@passthrough, self, i, visit_item_const];
-//     }
-//     fn visit_item_enum(&mut self, i: &'ast syn::ItemEnum) {
-//         intersect![@passthrough, self, i, visit_item_enum];
-//     }
-//     fn visit_item_extern_crate(&mut self, i: &'ast syn::ItemExternCrate) {
-//         intersect![@passthrough, self, i, visit_item_extern_crate];
-//     }
-//     fn visit_item_fn(&mut self, i: &'ast syn::ItemFn) {
-//         intersect![@passthrough, self, i, visit_item_fn];
-//     }
-//     fn visit_item_foreign_mod(&mut self, i: &'ast syn::ItemForeignMod) {
-//         intersect![@passthrough, self, i, visit_item_foreign_mod];
-//     }
-//     fn visit_item_impl(&mut self, i: &'ast syn::ItemImpl) {
-//         intersect![@passthrough, self, i, visit_item_impl];
-//     }
-//     fn visit_item_macro(&mut self, i: &'ast syn::ItemMacro) {
-//         intersect![@passthrough, self, i, visit_item_macro];
-//     }
-//     fn visit_item_macro2(&mut self, i: &'ast syn::ItemMacro2) {
-//         intersect![@passthrough, self, i, visit_item_macro2];
-//     }
-//     fn visit_item_mod(&mut self, i: &'ast syn::ItemMod) {
-//         intersect![@passthrough, self, i, visit_item_mod];
-//     }
-//     fn visit_item_static(&mut self, i: &'ast syn::ItemStatic) {
-//         intersect![@passthrough, self, i, visit_item_static];
-//     }
-//     fn visit_item_struct(&mut self, i: &'ast syn::ItemStruct) {
-//         intersect![@passthrough, self, i, visit_item_struct];
-//     }
-//     fn visit_item_trait(&mut self, i: &'ast syn::ItemTrait) {
-//         intersect![@passthrough, self, i, visit_item_trait];
-//     }
-//     fn visit_item_trait_alias(&mut self, i: &'ast syn::ItemTraitAlias) {
-//         intersect![@passthrough, self, i, visit_item_trait_alias];
-//     }
-//     fn visit_item_type(&mut self, i: &'ast syn::ItemType) {
-//         intersect![@passthrough, self, i, visit_item_type];
-//     }
-//     fn visit_item_union(&mut self, i: &'ast syn::ItemUnion) {
-//         intersect![@passthrough, self, i, visit_item_union];
-//     }
-//     fn visit_item_use(&mut self, i: &'ast syn::ItemUse) {
-//         intersect![@passthrough, self, i, visit_item_use];
-//     }
-//     fn visit_label(&mut self, i: &'ast syn::Label) {
-//         intersect![self, i, visit_label];
-//     }
-//     fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
-//         intersect![self, i, visit_lifetime];
-//     }
-//     fn visit_lifetime_def(&mut self, i: &'ast syn::LifetimeDef) {
-//         intersect![self, i, visit_lifetime_def];
-//     }
-//     fn visit_lit(&mut self, i: &'ast syn::Lit) {
-//         intersect![self, i, visit_lit];
-//     }
-//     fn visit_lit_bool(&mut self, i: &'ast syn::LitBool) {
-//         intersect![self, i, visit_lit_bool];
-//     }
-//     fn visit_lit_byte(&mut self, i: &'ast syn::LitByte) {
-//         intersect![self, i, visit_lit_byte];
-//     }
-//     fn visit_lit_byte_str(&mut self, i: &'ast syn::LitByteStr) {
-//         intersect![self, i, visit_lit_byte_str];
-//     }
-//     fn visit_lit_char(&mut self, i: &'ast syn::LitChar) {
-//         intersect![self, i, visit_lit_char];
-//     }
-//     fn visit_lit_float(&mut self, i: &'ast syn::LitFloat) {
-//         intersect![self, i, visit_lit_float];
-//     }
-//     fn visit_lit_int(&mut self, i: &'ast syn::LitInt) {
-//         intersect![self, i, visit_lit_int];
-//     }
-//     fn visit_lit_str(&mut self, i: &'ast syn::LitStr) {
-//         intersect![self, i, visit_lit_str];
-//     }
-//     fn visit_local(&mut self, i: &'ast syn::Local) {
-//         intersect![self, i, visit_local];
-//     }
-//     fn visit_macro(&mut self, i: &'ast syn::Macro) {
-//         intersect![self, i, visit_macro];
-//     }
-//     fn visit_macro_delimiter(&mut self, _i: &'ast syn::MacroDelimiter) {
-//         // OMITTED: not interested
-//     }
-//     fn visit_member(&mut self, i: &'ast syn::Member) {
-//         intersect![self, i, visit_member];
-//     }
-//     fn visit_meta(&mut self, i: &'ast syn::Meta) {
-//         intersect![self, i, visit_meta];
-//     }
-//     fn visit_meta_list(&mut self, i: &'ast syn::MetaList) {
-//         intersect![self, i, visit_meta_list];
-//     }
-//     fn visit_meta_name_value(&mut self, i: &'ast syn::MetaNameValue) {
-//         intersect![self, i, visit_meta_name_value];
-//     }
-//     fn visit_method_turbofish(&mut self, i: &'ast syn::MethodTurbofish) {
-//         intersect![self, i, visit_method_turbofish];
-//     }
-//     fn visit_nested_meta(&mut self, i: &'ast syn::NestedMeta) {
-//         intersect![self, i, visit_nested_meta];
-//     }
-//     fn visit_parenthesized_generic_arguments(
-//         &mut self,
-//         i: &'ast syn::ParenthesizedGenericArguments,
-//     ) {
-//         intersect![self, i, visit_parenthesized_generic_arguments];
-//     }
-//     fn visit_pat(&mut self, i: &'ast syn::Pat) {
-//         intersect![self, i, visit_pat];
-//     }
-//     // TODO: @passthrough for patterns
-//     fn visit_pat_box(&mut self, i: &'ast syn::PatBox) {
-//         intersect![self, i, visit_pat_box];
-//     }
-//     fn visit_pat_ident(&mut self, i: &'ast syn::PatIdent) {
-//         intersect![self, i, visit_pat_ident];
-//     }
-//     fn visit_pat_lit(&mut self, i: &'ast syn::PatLit) {
-//         intersect![self, i, visit_pat_lit];
-//     }
-//     fn visit_pat_macro(&mut self, i: &'ast syn::PatMacro) {
-//         intersect![self, i, visit_pat_macro];
-//     }
-//     fn visit_pat_or(&mut self, i: &'ast syn::PatOr) {
-//         intersect![self, i, visit_pat_or];
-//     }
-//     fn visit_pat_path(&mut self, i: &'ast syn::PatPath) {
-//         intersect![self, i, visit_pat_path];
-//     }
-//     fn visit_pat_range(&mut self, i: &'ast syn::PatRange) {
-//         intersect![self, i, visit_pat_range];
-//     }
-//     fn visit_pat_reference(&mut self, i: &'ast syn::PatReference) {
-//         intersect![self, i, visit_pat_reference];
-//     }
-//     fn visit_pat_rest(&mut self, i: &'ast syn::PatRest) {
-//         intersect![self, i, visit_pat_rest];
-//     }
-//     fn visit_pat_slice(&mut self, i: &'ast syn::PatSlice) {
-//         intersect![self, i, visit_pat_slice];
-//     }
-//     fn visit_pat_struct(&mut self, i: &'ast syn::PatStruct) {
-//         intersect![self, i, visit_pat_struct];
-//     }
-//     fn visit_pat_tuple(&mut self, i: &'ast syn::PatTuple) {
-//         intersect![self, i, visit_pat_tuple];
-//     }
-//     fn visit_pat_tuple_struct(&mut self, i: &'ast syn::PatTupleStruct) {
-//         intersect![self, i, visit_pat_tuple_struct];
-//     }
-//     fn visit_pat_type(&mut self, i: &'ast syn::PatType) {
-//         intersect![self, i, visit_pat_type];
-//     }
-//     fn visit_pat_wild(&mut self, i: &'ast syn::PatWild) {
-//         intersect![self, i, visit_pat_wild];
-//     }
-//     fn visit_path(&mut self, i: &'ast syn::Path) {
-//         intersect![self, i, visit_path];
-//     }
-//     fn visit_path_arguments(&mut self, i: &'ast syn::PathArguments) {
-//         intersect![self, i, visit_path_arguments];
-//     }
-//     fn visit_path_segment(&mut self, i: &'ast syn::PathSegment) {
-//         intersect![self, i, visit_path_segment];
-//     }
-//     fn visit_predicate_eq(&mut self, i: &'ast syn::PredicateEq) {
-//         intersect![self, i, visit_predicate_eq];
-//     }
-//     fn visit_predicate_lifetime(&mut self, i: &'ast syn::PredicateLifetime) {
-//         intersect![self, i, visit_predicate_lifetime];
-//     }
-//     fn visit_predicate_type(&mut self, i: &'ast syn::PredicateType) {
-//         intersect![self, i, visit_predicate_type];
-//     }
-//     fn visit_qself(&mut self, _i: &'ast syn::QSelf) {
-//         // OMITTED
-//     }
-//     fn visit_range_limits(&mut self, _i: &'ast syn::RangeLimits) {
-//         // OMITTED
-//     }
-//     fn visit_receiver(&mut self, i: &'ast syn::Receiver) {
-//         intersect![self, i, visit_receiver];
-//     }
-//     fn visit_return_type(&mut self, i: &'ast syn::ReturnType) {
-//         intersect![self, i, visit_return_type];
-//     }
-//     fn visit_signature(&mut self, i: &'ast syn::Signature) {
-//         intersect![self, i, visit_signature];
-//     }
-//     fn visit_span(&mut self, _i: &proc_macro2::Span) {
-//         // OMITTED
-//     }
-//     fn visit_stmt(&mut self, i: &'ast syn::Stmt) {
-//         intersect![self, i, visit_stmt];
-//     }
-//     fn visit_trait_bound(&mut self, i: &'ast syn::TraitBound) {
-//         intersect![self, i, visit_trait_bound];
-//     }
-//     fn visit_trait_bound_modifier(&mut self, i: &'ast syn::TraitBoundModifier) {
-//         intersect![self, i, visit_trait_bound_modifier];
-//     }
-//     fn visit_trait_item(&mut self, i: &'ast syn::TraitItem) {
-//         intersect![self, i, visit_trait_item];
-//     }
-//     fn visit_trait_item_const(&mut self, i: &'ast syn::TraitItemConst) {
-//         intersect![self, i, visit_trait_item_const];
-//     }
-//     fn visit_trait_item_macro(&mut self, i: &'ast syn::TraitItemMacro) {
-//         intersect![self, i, visit_trait_item_macro];
-//     }
-//     fn visit_trait_item_method(&mut self, i: &'ast syn::TraitItemMethod) {
-//         intersect![self, i, visit_trait_item_method];
-//     }
-//     fn visit_trait_item_type(&mut self, i: &'ast syn::TraitItemType) {
-//         intersect![self, i, visit_trait_item_type];
-//     }
-//     fn visit_type(&mut self, i: &'ast syn::Type) {
-//         intersect![self, i, visit_type];
-//     }
-//     fn visit_type_array(&mut self, i: &'ast syn::TypeArray) {
-//         intersect![@passthrough, self, i, visit_type_array];
-//     }
-//     fn visit_type_bare_fn(&mut self, i: &'ast syn::TypeBareFn) {
-//         intersect![@passthrough, self, i, visit_type_bare_fn];
-//     }
-//     fn visit_type_group(&mut self, i: &'ast syn::TypeGroup) {
-//         intersect![@passthrough, self, i, visit_type_group];
-//     }
-//     fn visit_type_impl_trait(&mut self, i: &'ast syn::TypeImplTrait) {
-//         intersect![@passthrough, self, i, visit_type_impl_trait];
-//     }
-//     fn visit_type_infer(&mut self, i: &'ast syn::TypeInfer) {
-//         intersect![@passthrough, self, i, visit_type_infer];
-//     }
-//     fn visit_type_macro(&mut self, i: &'ast syn::TypeMacro) {
-//         intersect![@passthrough, self, i, visit_type_macro];
-//     }
-//     fn visit_type_never(&mut self, i: &'ast syn::TypeNever) {
-//         intersect![@passthrough, self, i, visit_type_never];
-//     }
-//     fn visit_type_param(&mut self, i: &'ast syn::TypeParam) {
-//         intersect![self, i, visit_type_param];
-//     }
-//     fn visit_type_param_bound(&mut self, i: &'ast syn::TypeParamBound) {
-//         intersect![self, i, visit_type_param_bound];
-//     }
-//     fn visit_type_paren(&mut self, i: &'ast syn::TypeParen) {
-//         intersect![@passthrough, self, i, visit_type_paren];
-//     }
-//     fn visit_type_path(&mut self, i: &'ast syn::TypePath) {
-//         intersect![@passthrough, self, i, visit_type_path];
-//     }
-//     fn visit_type_ptr(&mut self, i: &'ast syn::TypePtr) {
-//         intersect![@passthrough, self, i, visit_type_ptr];
-//     }
-//     fn visit_type_reference(&mut self, i: &'ast syn::TypeReference) {
-//         intersect![@passthrough, self, i, visit_type_reference];
-//     }
-//     fn visit_type_slice(&mut self, i: &'ast syn::TypeSlice) {
-//         intersect![@passthrough, self, i, visit_type_slice];
-//     }
-//     fn visit_type_trait_object(&mut self, i: &'ast syn::TypeTraitObject) {
-//         intersect![@passthrough, self, i, visit_type_trait_object];
-//     }
-//     fn visit_type_tuple(&mut self, i: &'ast syn::TypeTuple) {
-//         intersect![@passthrough, self, i, visit_type_tuple];
-//     }
-//     fn visit_un_op(&mut self, i: &'ast syn::UnOp) {
-//         intersect![self, i, visit_un_op];
-//     }
-//     fn visit_use_glob(&mut self, i: &'ast syn::UseGlob) {
-//         intersect![self, i, visit_use_glob];
-//     }
-//     fn visit_use_group(&mut self, i: &'ast syn::UseGroup) {
-//         intersect![self, i, visit_use_group];
-//     }
-//     fn visit_use_name(&mut self, i: &'ast syn::UseName) {
-//         intersect![self, i, visit_use_name];
-//     }
-//     fn visit_use_path(&mut self, i: &'ast syn::UsePath) {
-//         intersect![self, i, visit_use_path];
-//     }
-//     fn visit_use_rename(&mut self, i: &'ast syn::UseRename) {
-//         intersect![self, i, visit_use_rename];
-//     }
-//     fn visit_use_tree(&mut self, i: &'ast syn::UseTree) {
-//         intersect![self, i, visit_use_tree];
-//     }
-//     fn visit_variadic(&mut self, i: &'ast syn::Variadic) {
-//         intersect![self, i, visit_variadic];
-//     }
-//     fn visit_variant(&mut self, i: &'ast syn::Variant) {
-//         intersect![self, i, visit_variant];
-//     }
-//     fn visit_vis_crate(&mut self, i: &'ast syn::VisCrate) {
-//         intersect![self, i, visit_vis_crate];
-//     }
-//     fn visit_vis_public(&mut self, i: &'ast syn::VisPublic) {
-//         intersect![self, i, visit_vis_public];
-//     }
-//     fn visit_vis_restricted(&mut self, i: &'ast syn::VisRestricted) {
-//         intersect![self, i, visit_vis_restricted];
-//     }
-//     fn visit_visibility(&mut self, i: &'ast syn::Visibility) {
-//         if let syn::Visibility::Inherited = i {
-//             return;
-//         }
-//         intersect![self, i, visit_visibility];
-//     }
-//     fn visit_where_clause(&mut self, i: &'ast syn::WhereClause) {
-//         intersect![self, i, visit_where_clause];
-//     }
-//     fn visit_where_predicate(&mut self, i: &'ast syn::WherePredicate) {
-//         intersect![self, i, visit_where_predicate];
-//     }
-// }
