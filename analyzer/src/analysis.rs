@@ -1831,8 +1831,12 @@ fn pattern_bindings(analyzer: &NodeAnalyzer) -> Option<BindingOf> {
     {
         return Some(BindingOf::Let);
     }
-    if analyzer.has_ancestor(4, SynKind::FnArg) {
+    if analyzer.has_ancestor(3, SynKind::FnArg) {
         return Some(BindingOf::Arg);
+    }
+
+    if analyzer.has_ancestor(2, SynKind::ExprForLoop) {
+        return Some(BindingOf::ForLoop);
     }
 
     None

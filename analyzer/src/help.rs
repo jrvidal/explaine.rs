@@ -91,6 +91,7 @@ pub enum HelpItem {
     // What about other expressions (`match`, `loop`, etc)?
     // Maybe explain that the test does not need parenthesis?
     ExprIf,
+    // TODO: if-let and while-let can also introduce bindings
     ExprIfLet,
     Else,
     ExprIndex {
@@ -198,6 +199,7 @@ pub enum HelpItem {
         trait_: Option<String>,
     },
     AsRename,
+    // TODO: special-case "as _"
     AsRenameExternCrate,
     AsCast,
     AsyncFn,
@@ -393,6 +395,8 @@ pub enum HelpItem {
     FieldUnnamedValue,
     Shebang,
     FatArrow,
+    // TODO: special-case module-level doc-comments
+    // TODO: fix #[doc(foobar = "blah")]
     DocBlock {
         outer: bool,
     },
@@ -425,6 +429,7 @@ variant![
     pub enum BindingOf {
         Let,
         Arg,
+        ForLoop,
     }
 ];
 
