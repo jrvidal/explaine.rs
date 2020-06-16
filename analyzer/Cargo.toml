@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [features]
-dev = ["syn/extra-traits"]
+dev = ["syn/extra-traits", "log"]
 
 [dependencies]
 syn = { version = "=1.0.19", default-features = false }
@@ -14,6 +14,7 @@ proc-macro2 = { version = "1.0.9", features = ["span-locations"] }
 serde = "1.0.105"
 tinytemplate = "1.0.3"
 quote = "1.0.3"
+log = { version = "0.4.8", optional = true }
 
 [build-dependencies]
 toml = "0.5.6"
