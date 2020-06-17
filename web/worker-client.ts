@@ -57,7 +57,8 @@ export default function worker({
   };
 
   if (!self.__PRODUCTION__) {
-    (window as any).worker = mainWorker;
+    (window as any).mainWorker = mainWorker;
+    (window as any).secondaryWorker = secondaryWorker;
   }
 
   mainWorker.postMessage({

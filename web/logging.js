@@ -43,7 +43,11 @@ if (!self.__PRODUCTION__) {
       },
       set(value) {
         nativeLogging = value;
-        worker.postMessage({
+        mainWorker.postMessage({
+          type: "LOGGING",
+          value,
+        });
+        secondaryWorker.postMessage({
           type: "LOGGING",
           value,
         });

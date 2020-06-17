@@ -188,7 +188,7 @@ let state: State = {
 const initialCompilation = state.compilation;
 
 type NonUIState = {
-  lastRule: number;
+  rules: number;
   mark: TextMarker | null;
   hoverMark: TextMarker | null;
   computedMarks: TextMarker[] | null;
@@ -202,7 +202,7 @@ type NonUIState = {
 };
 
 let nonUiState: NonUIState = {
-  lastRule: -1,
+  rules: 0,
   mark: null,
   hoverMark: null,
   computedMarks: null,
@@ -548,14 +548,14 @@ function computeExploration(exploration: Span[]) {
     return getMark({ start, end }, `computed-${i}`);
   });
 
-  for (let i = nonUiState.lastRule + 1; i < exploration.length; i++) {
+  for (let i = nonUiState.rules; i < exploration.length; i++) {
     styleSheet.insertRule(
       `.hover-${i} .computed-${i} { background: #e9deba; font-weight: bold; }`,
       styleSheet.cssRules.length
     );
   }
 
-  nonUiState.lastRule = Math.max(exploration.length, nonUiState.lastRule);
+  nonUiState.rules = Math.max(exploration.length, nonUiState.rules);
 
   nonUiState.hoverMark && nonUiState.hoverMark.clear();
 }
