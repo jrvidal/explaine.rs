@@ -28,8 +28,7 @@ pub fn test_example(source: &str) {
 struct RunData {
     naked: bool,
     expected_item: HelpItem,
-    // TODO: why?
-    span: Option<(Location, Location)>,
+    span: (Location, Location),
 }
 
 fn parse_run_data(lines: &[&str]) -> RunData {
@@ -78,13 +77,9 @@ fn parse_run_data(lines: &[&str]) -> RunData {
         panic!("Unknown directive {:?}", line);
     }
 
-    if item.is_some() != span.is_some() {
-        panic!("Item and location must be specified together");
-    }
-
     RunData {
-        expected_item: item.unwrap_or(HelpItem::Unknown),
-        span,
+        expected_item: item.expect("item should be defined"),
+        span: span.expect("span should be defined"),
         naked,
     }
 }
@@ -141,7 +136,6 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
             ..result.end
         },
     );
-    if let Some((start, end)) = run_data.span {
-        assert_eq!((start, end), adjusted, "Case {}", case);
-    }
+
+    assert_eq!(run_data.span, adjusted, "Case {}", case);
 }
