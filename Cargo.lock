@@ -15,7 +15,7 @@ version = "0.1.0"
 dependencies = [
  "comrak",
  "log",
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "serde",
  "serde_yaml",
@@ -181,7 +181,7 @@ dependencies = [
  "analyzer",
  "console_error_panic_hook",
  "console_log",
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "syn",
  "wasm-bindgen",
@@ -324,7 +324,7 @@ checksum = "99b8db626e31e5b81787b9783425769681b347011cc59471e33ea46d2ea0cf55"
 dependencies = [
  "pest",
  "pest_meta",
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "syn",
 ]
@@ -351,9 +351,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.9"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c09721c6781493a2a492a96b5a5bf19b65917fe6728884e7c44dd0c60ca3435"
+checksum = "beae6331a816b1f65d04c45b078fd8e6c93e8071771f41b8163255bbd8d7c8fa"
 dependencies = [
  "unicode-xid 0.2.0",
 ]
@@ -373,7 +373,7 @@ version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bdc6c187c65bca4260c9011c9e3132efe4909da44726bad24cf7572ae338d7f"
 dependencies = [
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
 ]
 
 [[package]]
@@ -437,7 +437,7 @@ version = "1.0.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac5d00fc561ba2724df6758a17de23df5914f20e41cb00f94d5b7ae42fffaff8"
 dependencies = [
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "syn",
 ]
@@ -489,7 +489,7 @@ version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8e5aa70697bb26ee62214ae3288465ecec0000f05182f039b477001f08f5ae7"
 dependencies = [
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "unicode-xid 0.2.0",
 ]
@@ -625,7 +625,7 @@ dependencies = [
  "bumpalo",
  "lazy_static",
  "log",
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "syn",
  "wasm-bindgen-shared",
@@ -660,7 +660,7 @@ version = "0.2.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d68a5b36eef1be7868f668632863292e37739656a80fc4b9acec7b0bd35a4931"
 dependencies = [
- "proc-macro2 1.0.9",
+ "proc-macro2 1.0.18",
  "quote 1.0.3",
  "syn",
  "wasm-bindgen-backend",

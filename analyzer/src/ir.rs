@@ -204,29 +204,10 @@ impl IrVisitor {
                 }
 
                 if is_doc {
-                    if range != node_range {
-                        #[cfg(feature = "dev")]
-                        {
-                            // TODO: remove once https://github.com/alexcrichton/proc-macro2/issues/227 is fixed
-                            let is_ascii = self
-                                .id_to_ptr
-                                .get(&node_id)
-                                .and_then(|data| match data.ptr.as_syn() {
-                                    Syn::Attribute(attr) => Some(attr),
-                                    _ => None,
-                                })
-                                .map(|attr| {
-                                    format!("{}", quote::ToTokens::to_token_stream(attr))
-                                        .chars()
-                                        .all(|c| c.is_ascii())
-                                })
-                                .unwrap_or(true);
-                            if !is_ascii {
-                                panic!(
-                                    "Doc comment should match element {:?}",
-                                    (range, node_range)
-                                );
-                            }
+                    #[cfg(feature = "dev")]
+                    {
+                        if range != node_range {
+                            panic!("Doc comment should match element {:?}", (range, node_range));
                         }
                     }
                     let _ = queue.pop_front();
