@@ -1,3 +1,13 @@
+use crate::ir::Range;
+
+#[derive(Clone)]
+pub struct Comment {
+    pub block: bool,
+    /// None -> normal, Some(inner) -> doc
+    pub doc: Option<bool>,
+    pub range: Range,
+}
+
 #[derive(Clone, Copy)]
 pub enum Syn<'a> {
     Abi(&'a syn::Abi),
@@ -175,6 +185,7 @@ pub enum Syn<'a> {
     Visibility(&'a syn::Visibility),
     WhereClause(&'a syn::WhereClause),
     WherePredicate(&'a syn::WherePredicate),
+    Comment(&'a Comment),
 }
 
 impl<'a> Syn<'a> {
@@ -355,6 +366,7 @@ impl<'a> Syn<'a> {
             Syn::Visibility(node) => *node as *const _ as *const (),
             Syn::WhereClause(node) => *node as *const _ as *const (),
             Syn::WherePredicate(node) => *node as *const _ as *const (),
+            Syn::Comment(node) => *node as *const _ as *const (),
         }
     }
 
@@ -543,11 +555,12 @@ impl<'a> Syn<'a> {
             SynKind::Visibility => Syn::Visibility(&*(data as *const _)),
             SynKind::WhereClause => Syn::WhereClause(&*(data as *const _)),
             SynKind::WherePredicate => Syn::WherePredicate(&*(data as *const _)),
+            SynKind::Comment => Syn::Comment(&*(data as *const _)),
         }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SynKind {
     Abi,
     AngleBracketedGenericArguments,
@@ -724,6 +737,7 @@ pub enum SynKind {
     Visibility,
     WhereClause,
     WherePredicate,
+    Comment,
 }
 
 impl<'a, 'b> From<&'a Syn<'b>> for SynKind {
@@ -904,6 +918,7 @@ impl<'a, 'b> From<&'a Syn<'b>> for SynKind {
             Syn::Visibility(..) => SynKind::Visibility,
             Syn::WhereClause(..) => SynKind::WhereClause,
             Syn::WherePredicate(..) => SynKind::WherePredicate,
+            Syn::Comment(..) => SynKind::Comment,
         }
     }
 }

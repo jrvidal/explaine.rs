@@ -1,12 +1,13 @@
-use crate::syn_wrappers::{Syn, SynKind};
+use crate::syn_wrappers::{Comment, Syn, SynKind};
 use proc_macro2::Span;
+use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::ptr::NonNull;
 use std::rc::Rc;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 pub struct NodeId(usize);
 
 impl From<usize> for NodeId {
@@ -23,46 +24,6 @@ pub struct Location {
     pub column: usize,
 }
 
-impl Location {
-    fn next(&self, line_info: &[usize]) -> Option<Location> {
-        let max_line = line_info.len();
-        let current_line_length = line_info[self.line - 1];
-        if self.column == current_line_length {
-            if self.line == max_line {
-                None
-            } else {
-                Some(Location {
-                    line: self.line + 1,
-                    column: 0,
-                })
-            }
-        } else {
-            Some(Location {
-                column: self.column + 1,
-                ..*self
-            })
-        }
-    }
-
-    fn prev(&self, line_info: &[usize]) -> Option<Location> {
-        if self.column == 0 {
-            if self.line == 1 {
-                None
-            } else {
-                Some(Location {
-                    line: self.line - 1,
-                    column: line_info[self.line - 2],
-                })
-            }
-        } else {
-            Some(Location {
-                column: self.column - 1,
-                ..*self
-            })
-        }
-    }
-}
-
 impl From<proc_macro2::LineColumn> for Location {
     fn from(line_column: proc_macro2::LineColumn) -> Self {
         Self {
@@ -72,17 +33,19 @@ impl From<proc_macro2::LineColumn> for Location {
     }
 }
 
+pub type Owner = (syn::File, Vec<Comment>);
+
 #[derive(Clone)]
 pub(crate) struct Ptr {
-    owner: Rc<syn::File>,
+    owner: Rc<Owner>,
     ptr: NonNull<()>,
     kind: SynKind,
 }
 
 impl Ptr {
-    fn new(owner: Rc<syn::File>, node: Syn) -> Self {
+    fn new(owner: Rc<Owner>, node: Syn) -> Self {
         Ptr {
-            owner: owner.clone(),
+            owner: owner,
             kind: (&node).into(),
             ptr: unsafe { NonNull::new_unchecked(node.data() as *mut _) },
         }
@@ -90,6 +53,10 @@ impl Ptr {
 
     pub fn as_syn(&self) -> Syn {
         unsafe { Syn::from_raw(self.ptr.as_ptr() as *const _, self.kind) }
+    }
+
+    pub fn kind(&self) -> SynKind {
+        self.kind
     }
 }
 
@@ -99,46 +66,44 @@ impl std::hash::Hash for Ptr {
     }
 }
 
-impl std::cmp::PartialEq<Ptr> for Ptr {
-    fn eq(&self, other: &Ptr) -> bool {
-        self.ptr.eq(&other.ptr)
-    }
+pub(crate) struct PtrData {
+    pub parent: NodeId,
+    pub ptr: Ptr,
+    pub children: HashSet<NodeId>,
 }
-
-impl std::cmp::Eq for Ptr {}
-
 pub type Range = (Location, Location);
 
 pub struct IrVisitor {
     counter: usize,
-    file: Rc<syn::File>,
+    owner: Rc<Owner>,
     id_to_ptr: HashMap<NodeId, PtrData>,
     locations: HashMap<NodeId, LocationData>,
     ancestors: Vec<NodeId>,
-    line_info: Vec<usize>,
 }
 
 #[derive(Debug, Clone)]
 struct LocationData {
     ranges: Vec<Range>,
+    /// Inner attributes require that we recalculate the span of children of the item they're attached
     blocked: Vec<Range>,
 }
 
 impl IrVisitor {
-    pub fn new(file: Rc<syn::File>, line_info: Vec<usize>) -> Self {
+    pub fn new(file: syn::File, source: String) -> Self {
+        let comments = parse_comments(&source);
+
         IrVisitor {
             counter: 1,
             id_to_ptr: Default::default(),
             ancestors: vec![],
-            file,
+            owner: Rc::new((file, comments)),
             locations: Default::default(),
-            line_info,
         }
     }
 
     pub fn visit(mut self) -> crate::analysis::Analyzer {
-        let file = self.file.clone();
-        self.visit_file(&file);
+        let owner = self.owner.clone();
+        self.visit_file(&owner.0);
 
         #[cfg(feature = "dev")]
         {
@@ -161,7 +126,7 @@ impl IrVisitor {
 
         let mut locations: Vec<_> = self
             .locations
-            .into_iter()
+            .drain()
             .flat_map(|(id, location_data)| {
                 location_data.ranges.into_iter().map(move |pos| (id, pos))
             })
@@ -169,25 +134,159 @@ impl IrVisitor {
 
         locations.sort_by_key(|(_, pos)| *pos);
 
-        let locations: Vec<_> = locations
-            .into_iter()
-            .map(|(id, range)| (id, range))
-            .collect();
+        self.add_comments(&mut locations);
 
         crate::analysis::Analyzer {
             locations,
             id_to_ptr: self.id_to_ptr,
+            owner,
         }
     }
-}
 
-pub(crate) struct PtrData {
-    pub parent: NodeId,
-    pub ptr: Ptr,
-    pub children: HashSet<NodeId>,
-}
+    fn add_comments(&mut self, locations: &mut Vec<(NodeId, Range)>) {
+        let mut new_locs = vec![];
+        let mut queue: VecDeque<_> = locations.drain(..).collect();
 
-impl IrVisitor {
+        for comment in &self.owner.1 {
+            let is_doc = comment.doc.is_some();
+            let id = self.counter.into();
+            self.counter += 1;
+
+            let ptr_data = PtrData {
+                parent: NodeId(0),
+                ptr: Ptr::new(self.owner.clone(), Syn::Comment(&comment)),
+                children: HashSet::new(),
+            };
+            self.id_to_ptr.insert(id, ptr_data);
+
+            let range = comment.range;
+
+            loop {
+                let (node_id, node_range) = if let Some(&(node_id, node_range)) = queue.front() {
+                    (node_id, node_range)
+                } else {
+                    if is_doc {
+                        #[cfg(feature = "dev")]
+                        {
+                            panic!("Unexpected end of items {:?}", range);
+                        }
+                        #[cfg(not(feature = "dev"))]
+                        return;
+                    }
+                    new_locs.push((id, range));
+                    break;
+                };
+
+                // comment starts after node
+                if node_range.1 <= range.0 {
+                    new_locs.extend(queue.pop_front());
+                    continue;
+                // node starts after range
+                } else if range.1 <= node_range.0 {
+                    #[cfg(feature = "dev")]
+                    {
+                        if is_doc {
+                            panic!("Doc comment should always be present");
+                        }
+                    }
+                    new_locs.push((id, range));
+                    break;
+                }
+
+                let is_macro = self
+                    .id_to_ptr
+                    .get(&node_id)
+                    .map(|data| data.ptr.kind == SynKind::Macro)
+                    .unwrap_or(false);
+
+                if is_macro {
+                    break;
+                }
+
+                if is_doc {
+                    if range != node_range {
+                        #[cfg(feature = "dev")]
+                        {
+                            // TODO: remove once https://github.com/alexcrichton/proc-macro2/issues/227 is fixed
+                            let is_ascii = self
+                                .id_to_ptr
+                                .get(&node_id)
+                                .and_then(|data| match data.ptr.as_syn() {
+                                    Syn::Attribute(attr) => Some(attr),
+                                    _ => None,
+                                })
+                                .map(|attr| {
+                                    format!("{}", quote::ToTokens::to_token_stream(attr))
+                                        .chars()
+                                        .all(|c| c.is_ascii())
+                                })
+                                .unwrap_or(true);
+                            if !is_ascii {
+                                panic!(
+                                    "Doc comment should match element {:?}",
+                                    (range, node_range)
+                                );
+                            }
+                        }
+                    }
+                    let _ = queue.pop_front();
+                    new_locs.push((id, range));
+
+                    let parent_id = {
+                        let mut node_id = node_id;
+                        loop {
+                            if let Some(data) = self.id_to_ptr.get(&node_id) {
+                                if data.ptr.kind == SynKind::Attribute {
+                                    break node_id;
+                                } else {
+                                    node_id = data.parent;
+                                }
+                            } else {
+                                #[cfg(feature = "dev")]
+                                {
+                                    panic!("Unable to find parent");
+                                }
+                                return;
+                            }
+                        }
+                    };
+
+                    if let Some(data) = self.id_to_ptr.get_mut(&id) {
+                        data.parent = parent_id;
+                    }
+                    if let Some(data) = self.id_to_ptr.get_mut(&parent_id) {
+                        data.children.insert(id);
+                    }
+                    break;
+                }
+
+                // Comment range is a subset of node range
+                if node_range.0 <= range.0 && range.1 <= node_range.1 {
+                    let _ = queue.pop_front();
+                    let diff = range_difference(node_range, range);
+                    if let Some(prefix) = diff[0] {
+                        new_locs.push((node_id, prefix));
+                    }
+                    new_locs.push((id, range));
+                    if let Some(suffix) = diff[1] {
+                        queue.push_front((node_id, suffix));
+                    }
+                    break;
+                }
+
+                #[cfg(feature = "dev")]
+                {
+                    panic!("Unexpected non-overlap {:?}", (range, node_range));
+                }
+                break;
+            }
+        }
+
+        new_locs.extend(queue.into_iter());
+
+        *locations = new_locs;
+    }
+
     fn prepare(&mut self, node: Syn, span: Span) -> NodeId {
         let start: Location = span.start().into();
         let end: Location = span.end().into();
@@ -214,7 +313,7 @@ impl IrVisitor {
                 }
             }
         }
-        let ptr = Ptr::new(self.file.clone(), node);
+        let ptr = Ptr::new(self.owner.clone(), node);
 
         let id = self.counter.into();
         self.counter += 1;
@@ -247,7 +346,7 @@ impl IrVisitor {
         let mut ranges: Vec<_> = ranges.iter().cloned().collect();
 
         for blocked_range in blocked {
-            IrVisitor::recalculate_location(&self.line_info[..], *blocked_range, &mut ranges);
+            IrVisitor::recalculate_location(*blocked_range, &mut ranges);
         }
 
         self.id_to_ptr.insert(id, data);
@@ -269,11 +368,7 @@ impl IrVisitor {
                 return;
             };
 
-        let _changed = IrVisitor::recalculate_location(
-            &self.line_info[..],
-            child,
-            &mut ancestor_locations.ranges,
-        );
+        let _changed = IrVisitor::recalculate_location(child, &mut ancestor_locations.ranges);
 
         #[cfg(feature = "dev")]
         {
@@ -291,8 +386,6 @@ impl IrVisitor {
 
                     if next.0 == el.1 {
                         panic!("TODO This should not be necessary");
-                    // el.1 = next.1;
-                    // ancestor_locations.remove(i + 1);
                     } else {
                         i += 1;
                     }
@@ -301,11 +394,11 @@ impl IrVisitor {
         }
     }
 
-    fn recalculate_location(line_info: &[usize], child: Range, locations: &mut Vec<Range>) -> bool {
+    fn recalculate_location(child: Range, locations: &mut Vec<Range>) -> bool {
         let mut changed = false;
 
         let new_locations = locations.drain(..).fold(vec![], |mut acc, range| {
-            let diff = range_difference(range, child, line_info);
+            let diff = range_difference(range, child);
 
             for interval in diff.iter().cloned().filter_map(|x| x) {
                 changed = changed || (interval != range);
@@ -320,8 +413,8 @@ impl IrVisitor {
     }
 }
 
-fn range_difference(parent: Range, child: Range, line_info: &[usize]) -> [Option<Range>; 3] {
-    let mut ret = [None; 3];
+fn range_difference(parent: Range, child: Range) -> [Option<Range>; 2] {
+    let mut ret = [None; 2];
     let (start, end) = child;
     let child_to_left = end < parent.0;
     let child_to_right = start > parent.1;
@@ -334,20 +427,24 @@ fn range_difference(parent: Range, child: Range, line_info: &[usize]) -> [Option
     let cuts_prefix = start > parent.0;
     let cuts_suffix = end < parent.1;
 
+    // The diff is calculated so the enclosing points are shared between parent and child
+
     if cuts_prefix {
-        if let Some(prefix_end) = start.prev(line_info) {
-            if prefix_end >= parent.0 {
-                ret[1] = Some((parent.0, prefix_end));
-            }
-        }
+        // if let Some(prefix_end) = start.prev(line_info) {
+        //     if prefix_end >= parent.0 {
+        //         ret[0] = Some((parent.0, prefix_end));
+        //     }
+        // }
+        ret[0] = Some((parent.0, start));
     }
 
     if cuts_suffix {
-        if let Some(suffix_start) = end.next(line_info) {
-            if suffix_start <= parent.1 {
-                ret[2] = Some((suffix_start, parent.1));
-            }
-        }
+        // if let Some(suffix_start) = end.next(line_info) {
+        //     if suffix_start <= parent.1 {
+        //         ret[1] = Some((suffix_start, parent.1));
+        //     }
+        // }
+        ret[1] = Some((end, parent.1));
     }
 
     ret
@@ -1061,4 +1158,300 @@ impl<'ast> Visit<'ast> for IrVisitor {
     fn visit_where_predicate(&mut self, i: &'ast syn::WherePredicate) {
         visit![self, i, visit_where_predicate];
     }
+}
+
+fn parse_comments(source: &str) -> Vec<Comment> {
+    let mut ret: Vec<Comment> = vec![];
+
+    #[derive(Clone, Copy)]
+    enum State {
+        Normal,
+        String_ {
+            escaping: bool,
+        },
+        RawString {
+            pounds: u8,
+        },
+        OpenRaw {
+            pounds: u8,
+        },
+        CloseRaw {
+            pounds: u8,
+            total: u8,
+        },
+        OpenLineComment {
+            slashes: u8,
+            start: Location,
+        },
+        OpenBlockComment {
+            asterisks: u8,
+            start: Location,
+            doc: Option<bool>,
+            count: u8,
+        },
+        LineComment {
+            // None -> normal, Some(false) -> outer, Some(true) -> inner
+            doc: Option<bool>,
+            start: Location,
+        },
+        BlockComment {
+            doc: Option<bool>,
+            start: Location,
+            asterisk: usize,
+            count: u8,
+        },
+    }
+
+    let mut state = State::Normal;
+    let mut iter = source.char_indices();
+    let bytes = source.as_bytes();
+    let mut location = Location { line: 1, column: 0 };
+
+    while let Some((i, character)) = iter.next() {
+        use State::*;
+        let next_location = {
+            let mut next_location = location;
+            if character == '\n' {
+                next_location.line += 1;
+                next_location.column = 0;
+            } else {
+                next_location.column += 1;
+            }
+            next_location
+        };
+        state = match (state, character) {
+            // NORMAL
+            (Normal, '"') => String_ { escaping: false },
+            (Normal, 'r') => {
+                let next = bytes.get(i + 1).cloned().map(char::from);
+                match next {
+                    Some('"') | Some('#') => OpenRaw { pounds: 0 },
+                    _ => Normal,
+                }
+            }
+            (Normal, '/') => {
+                let next = bytes.get(i + 1).cloned().map(char::from);
+
+                match next {
+                    Some('/') => OpenLineComment {
+                        start: location,
+                        slashes: 1,
+                    },
+                    Some('*') => OpenBlockComment {
+                        start: location,
+                        asterisks: 0,
+                        count: 0,
+                        doc: None,
+                    },
+                    _ => Normal,
+                }
+            }
+            (Normal, _) => Normal,
+
+            (OpenLineComment { slashes, start }, '/') => OpenLineComment {
+                slashes: slashes + 1,
+                start,
+            },
+            (OpenLineComment { slashes, start }, '\n') => {
+                ret.push(Comment {
+                    block: false,
+                    doc: if slashes == 3 { Some(false) } else { None },
+                    range: (start, location),
+                });
+                Normal
+            }
+            (OpenLineComment { slashes: 3, start }, _) => LineComment {
+                doc: Some(false),
+                start,
+            },
+            (OpenLineComment { slashes: 2, start }, '!') => LineComment {
+                doc: Some(true),
+                start,
+            },
+            (OpenLineComment { start, .. }, _) => LineComment { doc: None, start },
+
+            (
+                OpenBlockComment {
+                    asterisks,
+                    start,
+                    count,
+                    doc,
+                },
+                '*',
+            ) => OpenBlockComment {
+                asterisks: asterisks + 1,
+                start,
+                count,
+                doc,
+            },
+            (
+                OpenBlockComment {
+                    asterisks: 3,
+                    start,
+                    count,
+                    doc,
+                },
+                '/',
+            ) => {
+                if count == 0 {
+                    ret.push(Comment {
+                        block: true,
+                        doc,
+                        range: (start, next_location),
+                    });
+                    Normal
+                } else {
+                    BlockComment {
+                        count: count - 1,
+                        start,
+                        asterisk: 0,
+                        doc,
+                    }
+                }
+            }
+            (
+                OpenBlockComment {
+                    asterisks: 1,
+                    start,
+                    count,
+                    doc,
+                },
+                '!',
+            ) => BlockComment {
+                doc: if count == 0 { Some(true) } else { doc },
+                start,
+                count: count + 1,
+                asterisk: 0,
+            },
+            (
+                OpenBlockComment {
+                    asterisks,
+                    start,
+                    count,
+                    doc,
+                },
+                _,
+            ) => BlockComment {
+                doc: if count != 0 {
+                    doc
+                } else if asterisks == 2 {
+                    Some(false)
+                } else {
+                    None
+                },
+                start,
+                asterisk: 0,
+                count: count + 1,
+            },
+
+            (LineComment { start, doc }, '\n') => {
+                ret.push(Comment {
+                    block: false,
+                    doc,
+                    range: (start, location),
+                });
+                Normal
+            }
+            (LineComment { start, doc }, _) => LineComment { start, doc },
+
+            (
+                BlockComment {
+                    start, doc, count, ..
+                },
+                '*',
+            ) => BlockComment {
+                start,
+                doc,
+                count,
+                asterisk: i,
+            },
+            (
+                BlockComment {
+                    start,
+                    doc,
+                    count,
+                    asterisk,
+                },
+                '/',
+            ) if (asterisk + 1) == i => {
+                if count == 1 {
+                    ret.push(Comment {
+                        block: true,
+                        doc,
+                        range: (start, next_location),
+                    });
+                    Normal
+                } else {
+                    BlockComment {
+                        start,
+                        doc,
+                        count: count - 1,
+                        asterisk,
+                    }
+                }
+            }
+            (
+                BlockComment {
+                    doc, start, count, ..
+                },
+                '/',
+            ) => {
+                let next_is_asterisk =
+                    bytes.get(i + 1).cloned().map(char::from).unwrap_or('\x00') == '*';
+                if next_is_asterisk {
+                    OpenBlockComment {
+                        doc,
+                        start,
+                        count,
+                        asterisks: 0,
+                    }
+                } else {
+                    state
+                }
+            }
+            (BlockComment { .. }, _) => state,
+
+            (OpenRaw { pounds }, '"') => RawString { pounds },
+            (OpenRaw { pounds }, '#') => OpenRaw { pounds: pounds + 1 },
+            (OpenRaw { .. }, _) => Normal,
+
+            (RawString { pounds: 0 }, '"') => Normal,
+            (RawString { pounds }, '"') => State::CloseRaw {
+                total: pounds,
+                pounds,
+            },
+            (RawString { .. }, _) => state,
+
+            (
+                State::CloseRaw {
+                    total: _,
+                    pounds: 1,
+                },
+                '#',
+            ) => Normal,
+            (State::CloseRaw { total, pounds }, '#') => State::CloseRaw {
+                total,
+                pounds: pounds - 1,
+            },
+            (State::CloseRaw { total, pounds: _ }, _) => RawString { pounds: total },
+
+            (String_ { escaping: false }, '\\') => String_ { escaping: true },
+            (String_ { escaping: false }, '"') => Normal,
+            (String_ { escaping: false }, _) => state,
+            (String_ { escaping: true }, _) => String_ { escaping: false },
+        };
+
+        location = next_location;
+    }
+
+    match state {
+        State::LineComment { doc, start } => ret.push(Comment {
+            block: false,
+            doc,
+            range: (start, location),
+        }),
+        _ => {}
+    }
+
+    ret
 }

@@ -520,9 +520,10 @@ info = "The receiver of {{if method}}the `{ method }` method{{else}}this method 
 keyword = "self"
 book = "ch05-03-method-syntax.html"
 
-[help.Attribute]
+[help.Attribute-other]
 title = "Attribute"
 variant = "Attribute"
+pattern = ".."
 info = """
 Attributes assign metadata to expressions, statements and other elements.
 {{if not outer}}
@@ -1250,3 +1251,15 @@ info = "A right arrow token `->` used to signify the return type of this { retur
 title = "`'static` lifetime"
 info = "The `'static` lifetime is a special, constant lifetime that represents a value that can potentially live indefinitely."
 book = "ch10-03-lifetime-syntax.html#the-static-lifetime"
+
+[help.Comment-block]
+title = "Block Comment"
+variant = "Comment"
+pattern = "block: true"
+info = "A block comment."
+
+[help.Comment-line]
+title = "Line Comment"
+variant = "Comment"
+pattern = "block: false"
+info = "A line comment."

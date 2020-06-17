@@ -147,14 +147,12 @@ impl Session {
 
         let result = match parse_result {
             Ok(file) => {
-                let file = std::rc::Rc::new(file);
-
-                let line_info: Vec<_> = source.lines().map(|line| line.len()).collect();
-                let analyzer = IrVisitor::new(file.clone(), line_info).visit();
+                let token_stream = file.to_token_stream();
+                let analyzer = IrVisitor::new(file, source).visit();
 
                 Ok(Session {
                     analyzer,
-                    tokens: file.to_token_stream().into(),
+                    tokens: token_stream.into(),
                     state: ExplorationState::default(),
                 })
             }
@@ -177,7 +175,7 @@ impl Session {
 
         let mut exploration_iterator = ExplorationIterator {
             analyzer: &self.analyzer,
-            state: self.state.clone(),
+            state: &mut self.state,
             source,
         };
 
@@ -220,7 +218,6 @@ impl Session {
             }
         }
 
-        self.state = exploration_iterator.state;
         count
     }
 

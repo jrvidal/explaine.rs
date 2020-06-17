@@ -1,7 +1,7 @@
 use crate::{ir::Location, HelpItem};
 use serde_yaml;
 use std::borrow::Cow;
-use std::{rc::Rc, str::FromStr};
+use std::str::FromStr;
 
 pub fn test_example(source: &str) {
     let lines: Vec<_> = source.lines().collect();
@@ -28,6 +28,7 @@ pub fn test_example(source: &str) {
 struct RunData {
     naked: bool,
     expected_item: HelpItem,
+    // TODO: why?
     span: Option<(Location, Location)>,
 }
 
@@ -115,9 +116,8 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
     }
 
     let test_source = source_lines.join("\n");
-    let line_info = test_source.lines().map(|l| l.len()).collect();
     let file = syn::parse_file(&test_source).expect("invalid source");
-    let ir_visitor = crate::ir::IrVisitor::new(Rc::new(file), line_info);
+    let ir_visitor = crate::ir::IrVisitor::new(file, test_source);
 
     let analyzer = ir_visitor.visit();
 

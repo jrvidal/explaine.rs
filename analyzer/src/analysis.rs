@@ -1,19 +1,23 @@
 use crate::help::*;
-use crate::ir::{Location, NodeId, PtrData, Range};
-use crate::syn_wrappers::{Syn, SynKind};
+use crate::ir::{Location, NodeId, Owner, PtrData, Range};
+use crate::syn_wrappers::{Comment, Syn, SynKind};
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 use syn::spanned::Spanned;
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct ExplorationState {
     location_index: usize,
+    comment_index: usize,
 }
 
 pub struct ExplorationIterator<'a, I> {
     pub analyzer: &'a Analyzer,
-    pub state: ExplorationState,
+    pub state: &'a mut ExplorationState,
     pub source: I,
 }
 
@@ -21,16 +25,19 @@ impl<'a, I: Iterator<Item = Location>> Iterator for ExplorationIterator<'a, I> {
     type Item = Option<AnalysisResult>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.source.next().and_then(|location| {
+        if let Some(location) = self.source.next() {
             self.analyzer
                 .analyze_for_exploration(&mut self.state, location)
-        })
+        } else {
+            self.analyzer.analyze_comment(&mut self.state)
+        }
     }
 }
 
 pub struct Analyzer {
     pub(crate) id_to_ptr: HashMap<NodeId, PtrData>,
     pub(crate) locations: Vec<(NodeId, Range)>,
+    pub(crate) owner: Rc<Owner>,
 }
 
 struct NodeAnalyzer<'a> {
@@ -61,12 +68,37 @@ impl Analyzer {
 
         for (idx, &(id, range)) in self.locations[state.location_index..].iter().enumerate() {
             if range.0 <= location && location <= range.1 {
-                state.location_index = idx;
+                state.location_index += idx;
                 return Some(self.analyze_at_location(id, location, state.location_index, range));
             }
         }
 
         None
+    }
+
+    fn analyze_comment(&self, state: &mut ExplorationState) -> Option<Option<AnalysisResult>> {
+        let comments = &self.owner.1[..];
+        if state.comment_index >= comments.len() {
+            return None;
+        }
+        let start = state.comment_index;
+        let comment = &self.owner.1.as_slice()[start..]
+            .iter()
+            .enumerate()
+            .filter(|(_, comment)| comment.doc.is_none())
+            .next();
+        if let Some((idx, comment)) = comment {
+            state.comment_index = idx + start + 1;
+            Some(Some(AnalysisResult {
+                start: comment.range.0,
+                end: comment.range.1,
+                help: HelpItem::Comment {
+                    block: comment.block,
+                },
+            }))
+        } else {
+            None
+        }
     }
 
     pub fn analyze(&self, location: Location) -> Option<AnalysisResult> {
@@ -76,11 +108,7 @@ impl Analyzer {
             .map(|idx| Some(idx))
             .unwrap_or_else(|err| if err == 0 { None } else { Some(err - 1) })?;
 
-        let (&id, &range) = if let Some((id, range)) = self.locations.get(idx) {
-            (id, range)
-        } else {
-            return None;
-        };
+        let (id, range) = self.locations.get(idx).cloned()?;
 
         self.analyze_at_location(id, location, idx, range)
     }
@@ -92,9 +120,8 @@ impl Analyzer {
         idx: usize,
         range: Range,
     ) -> Option<AnalysisResult> {
-        if let Some(result) = self.analyze_node_at_location(id, location) {
-            return Some(result);
-        }
+        let mut candidates = [None; 3];
+        candidates[0] = Some(id);
 
         if location == range.0 && idx > 0 {
             if let Some(&(prev_id, _)) = self
@@ -102,10 +129,7 @@ impl Analyzer {
                 .get(idx - 1)
                 .filter(|(_, prev_range)| prev_range.1 == range.0)
             {
-                let result = self.analyze_node_at_location(prev_id, location);
-                if result.is_some() {
-                    return result;
-                }
+                candidates[1] = Some(prev_id);
             }
         }
 
@@ -115,14 +139,25 @@ impl Analyzer {
                 .get(idx + 1)
                 .filter(|(_, next_range)| next_range.0 == range.1)
             {
-                let result = self.analyze_node_at_location(next_id, location);
-                if result.is_some() {
-                    return result;
-                }
+                candidates[2] = Some(next_id);
             }
         }
 
-        None
+        candidates.sort_by(|candidate, candidate2| {
+            let (id1, id2) = match (candidate, candidate2) {
+                (Some(id1), Some(id2)) => (*id1, *id2),
+                _ => return std::cmp::Ordering::Equal,
+            };
+
+            self.descendant_of(id1, id2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        candidates
+            .iter()
+            .filter_map(|id| *id)
+            .flat_map(|id| self.analyze_node_at_location(id, location))
+            .next()
     }
 
     fn analyze_node_at_location(&self, id: NodeId, location: Location) -> Option<AnalysisResult> {
@@ -144,35 +179,62 @@ impl Analyzer {
             if node_id == id {
                 continue;
             }
-            let mut node_analyzer = NodeAnalyzer {
-                location,
-                id_to_ptr: &self.id_to_ptr,
-                help: None,
-                id: node_id,
-                ancestors: &ancestors[0..idx],
-            };
+
+            let mut node_analyzer = NodeAnalyzer::new(node_id, location, &self);
+            node_analyzer.ancestors = &ancestors[0..idx];
 
             node_analyzer.analyze_node_first_pass(node);
 
-            if let Some(((start, end), help)) = node_analyzer.help {
-                return Some(AnalysisResult { start, end, help });
+            if node_analyzer.help.is_some() {
+                return node_analyzer.result();
             }
         }
 
         let mut ancestors = ancestors;
         while let Some((id, node)) = ancestors.pop() {
-            let mut node_analyzer = NodeAnalyzer {
-                location,
-                id_to_ptr: &self.id_to_ptr,
-                help: None,
-                id,
-                ancestors: &ancestors[..],
-            };
-
+            let mut node_analyzer = NodeAnalyzer::new(id, location, &self);
+            node_analyzer.ancestors = &ancestors[..];
             node_analyzer.analyze_node(node);
 
-            if let Some(((start, end), help)) = node_analyzer.help {
-                return Some(AnalysisResult { start, end, help });
+            if node_analyzer.help.is_some() {
+                return node_analyzer.result();
+            }
+        }
+
+        None
+    }
+
+    fn descendant_of(&self, child: NodeId, ancestor: NodeId) -> Option<std::cmp::Ordering> {
+        let mut node = child;
+        let mut ancestors = HashSet::new();
+
+        loop {
+            node = if let Some(ptr) = self.id_to_ptr.get(&node) {
+                ptr.parent
+            } else {
+                break;
+            };
+
+            ancestors.insert(node);
+
+            if node == ancestor {
+                return Some(std::cmp::Ordering::Less);
+            }
+        }
+
+        node = ancestor;
+
+        loop {
+            node = if let Some(ptr) = self.id_to_ptr.get(&node) {
+                ptr.parent
+            } else {
+                break;
+            };
+
+            if node == child {
+                return Some(std::cmp::Ordering::Greater);
+            } else if ancestors.contains(&node) {
+                return None;
             }
         }
 
@@ -217,6 +279,21 @@ macro_rules! get_ancestor {
 }
 
 impl<'a> NodeAnalyzer<'a> {
+    fn new(id: NodeId, location: Location, analyzer: &Analyzer) -> NodeAnalyzer {
+        NodeAnalyzer {
+            id,
+            location,
+            id_to_ptr: &analyzer.id_to_ptr,
+            ancestors: &[],
+            help: None,
+        }
+    }
+
+    fn result(self) -> Option<AnalysisResult> {
+        self.help
+            .map(|((start, end), help)| AnalysisResult { start, end, help })
+    }
+
     fn analyze_node_first_pass(&mut self, node: Syn) {
         match node {
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
@@ -405,6 +482,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::Visibility(_i) => { /* self.visit_visibility(i) */ }
             Syn::WhereClause(i) => self.visit_where_clause(i),
             Syn::WherePredicate(_i) => { /* self.visit_where_predicate(i) */ }
+            Syn::Comment(i) => self.visit_comment(i),
         }
     }
 
@@ -472,61 +550,100 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     fn visit_attribute(&mut self, node: &syn::Attribute) {
-        let outer = outer_attr(node);
+        let is_comment = |id| {
+            self.id_to_ptr
+                .get(id)
+                .into_iter()
+                .flat_map(|data| data.children.iter())
+                .filter_map(|child| self.id_to_ptr.get(child))
+                .any(|child_data| child_data.ptr.kind() == SynKind::Comment)
+        };
 
-        if !node.path.is_ident("doc") {
-            return self.set_help(&node, HelpItem::Attribute { outer });
+        if !node.path.is_ident("doc") || !is_comment(&self.id) {
+            return self.visit_explicit_attribute(node);
         }
 
-        let parent = self
+        let outer = outer_attr(node);
+
+        let parent_data = self
             .id_to_ptr
             .get(&self.id)
             .map(|data| data.parent)
-            .and_then(|parent_id| self.id_to_ptr.get(&parent_id))
-            .map(|data| data.ptr.as_syn());
+            .and_then(|parent_id| self.id_to_ptr.get(&parent_id));
+
+        let parent = parent_data.map(|data| data.ptr.as_syn());
 
         let attributes = parent
             .as_ref()
             .and_then(|parent| parent.attributes())
             .unwrap_or(&[]);
 
-        let bounds = if attributes.len() > 0 {
-            let this_idx = attributes
-                .iter()
-                .enumerate()
-                .find(|(_, attr)| std::ptr::eq(node, *attr))
-                .expect("attr in list")
-                .0;
-
-            let last = attributes
-                .iter()
-                .enumerate()
-                .filter(|&(i, attr)| {
-                    i >= this_idx && attr.path.is_ident("doc") && outer_attr(attr) == outer
-                })
-                .last()
-                .expect("last")
-                .1;
-
-            let start = attributes
-                .iter()
-                .enumerate()
-                .rev()
-                .filter(|&(i, attr)| {
-                    i <= this_idx && !(attr.path.is_ident("doc") && outer_attr(attr) == outer)
-                })
-                .next()
-                .map(|(i, _)| &attributes[i - 1])
-                .unwrap_or(&attributes[0]);
-
-            Some((start.span(), last.span()))
-        } else {
-            None
-        };
-        if let Some((start, end)) = bounds {
-            return self.set_help_between(start, end, HelpItem::DocBlock { outer });
+        if attributes.len() == 0 {
+            return;
         }
+
+        let attribute_ids: Vec<NodeId> = {
+            let mut ids = vec![];
+
+            let node_to_id = parent_data
+                .into_iter()
+                .flat_map(|data| &data.children)
+                .filter_map(|id| self.id_to_ptr.get(id).map(|data| (data, id)))
+                .map(|(data, id)| (data.ptr.as_syn().data(), *id))
+                .collect::<HashMap<_, _>>();
+
+            for attr in attributes {
+                if let Some(id) = node_to_id.get(&Syn::Attribute(attr).data()) {
+                    ids.push(*id);
+                } else {
+                    #[cfg(feature = "dev")]
+                    {
+                        panic!("Unable to find id");
+                    }
+                    return;
+                };
+            }
+
+            ids
+        };
+
+        let this_idx = attributes
+            .iter()
+            .enumerate()
+            .find(|(_, attr)| std::ptr::eq(node, *attr))
+            .expect("attr in list")
+            .0;
+
+        let last = attributes
+            .iter()
+            .enumerate()
+            .filter(|&(i, attr)| {
+                i >= this_idx
+                    && attr.path.is_ident("doc")
+                    && outer_attr(attr) == outer
+                    && is_comment(&attribute_ids[i])
+            })
+            .last()
+            .expect("last")
+            .1;
+
+        let start = attributes
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|&(i, attr)| {
+                i <= this_idx
+                    && !(attr.path.is_ident("doc")
+                        && outer_attr(attr) == outer
+                        && is_comment(&attribute_ids[i]))
+            })
+            .next()
+            .map(|(i, _)| &attributes[i - 1])
+            .unwrap_or(&attributes[0]);
+
+        return self.set_help_between(start.span(), last.span(), HelpItem::DocBlock { outer });
     }
+
     fn visit_bin_op(&mut self, node: &syn::BinOp) {
         use syn::BinOp::*;
         let item = match node {
@@ -1231,7 +1348,7 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }
 
-        // Handle upstream
+        // Handled upstream
         if self.has_ancestor(2, SynKind::Local)
             || (self.has_ancestor(4, SynKind::Local) && self.has_ancestor(2, SynKind::PatType))
         {
@@ -1753,6 +1870,19 @@ impl<'a> NodeAnalyzer<'a> {
     }
     fn visit_where_clause(&mut self, node: &syn::WhereClause) {
         token![self, node.where_token, WhereClause];
+    }
+
+    fn visit_comment(&mut self, node: &Comment) {
+        if node.doc.is_some() {
+            return;
+        }
+        self.help = Some((node.range, HelpItem::Comment { block: node.block }));
+    }
+
+    fn visit_explicit_attribute(&mut self, node: &syn::Attribute) {
+        let outer = outer_attr(node);
+
+        return self.set_help(&node, HelpItem::Attribute { outer, known: None });
     }
 }
 

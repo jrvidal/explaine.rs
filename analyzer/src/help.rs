@@ -181,8 +181,15 @@ pub enum HelpItem {
     ReceiverPath {
         method: Option<String>,
     },
+    // TODO:
+    // * outer top-level or module-level attributes are normal-ish
+    // * outer attributes in other items are kind of weird
+    // * explicit #[doc] attributes
+    // * Other known attributes
+    // * Maybe name of the item...?
     Attribute {
         outer: bool,
+        known: Option<KnownAttribute>,
     },
     ItemExternCrate,
     ItemFn,
@@ -300,7 +307,7 @@ pub enum HelpItem {
     },
     StaticMut,
     Static,
-    // TODO: handle special cases: dyn
+    // TODO: handle special cases: &dyn Foo, &(dyn Foo)
     TypeReference {
         mutable: bool,
         lifetime: bool,
@@ -395,8 +402,10 @@ pub enum HelpItem {
     FieldUnnamedValue,
     Shebang,
     FatArrow,
-    // TODO: special-case module-level doc-comments
-    // TODO: fix #[doc(foobar = "blah")]
+    // TODO:
+    //  * special-case module-level doc-comments
+    //  * fix #[doc(foobar = "blah")]
+    //  * elaborate on block vs. line comments
     DocBlock {
         outer: bool,
     },
@@ -404,6 +413,9 @@ pub enum HelpItem {
         return_of: ReturnOf,
     },
     StaticLifetime,
+    Comment {
+        block: bool,
+    },
 }
 
 macro_rules! variant {
@@ -495,6 +507,12 @@ variant![
         #[serde(rename(serialize = "self"))]
         Self_,
         Path,
+    }
+];
+
+variant![
+    pub enum KnownAttribute {
+        Doc,
     }
 ];
 

@@ -17,6 +17,7 @@ macro_rules! case {
 case![arrays];
 case![binding_patterns];
 case![bound_lifetimes];
+case![comments];
 case![enums];
 case![fn_type];
 case![inner_doc_comment];
