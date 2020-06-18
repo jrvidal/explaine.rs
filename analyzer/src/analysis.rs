@@ -296,6 +296,8 @@ impl<'a> NodeAnalyzer<'a> {
 
     fn analyze_node_first_pass(&mut self, node: Syn) {
         match node {
+            Syn::ExprForLoop(i) => self.visit_expr_for_loop_first_pass(i),
+            Syn::Local(i) => self.visit_local_first_pass(i),
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
             _ => {}
         }
@@ -333,7 +335,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::ExprClosure(i) => self.visit_expr_closure(i),
             Syn::ExprContinue(i) => self.visit_expr_continue(i),
             Syn::ExprField(i) => self.visit_expr_field(i),
-            Syn::ExprForLoop(i) => self.visit_expr_for_loop(i),
+            Syn::ExprForLoop(_i) => {/* self.visit_expr_for_loop(i) */},
             Syn::ExprGroup(_i) => { /* self.visit_expr_group(i) */ }
             Syn::ExprIf(i) => self.visit_expr_if(i),
             Syn::ExprIndex(i) => self.visit_expr_index(i),
@@ -410,7 +412,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::LitFloat(i) => self.visit_lit_float(i),
             Syn::LitInt(i) => self.visit_lit_int(i),
             Syn::LitStr(i) => self.visit_lit_str(i),
-            Syn::Local(i) => self.visit_local(i),
+            Syn::Local(_i) => {/* self.visit_local(i) */},
             Syn::Macro(i) => self.visit_macro(i),
             Syn::Member(_i) => { /* self.visit_member(i) */ }
             Syn::MethodTurbofish(i) => self.visit_method_turbofish(i),
@@ -749,7 +751,7 @@ impl<'a> NodeAnalyzer<'a> {
             );
         }
     }
-    fn visit_expr_for_loop(&mut self, node: &syn::ExprForLoop) {
+    fn visit_expr_for_loop_first_pass(&mut self, node: &syn::ExprForLoop) {
         token![self, node.for_token, ExprForLoopToken];
         token![self, node.in_token, ExprForLoopToken];
         if self.within(&node.pat) {
@@ -1282,7 +1284,7 @@ impl<'a> NodeAnalyzer<'a> {
         let raw = prefix.is_some();
         return self.set_help(node, HelpItem::LitStr { raw, prefix });
     }
-    fn visit_local(&mut self, node: &syn::Local) {
+    fn visit_local_first_pass(&mut self, node: &syn::Local) {
         let ident_pat = match &node.pat {
             syn::Pat::Ident(pat) => Some(pat),
             syn::Pat::Type(syn::PatType { pat, .. }) => match &**pat {
@@ -1346,13 +1348,6 @@ impl<'a> NodeAnalyzer<'a> {
                     },
                 );
             }
-        }
-
-        // Handled upstream
-        if self.has_ancestor(2, SynKind::Local)
-            || (self.has_ancestor(4, SynKind::Local) && self.has_ancestor(2, SynKind::PatType))
-        {
-            return;
         }
 
         if node.mutability.is_some() && self.has_ancestor(3, SynKind::FnArg) {
