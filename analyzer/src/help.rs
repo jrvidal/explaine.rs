@@ -113,7 +113,9 @@ pub enum HelpItem {
     ExprRepeat {
         len: String,
     },
-    ExprReturn,
+    ExprReturn {
+        of: ReturnOf,
+    },
     ExprStruct,
     ExprStructRest,
     ExprTryQuestionMark,
@@ -483,9 +485,10 @@ variant![
         Method,
         #[serde(rename(serialize = "bare function type"))]
         BareFunctionType,
-        #[serde(rename(serialize = "function trait"))]
         FnTrait,
         Closure,
+        #[serde(rename(serialize = "async block"))]
+        AsyncBlock,
     }
 ];
 

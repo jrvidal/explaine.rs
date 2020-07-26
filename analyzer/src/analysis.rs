@@ -335,7 +335,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::ExprClosure(i) => self.visit_expr_closure(i),
             Syn::ExprContinue(i) => self.visit_expr_continue(i),
             Syn::ExprField(i) => self.visit_expr_field(i),
-            Syn::ExprForLoop(_i) => {/* self.visit_expr_for_loop(i) */},
+            Syn::ExprForLoop(_i) => { /* self.visit_expr_for_loop(i) */ }
             Syn::ExprGroup(_i) => { /* self.visit_expr_group(i) */ }
             Syn::ExprIf(i) => self.visit_expr_if(i),
             Syn::ExprIndex(i) => self.visit_expr_index(i),
@@ -412,7 +412,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::LitFloat(i) => self.visit_lit_float(i),
             Syn::LitInt(i) => self.visit_lit_int(i),
             Syn::LitStr(i) => self.visit_lit_str(i),
-            Syn::Local(_i) => {/* self.visit_local(i) */},
+            Syn::Local(_i) => { /* self.visit_local(i) */ }
             Syn::Macro(i) => self.visit_macro(i),
             Syn::Member(_i) => { /* self.visit_member(i) */ }
             Syn::MethodTurbofish(i) => self.visit_method_turbofish(i),
@@ -843,7 +843,20 @@ impl<'a> NodeAnalyzer<'a> {
         );
     }
     fn visit_expr_return(&mut self, node: &syn::ExprReturn) {
-        token![self, node.return_token, ExprReturn];
+        let of = self
+            .ancestors
+            .iter()
+            .rev()
+            .find_map(|(_, node)| match node {
+                Syn::ItemFn(_) => Some(ReturnOf::Function),
+                Syn::ImplItemMethod(_) => Some(ReturnOf::Method),
+                Syn::TraitItemMethod(_) => Some(ReturnOf::Method),
+                Syn::ExprClosure(_) => Some(ReturnOf::Closure),
+                Syn::ExprAsync(_) => Some(ReturnOf::AsyncBlock),
+                _ => None,
+            })
+            .unwrap_or(ReturnOf::Function);
+        token![self, node.return_token, *HelpItem::ExprReturn { of }];
     }
     fn visit_expr_struct(&mut self, node: &syn::ExprStruct) {
         if self.within(&node.path) {

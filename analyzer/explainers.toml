@@ -317,10 +317,9 @@ title = "Array Initialization"
 info = "An expression that initializes an array of length `{ len }` by copying an initial value in every position."
 book = "ch03-02-data-types.html#the-array-type"
 
-# TODO: contextualize to functions/closures/async block
 [help.ExprReturn]
 title = "`return` expression"
-info = "The `return` keyword stops the execution of the current function with the provided value."
+info = "This `return` keyword stops the execution of the current { of } with the provided value."
 keyword = "return"
 
 [help.ExprStruct]

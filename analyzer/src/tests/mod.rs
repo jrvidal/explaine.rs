@@ -35,5 +35,6 @@ case![struct_field];
 case![tuple_struct_pat];
 case![type_array];
 case![type_reference];
+case![returns];
 case![unit];
 case![visibility];
