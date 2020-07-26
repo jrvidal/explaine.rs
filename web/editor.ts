@@ -14,14 +14,14 @@ export default function codemirror({
   onMouseMove,
   onClick,
 }: {
-  anchor: HTMLElement;
+  anchor: HTMLTextAreaElement;
   isTouchDevice: boolean;
   onChange: (editor: Editor, event: EditorChange) => void;
   onMouseMove: (editor: Editor, event: MouseEvent) => void;
   onClick: (editor: Editor, event: MouseEvent) => void;
 }) {
-  let cmPromise = importPromise.then(([{ default: CodeMirror }]) => {
-    const cm = CodeMirror.fromTextArea(anchor, {
+  let cmPromise = importPromise.then(([{ fromTextArea }]) => {
+    const cm = fromTextArea(anchor, {
       mode: "rust",
       lineNumbers: true,
       theme: "solarized",
@@ -31,7 +31,7 @@ export default function codemirror({
 
     const codemirrorEl = cm.getWrapperElement();
 
-    cm.on("change", (e: EditorChange) => onChange(cm, e));
+    cm.on("change", (_instance: Editor, e: EditorChange) => onChange(cm, e));
     codemirrorEl.addEventListener("mousemove", (e: MouseEvent) =>
       onMouseMove(cm, e)
     );

@@ -45,7 +45,7 @@ let codemirrorEl: HTMLElement;
 
 codemirror({
   isTouchDevice: IS_TOUCH_DEVICE,
-  anchor: querySelector(".codemirror-anchor") as HTMLElement,
+  anchor: querySelector(".codemirror-anchor") as HTMLTextAreaElement,
   onClick() {
     onCmClick();
   },
