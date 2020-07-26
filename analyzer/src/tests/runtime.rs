@@ -15,11 +15,7 @@ pub fn test_example(source: &str) {
         }
     });
 
-    assert!(
-        blocks.len() % 2 == 0,
-        "Expected even number of blocks: data + source; found {}",
-        blocks.len()
-    );
+    assert!(blocks.len() % 2 == 0, "Expected even number of blocks: data + source; found {}", blocks.len());
 
     for case in 0..(blocks.len() / 2) {
         let data_lines = &blocks[2 * case];

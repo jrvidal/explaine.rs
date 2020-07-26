@@ -20,6 +20,7 @@ case![bound_lifetimes];
 case![comments];
 case![enums];
 case![fn_type];
+case![generics];
 case![inner_doc_comment];
 case![item_use_special];
 case![let_patterns];

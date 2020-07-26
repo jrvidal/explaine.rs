@@ -5,7 +5,14 @@ use serde::Serialize;
 use std::fmt::Debug;
 
 std::thread_local! {
-    static TEMPLATE: tinytemplate::TinyTemplate<'static> = init_template();
+    static TEMPLATE: tinytemplate::TinyTemplate<'static> = {
+        let mut template = init_template();
+        template.add_formatter("generics", |value, bf| {
+            render_generics(value, bf);
+            Ok(())
+        });
+        template
+    };
 }
 
 struct HelpData {
@@ -339,6 +346,7 @@ pub enum HelpItem {
     ItemStruct {
         unit: bool,
         name: String,
+        generics: Option<Generics>
     },
     ItemAutoTrait,
     ItemUnsafeTrait,
@@ -423,7 +431,7 @@ pub enum HelpItem {
     },
 }
 
-macro_rules! variant {
+macro_rules! help_data {
     ($item:item) => {
         #[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize, Copy, Clone))]
         #[cfg_attr(test, derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq))]
@@ -433,7 +441,7 @@ macro_rules! variant {
     };
 }
 
-variant![
+help_data![
     pub enum FieldOf {
         #[serde(rename(serialize = "enum variant"))]
         Variant,
@@ -442,7 +450,7 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum BindingOf {
         Let,
         Arg,
@@ -450,7 +458,7 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum IntMode {
         Binary,
         Hexadecimal,
@@ -458,7 +466,7 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum RestOf {
         Struct,
         Tuple,
@@ -467,7 +475,7 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum FnOf {
         Method,
         #[serde(rename(serialize = "associated function"))]
@@ -475,14 +483,14 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum Fields {
         Named,
         Unnamed,
     }
 ];
 
-variant![
+help_data![
     pub enum ReturnOf {
         Function,
         Method,
@@ -495,7 +503,7 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum LoopOf {
         Loop,
         Block,
@@ -506,7 +514,7 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum VisRestrictedPath {
         Crate,
         Super,
@@ -516,9 +524,17 @@ variant![
     }
 ];
 
-variant![
+help_data![
     pub enum KnownAttribute {
         Doc,
+    }
+];
+
+help_data![
+    pub struct Generics {
+        pub type_: bool,
+        pub lifetime: bool,
+        pub const_: bool,
     }
 ];
 
@@ -546,4 +562,20 @@ impl HelpItem {
     fn data(&self) -> HelpData {
         help_to_template_data(self)
     }
+}
+
+fn render_generics(value: &serde_json::Value, buffer: &mut String) {
+    let type_ = match value.get("type").and_then(|ty| ty.as_str()) {
+        Some("ItemStruct") => "struct",
+        _ => return
+    };
+
+    let generics = if let Some(generics) = value.get("generics").and_then(|gen| gen.as_object()) {
+        generics
+    } else {
+        return;
+    };
+
+
+    buffer.push_str(&format!("This {type_} is _generic_", type_ = type_));
 }

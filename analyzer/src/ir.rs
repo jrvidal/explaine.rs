@@ -2,7 +2,7 @@ use crate::syn_wrappers::{Comment, Syn, SynKind};
 use proc_macro2::Span;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
-use std::ptr::NonNull;
+use std::{rc::Rc, ptr::NonNull};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -66,7 +66,7 @@ pub type Range = (Location, Location);
 
 pub struct IrVisitor {
     counter: usize,
-    owner: Box<Owner>,
+    owner: Rc<Owner>,
     id_to_ptr: HashMap<NodeId, PtrData>,
     ptr_to_id: HashMap<Ptr, NodeId>,
     locations: HashMap<NodeId, LocationData>,
@@ -89,7 +89,7 @@ impl IrVisitor {
             id_to_ptr: Default::default(),
             ptr_to_id: Default::default(),
             ancestors: vec![],
-            owner: Box::new((file, comments)),
+            owner: Rc::new((file, comments)),
             locations: Default::default(),
         }
     }
@@ -129,11 +129,12 @@ impl IrVisitor {
 
         self.add_comments(&mut locations);
 
+        
         crate::analysis::Analyzer {
             locations,
             id_to_ptr: self.id_to_ptr,
             ptr_to_id: self.ptr_to_id,
-            owner,
+            owner: self.owner,
         }
     }
 

@@ -965,7 +965,8 @@ keyword = "unsafe"
 title = "`struct` Declaration"
 info = """The declaration for a `struct`, a data type{{if unit}} (usually){{endif}} defined by a list of fields.{{if unit}}
 
-In this case, `{ name }` is a _unit_ struct, with no fields.{{endif}}"""
+In this case, `{ name }` is a _unit_ struct, with no fields.{{endif}}{{if generics}}
+{ @root | generics }{{endif}}"""
 keyword = "struct"
 book = "ch05-01-defining-structs.html"
 pattern = ".."

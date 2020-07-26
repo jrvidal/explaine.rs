@@ -1,6 +1,6 @@
 use crate::ir::Range;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Comment {
     pub block: bool,
     /// None -> normal, Some(inner) -> doc

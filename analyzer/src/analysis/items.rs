@@ -1,11 +1,24 @@
 use super::NodeAnalyzer;
-use crate::help::HelpItem;
+use crate::help::{HelpItem, Generics};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
+
+macro_rules! generics {
+    ($self:expr, $node:expr) => {
+        let wrapped = (&$node.generics).into();
+        if let Some(node_id) = $self.syn_to_id(wrapped) {
+            eprintln!("Filling with {:?}, {:?}", $self.id, node_id);
+            $self.fill_generics_info($self.id, node_id, &$node.generics);
+        }
+    };
+}
 
 impl<'a> NodeAnalyzer<'a> {
     pub(super) fn visit_item_const(&mut self, node: &syn::ItemConst) {
         token![self, node.const_token, ItemConst];
+    }
+    pub(super) fn visit_item_enum_first_pass(&mut self, node: &syn::ItemEnum) {
+        generics![self, node];
     }
     pub(super) fn visit_item_enum(&mut self, node: &syn::ItemEnum) {
         token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
@@ -86,11 +99,15 @@ impl<'a> NodeAnalyzer<'a> {
             );
         }
     }
+    pub(super) fn visit_item_struct_first_pass(&mut self, node: &syn::ItemStruct) {
+        generics![self, node];
+    }
     pub(super) fn visit_item_struct(&mut self, node: &syn::ItemStruct) {
         let unit = match node.fields {
             syn::Fields::Unit => true,
             _ => false,
         };
+        dbg![self.id, &self.generics_state.from_item];
         if self.between_spans(node.struct_token.span(), node.ident.span()) {
             return self.set_help_between(
                 node.struct_token.span(),
@@ -98,9 +115,18 @@ impl<'a> NodeAnalyzer<'a> {
                 HelpItem::ItemStruct {
                     unit,
                     name: node.ident.to_string(),
+                    generics: self
+                        .generics_state
+                        .from_item
+                        .get(&self.id)
+                        .map(|&idx| &self.generics_state.generics[idx])
+                        .map(|gen| Generics::from(gen)),
                 },
             );
         }
+    }
+    pub(super) fn visit_item_trait_first_pass(&mut self, node: &syn::ItemTrait) {
+        generics![self, node];
     }
     pub(super) fn visit_item_trait(&mut self, node: &syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
@@ -126,6 +152,9 @@ impl<'a> NodeAnalyzer<'a> {
     }
     pub(super) fn visit_item_type(&mut self, node: &syn::ItemType) {
         token![self, node.type_token => node.ident, ItemType];
+    }
+    pub(super) fn visit_item_union_first_pass(&mut self, node: &syn::ItemUnion) {
+        generics![self, node];
     }
     pub(super) fn visit_item_union(&mut self, node: &syn::ItemUnion) {
         token![self, node.union_token, ItemUnion];

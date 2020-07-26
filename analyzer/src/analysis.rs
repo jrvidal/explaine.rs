@@ -1,12 +1,11 @@
 use crate::help::*;
 use crate::ir::{Location, NodeId, Owner, Ptr, PtrData, Range};
 use crate::syn_wrappers::{Comment, Syn, SynKind};
+use generics::Generics;
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
-use std::collections::{HashMap, HashSet};
+use std::{rc::Rc, collections::{HashMap, HashSet}};
 use syn::spanned::Spanned;
-
-const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 
 macro_rules! token {
     ($self:expr, $token:expr, $item:ident) => {
@@ -45,6 +44,7 @@ macro_rules! get_ancestor {
 }
 
 mod expressions;
+mod generics;
 mod items;
 mod patterns;
 mod types;
@@ -78,7 +78,7 @@ pub struct Analyzer {
     pub(crate) id_to_ptr: HashMap<NodeId, PtrData>,
     pub(crate) ptr_to_id: HashMap<Ptr, NodeId>,
     pub(crate) locations: Vec<(NodeId, Range)>,
-    pub(crate) owner: Box<Owner>,
+    pub(crate) owner: Rc<Owner>,
 }
 
 struct NodeAnalyzer<'a> {
@@ -88,7 +88,15 @@ struct NodeAnalyzer<'a> {
     ptr_to_id: &'a HashMap<Ptr, NodeId>,
     ancestors: &'a [(NodeId, Syn<'a>)],
     state: &'a mut HashMap<NodeId, NodeId>,
+    generics_state: &'a mut GenericsState,
     help: Option<(Range, HelpItem)>,
+}
+
+#[derive(Default)]
+struct GenericsState {
+    generics: Vec<Generics>,
+    from_item: HashMap<NodeId, usize>,
+    from_node: HashMap<NodeId, usize>,
 }
 
 pub struct AnalysisResult {
@@ -219,13 +227,15 @@ impl Analyzer {
         };
 
         let mut state = HashMap::new();
+        let mut generics_state = Default::default();
 
         for (idx, &(node_id, node)) in ancestors.iter().enumerate() {
             if node_id == id {
                 continue;
             }
 
-            let mut node_analyzer = NodeAnalyzer::new(node_id, location, &self, &mut state);
+            let mut node_analyzer =
+                NodeAnalyzer::new(node_id, location, &self, &mut state, &mut generics_state);
             node_analyzer.ancestors = &ancestors[0..idx];
 
             node_analyzer.analyze_node_first_pass(node);
@@ -237,10 +247,11 @@ impl Analyzer {
 
         let mut ancestors = ancestors;
         while let Some((id, node)) = ancestors.pop() {
-            let mut node_analyzer = NodeAnalyzer::new(id, location, &self, &mut state);
+            let mut node_analyzer =
+                NodeAnalyzer::new(id, location, &self, &mut state, &mut generics_state);
             node_analyzer.ancestors = &ancestors[..];
             node_analyzer.analyze_node(node);
-
+            
             if node_analyzer.help.is_some() {
                 return node_analyzer.result();
             }
@@ -293,6 +304,7 @@ impl<'a> NodeAnalyzer<'a> {
         location: Location,
         analyzer: &'a Analyzer,
         state: &'a mut HashMap<NodeId, NodeId>,
+        generics_state: &'a mut GenericsState,
     ) -> NodeAnalyzer<'a> {
         NodeAnalyzer {
             id,
@@ -302,6 +314,7 @@ impl<'a> NodeAnalyzer<'a> {
             ancestors: &[],
             help: None,
             state,
+            generics_state,
         }
     }
 
@@ -313,6 +326,10 @@ impl<'a> NodeAnalyzer<'a> {
     fn analyze_node_first_pass(&mut self, node: Syn) {
         match node {
             Syn::ExprForLoop(i) => self.visit_expr_for_loop_first_pass(i),
+            Syn::ItemEnum(i) => self.visit_item_enum_first_pass(i),
+            Syn::ItemStruct(i) => self.visit_item_struct_first_pass(i),
+            Syn::ItemTrait(i) => self.visit_item_trait_first_pass(i),
+            Syn::ItemUnion(i) => self.visit_item_union_first_pass(i),
             Syn::Local(i) => self.visit_local_first_pass(i),
             Syn::TypeParam(i) => self.visit_type_param_first_pass(i),
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
@@ -552,6 +569,22 @@ impl<'a> NodeAnalyzer<'a> {
             .get(self.ancestors.len() - ancestor)
             .map(|(_, node)| *node)
     }
+
+    fn syn_to_id(&self, syn: Syn) -> Option<NodeId> {
+        self.ptr_to_id.get(&Ptr::new(syn)).cloned()
+    }
+
+    fn fill_generics_info(&mut self, item_id: NodeId, node_id: NodeId, generics: &syn::Generics) {
+        if self.generics_state.from_item.contains_key(&item_id) {
+            return;
+        }
+        if let Some(generics) = self.analyze_generics(generics) {
+            self.generics_state.generics.push(generics);
+            let id = self.generics_state.generics.len() - 1;
+            self.generics_state.from_item.insert(item_id, id);
+            self.generics_state.from_node.insert(node_id, id);
+        }
+    }
     //============= VISIT METHODS
 
     fn visit_angle_bracketed_generic_arguments(
@@ -705,9 +738,6 @@ impl<'a> NodeAnalyzer<'a> {
                 ident: node.ident.to_string(),
             },
         );
-    }
-    fn visit_const_param(&mut self, node: &syn::ConstParam) {
-        token![self, node.const_token, ConstParam];
     }
     fn visit_field(&mut self, node: &syn::Field) {
         let field_data = loop {
@@ -1047,9 +1077,6 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(node, HelpItem::ParenthesizedGenericArguments);
         }
     }
-    fn visit_predicate_type(&mut self, node: &syn::PredicateType) {
-        token![self, node.lifetimes, BoundLifetimes];
-    }
     // OPEN QUESTION: what is the purpose of the `<T>::foo()` syntax?
     // If `T` has an intrinsic `foo()`, both:
     // * T::foo()
@@ -1155,31 +1182,6 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_trait_item_type(&mut self, node: &syn::TraitItemType) {
         token![self, node.type_token, TraitItemType];
     }
-    fn visit_type_param_first_pass(&mut self, _: &syn::TypeParam) {
-        let scope_id = match self.get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER) {
-            Some(i @ Syn::ItemStruct(_)) => self.ptr_to_id.get(&Ptr::new(i.clone())).cloned(),
-            _ => None,
-        };
-        if let Some(scope_id) = scope_id {
-            self.state.insert(self.id, scope_id);
-        }
-    }
-    fn visit_type_param(&mut self, node: &syn::TypeParam) {
-        let is_def = self
-            .get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER)
-            .and_then(|container| self.ptr_to_id.get(&Ptr::new(container.clone())))
-            .map(|container_id| Some(container_id) == self.state.get(&self.id))
-            .unwrap_or(false);
-
-        if is_def {
-            return self.set_help(
-                &node.ident,
-                HelpItem::TypeParam {
-                    name: node.ident.to_token_stream().to_string(),
-                },
-            );
-        }
-    }
     fn visit_use_glob(&mut self, node: &syn::UseGlob) {
         return self.set_help(node, HelpItem::UseGlob);
     }
@@ -1279,9 +1281,6 @@ impl<'a> NodeAnalyzer<'a> {
                 in_: node.in_token.is_some(),
             },
         );
-    }
-    fn visit_where_clause(&mut self, node: &syn::WhereClause) {
-        token![self, node.where_token, WhereClause];
     }
     fn visit_comment(&mut self, node: &Comment) {
         if node.doc.is_some() {

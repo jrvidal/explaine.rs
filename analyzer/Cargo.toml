@@ -12,9 +12,10 @@ dev = ["syn/extra-traits", "log"]
 syn = { version = "=1.0.35", default-features = false }
 proc-macro2 = { version = "1.0.9", features = ["span-locations"] }
 serde = "1.0.105"
-tinytemplate = "1.0.3"
+tinytemplate = "1.1"
 quote = "1.0.3"
 log = { version = "0.4.8", optional = true }
+serde_json = "1.0.56"
 
 [build-dependencies]
 toml = "0.5.6"
