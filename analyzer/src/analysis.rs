@@ -1,13 +1,12 @@
 use crate::help::*;
-use crate::ir::{Location, NodeId, Owner, PtrData, Range};
+use crate::ir::{Location, NodeId, Owner, Ptr, PtrData, Range};
 use crate::syn_wrappers::{Comment, Syn, SynKind};
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::{HashMap, HashSet};
 use syn::spanned::Spanned;
+
+const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 
 #[derive(Default)]
 pub struct ExplorationState {
@@ -36,15 +35,18 @@ impl<'a, I: Iterator<Item = Location>> Iterator for ExplorationIterator<'a, I> {
 
 pub struct Analyzer {
     pub(crate) id_to_ptr: HashMap<NodeId, PtrData>,
+    pub(crate) ptr_to_id: HashMap<Ptr, NodeId>,
     pub(crate) locations: Vec<(NodeId, Range)>,
-    pub(crate) owner: Rc<Owner>,
+    pub(crate) owner: Box<Owner>,
 }
 
 struct NodeAnalyzer<'a> {
     id: NodeId,
     location: Location,
     id_to_ptr: &'a HashMap<NodeId, PtrData>,
+    ptr_to_id: &'a HashMap<Ptr, NodeId>,
     ancestors: &'a [(NodeId, Syn<'a>)],
+    state: &'a mut HashMap<NodeId, NodeId>,
     help: Option<(Range, HelpItem)>,
 }
 
@@ -175,12 +177,14 @@ impl Analyzer {
             ancestors
         };
 
+        let mut state = HashMap::new();
+
         for (idx, &(node_id, node)) in ancestors.iter().enumerate() {
             if node_id == id {
                 continue;
             }
 
-            let mut node_analyzer = NodeAnalyzer::new(node_id, location, &self);
+            let mut node_analyzer = NodeAnalyzer::new(node_id, location, &self, &mut state);
             node_analyzer.ancestors = &ancestors[0..idx];
 
             node_analyzer.analyze_node_first_pass(node);
@@ -192,7 +196,7 @@ impl Analyzer {
 
         let mut ancestors = ancestors;
         while let Some((id, node)) = ancestors.pop() {
-            let mut node_analyzer = NodeAnalyzer::new(id, location, &self);
+            let mut node_analyzer = NodeAnalyzer::new(id, location, &self, &mut state);
             node_analyzer.ancestors = &ancestors[..];
             node_analyzer.analyze_node(node);
 
@@ -279,13 +283,20 @@ macro_rules! get_ancestor {
 }
 
 impl<'a> NodeAnalyzer<'a> {
-    fn new(id: NodeId, location: Location, analyzer: &Analyzer) -> NodeAnalyzer {
+    fn new(
+        id: NodeId,
+        location: Location,
+        analyzer: &'a Analyzer,
+        state: &'a mut HashMap<NodeId, NodeId>,
+    ) -> NodeAnalyzer<'a> {
         NodeAnalyzer {
             id,
             location,
             id_to_ptr: &analyzer.id_to_ptr,
+            ptr_to_id: &analyzer.ptr_to_id,
             ancestors: &[],
             help: None,
+            state,
         }
     }
 
@@ -298,6 +309,7 @@ impl<'a> NodeAnalyzer<'a> {
         match node {
             Syn::ExprForLoop(i) => self.visit_expr_for_loop_first_pass(i),
             Syn::Local(i) => self.visit_local_first_pass(i),
+            Syn::TypeParam(i) => self.visit_type_param_first_pass(i),
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
             _ => {}
         }
@@ -460,7 +472,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::TypeInfer(i) => self.visit_type_infer(i),
             Syn::TypeMacro(_i) => { /* self.visit_type_macro(i) */ }
             Syn::TypeNever(i) => self.visit_type_never(i),
-            Syn::TypeParam(_i) => { /* self.visit_type_param(i) */ }
+            Syn::TypeParam(i) => self.visit_type_param(i),
             Syn::TypeParamBound(_i) => { /* self.visit_type_param_bound(i) */ }
             Syn::TypeParen(_i) => { /* self.visit_type_paren(i) */ }
             Syn::TypePath(i) => self.visit_type_path(i),
@@ -1645,6 +1657,22 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_type_never(&mut self, node: &syn::TypeNever) {
         return self.set_help(node, HelpItem::TypeNever);
     }
+    fn visit_type_param(&mut self, node: &syn::TypeParam) {
+        let is_def = self
+            .get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER)
+            .and_then(|container| self.ptr_to_id.get(&Ptr::new(container.clone())))
+            .map(|container_id| Some(container_id) == self.state.get(&self.id))
+            .unwrap_or(false);
+
+        if is_def {
+            return self.set_help(
+                &node.ident,
+                HelpItem::TypeParam {
+                    name: node.ident.to_token_stream().to_string(),
+                },
+            );
+        }
+    }
     fn visit_type_path(&mut self, node: &syn::TypePath) {
         if let Some(item) = well_known_type(node) {
             // SHORTCUT
@@ -1860,6 +1888,15 @@ impl<'a> NodeAnalyzer<'a> {
     }
     fn visit_vis_public(&mut self, node: &syn::VisPublic) {
         return self.set_help(node, HelpItem::VisPublic);
+    }
+    fn visit_type_param_first_pass(&mut self, _: &syn::TypeParam) {
+        let scope_id = match self.get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER) {
+            Some(i @ Syn::ItemStruct(_)) => self.ptr_to_id.get(&Ptr::new(i.clone())).cloned(),
+            _ => None,
+        };
+        if let Some(scope_id) = scope_id {
+            self.state.insert(self.id, scope_id);
+        }
     }
     fn visit_vis_restricted_first_pass(&mut self, node: &syn::VisRestricted) {
         let path = match &*node.path {

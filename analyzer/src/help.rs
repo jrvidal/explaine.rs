@@ -358,6 +358,9 @@ pub enum HelpItem {
     TypeBareUnsafeFn,
     TypeInfer,
     TypeNever,
+    TypeParam {
+        name: String,
+    },
     TypeParamBoundAdd,
     TypeTupleUnit,
     TypeTuple {

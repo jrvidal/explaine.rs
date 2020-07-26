@@ -560,7 +560,7 @@ impl<'a> Syn<'a> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum SynKind {
     Abi,
     AngleBracketedGenericArguments,

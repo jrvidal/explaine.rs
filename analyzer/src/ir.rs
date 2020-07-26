@@ -3,7 +3,6 @@ use proc_macro2::Span;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::ptr::NonNull;
-use std::rc::Rc;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -35,17 +34,15 @@ impl From<proc_macro2::LineColumn> for Location {
 
 pub type Owner = (syn::File, Vec<Comment>);
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Hash, Eq)]
 pub(crate) struct Ptr {
-    owner: Rc<Owner>,
     ptr: NonNull<()>,
     kind: SynKind,
 }
 
 impl Ptr {
-    fn new(owner: Rc<Owner>, node: Syn) -> Self {
+    pub fn new(node: Syn) -> Self {
         Ptr {
-            owner: owner,
             kind: (&node).into(),
             ptr: unsafe { NonNull::new_unchecked(node.data() as *mut _) },
         }
@@ -60,12 +57,6 @@ impl Ptr {
     }
 }
 
-impl std::hash::Hash for Ptr {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.ptr.hash(state)
-    }
-}
-
 pub(crate) struct PtrData {
     pub parent: NodeId,
     pub ptr: Ptr,
@@ -75,8 +66,9 @@ pub type Range = (Location, Location);
 
 pub struct IrVisitor {
     counter: usize,
-    owner: Rc<Owner>,
+    owner: Box<Owner>,
     id_to_ptr: HashMap<NodeId, PtrData>,
+    ptr_to_id: HashMap<Ptr, NodeId>,
     locations: HashMap<NodeId, LocationData>,
     ancestors: Vec<NodeId>,
 }
@@ -95,8 +87,9 @@ impl IrVisitor {
         IrVisitor {
             counter: 1,
             id_to_ptr: Default::default(),
+            ptr_to_id: Default::default(),
             ancestors: vec![],
-            owner: Rc::new((file, comments)),
+            owner: Box::new((file, comments)),
             locations: Default::default(),
         }
     }
@@ -139,6 +132,7 @@ impl IrVisitor {
         crate::analysis::Analyzer {
             locations,
             id_to_ptr: self.id_to_ptr,
+            ptr_to_id: self.ptr_to_id,
             owner,
         }
     }
@@ -154,9 +148,10 @@ impl IrVisitor {
 
             let ptr_data = PtrData {
                 parent: NodeId(0),
-                ptr: Ptr::new(self.owner.clone(), Syn::Comment(&comment)),
+                ptr: Ptr::new(Syn::Comment(&comment)),
                 children: HashSet::new(),
             };
+            self.ptr_to_id.insert(ptr_data.ptr.clone(), id);
             self.id_to_ptr.insert(id, ptr_data);
 
             let range = comment.range;
@@ -294,7 +289,7 @@ impl IrVisitor {
                 }
             }
         }
-        let ptr = Ptr::new(self.owner.clone(), node);
+        let ptr = Ptr::new(node);
 
         let id = self.counter.into();
         self.counter += 1;
@@ -330,6 +325,7 @@ impl IrVisitor {
             IrVisitor::recalculate_location(*blocked_range, &mut ranges);
         }
 
+        self.ptr_to_id.insert(data.ptr.clone(), id);
         self.id_to_ptr.insert(id, data);
         self.locations.insert(
             id,

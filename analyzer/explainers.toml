@@ -1049,6 +1049,11 @@ title = "Never Type"
 info = "The type `!` represents computations that never resolve to any value at all."
 std = "primitive.never.html"
 
+[help.TypeParam]
+title = "Type Parameter"
+info = "This type parameter `{ name }` introduces generics!"
+# TODO
+
 [help.TypeParamBoundAdd]
 title = "Trait Bounds"
 info = "The plus sign `+` joins several bounds that a given type must fulfill."
