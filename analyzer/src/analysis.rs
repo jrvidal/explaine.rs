@@ -8,6 +8,47 @@ use syn::spanned::Spanned;
 
 const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 
+macro_rules! token {
+    ($self:expr, $token:expr, $item:ident) => {
+        token![$self, $token, *HelpItem::$item];
+    };
+    ($self:expr, $start:expr => $end:expr, $item:ident) => {
+        token![$self, $start => $end, * HelpItem::$item];
+    };
+    ($self:expr, $start:expr => $end:expr, * $item:expr) => {
+        if $self.between(&$start, &$end) {
+            return $self.set_help_between($start.span(), $end.span(), $item);
+        }
+    };
+    ($self:expr, $token:expr, * $item:expr) => {
+        if $self.within(&$token) {
+            return $self.set_help(&$token, $item);
+        }
+    };
+    ($self:expr, some $token:expr, $item:ident) => {
+        token![$self, some $token, * HelpItem::$item];
+    };
+    ($self:expr, some $token:expr, * $item:expr) => {
+        if let Some(ref inner) = &$token {
+            token![$self, inner, * $item];
+        }
+    };
+}
+
+macro_rules! get_ancestor {
+    ($self:ident, $ty:ident, $depth:expr) => {
+        match $self.get_ancestor($depth) {
+            Some(Syn::$ty(node)) => Some(node),
+            _ => None,
+        }
+    };
+}
+
+mod expressions;
+mod items;
+mod patterns;
+mod types;
+
 #[derive(Default)]
 pub struct ExplorationState {
     location_index: usize,
@@ -244,42 +285,6 @@ impl Analyzer {
 
         None
     }
-}
-
-macro_rules! token {
-    ($self:expr, $token:expr, $item:ident) => {
-        token![$self, $token, *HelpItem::$item];
-    };
-    ($self:expr, $start:expr => $end:expr, $item:ident) => {
-        token![$self, $start => $end, * HelpItem::$item];
-    };
-    ($self:expr, $start:expr => $end:expr, * $item:expr) => {
-        if $self.between(&$start, &$end) {
-            return $self.set_help_between($start.span(), $end.span(), $item);
-        }
-    };
-    ($self:expr, $token:expr, * $item:expr) => {
-        if $self.within(&$token) {
-            return $self.set_help(&$token, $item);
-        }
-    };
-    ($self:expr, some $token:expr, $item:ident) => {
-        token![$self, some $token, * HelpItem::$item];
-    };
-    ($self:expr, some $token:expr, * $item:expr) => {
-        if let Some(ref inner) = &$token {
-            token![$self, inner, * $item];
-        }
-    };
-}
-
-macro_rules! get_ancestor {
-    ($self:ident, $ty:ident, $depth:expr) => {
-        match $self.get_ancestor($depth) {
-            Some(Syn::$ty(node)) => Some(node),
-            _ => None,
-        }
-    };
 }
 
 impl<'a> NodeAnalyzer<'a> {
@@ -704,235 +709,6 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_const_param(&mut self, node: &syn::ConstParam) {
         token![self, node.const_token, ConstParam];
     }
-    // EXAMPLE
-    // impl<P: Deref<Target: Eq>> Eq for Pin<P> {}
-    fn visit_expr_array(&mut self, node: &syn::ExprArray) {
-        if !self.has_ancestor(2, SynKind::ExprReference) {
-            self.set_help(node, HelpItem::ExprArray)
-        }
-    }
-    fn visit_expr_assign(&mut self, node: &syn::ExprAssign) {
-        // TODO: add context on the lvalue/place expression: deref, index, field access, etc.
-        return self.set_help(node, HelpItem::ExprAssign);
-    }
-    fn visit_expr_assign_op(&mut self, node: &syn::ExprAssignOp) {
-        // TODO: add context on the lvalue/place expression: deref, index, field access, etc.
-        return self.set_help(node, HelpItem::ExprAssignOp);
-    }
-    fn visit_expr_async(&mut self, node: &syn::ExprAsync) {
-        token![self, some node.capture, ExprAsyncMove];
-        return self.set_help(node, HelpItem::ExprAsync);
-    }
-    fn visit_expr_await(&mut self, node: &syn::ExprAwait) {
-        token![self, node.await_token, ExprAwait];
-    }
-    fn visit_expr_break(&mut self, node: &syn::ExprBreak) {
-        return self.set_help(
-            &node,
-            HelpItem::ExprBreak {
-                expr: node.expr.is_some(),
-                label: node.label.as_ref().map(|l| l.to_string()),
-            },
-        );
-    }
-    fn visit_expr_cast(&mut self, node: &syn::ExprCast) {
-        token![self, node.as_token, AsCast];
-    }
-    fn visit_expr_closure(&mut self, node: &syn::ExprClosure) {
-        token![self, node.or1_token, ExprClosureArguments];
-        token![self, node.or2_token, ExprClosureArguments];
-        token![self, some node.asyncness, ExprClosureAsync];
-        token![self, some node.capture, ExprClosureMove];
-        token![self, some node.movability, ExprClosureStatic];
-        return self.set_help(node, HelpItem::ExprClosure);
-    }
-    fn visit_expr_continue(&mut self, node: &syn::ExprContinue) {
-        self.set_help(
-            node,
-            HelpItem::ExprContinue {
-                label: node.label.as_ref().map(|l| l.to_string()),
-            },
-        );
-    }
-    fn visit_expr_field(&mut self, node: &syn::ExprField) {
-        if let syn::Member::Unnamed(..) = node.member {
-            return self.set_help_between(
-                node.dot_token.span(),
-                node.member.span(),
-                HelpItem::ExprUnnamedField,
-            );
-        }
-    }
-    fn visit_expr_for_loop_first_pass(&mut self, node: &syn::ExprForLoop) {
-        token![self, node.for_token, ExprForLoopToken];
-        token![self, node.in_token, ExprForLoopToken];
-        if self.within(&node.pat) {
-            match &node.pat {
-                syn::Pat::Ident(syn::PatIdent {
-                    ident, mutability, ..
-                }) => {
-                    return self.set_help(
-                        &node.pat,
-                        HelpItem::ForLoopLocal {
-                            mutability: mutability.is_some(),
-                            ident: Some(ident.to_string()),
-                        },
-                    );
-                }
-                syn::Pat::Wild(..) => {
-                    return self.set_help(
-                        &node.pat,
-                        HelpItem::ForLoopLocal {
-                            mutability: false,
-                            ident: None,
-                        },
-                    );
-                }
-                _ => {}
-            }
-        }
-    }
-    fn visit_expr_if(&mut self, node: &syn::ExprIf) {
-        if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
-            if self.between_spans(node.if_token.span(), let_token.span()) {
-                return self.set_help_between(
-                    node.if_token.span(),
-                    let_token.span(),
-                    HelpItem::ExprIfLet,
-                );
-            }
-        } else {
-            token![self, node.if_token, ExprIf];
-        };
-        if let Some((else_token, _)) = node.else_branch {
-            token![self, else_token, Else];
-        }
-    }
-    fn visit_expr_index(&mut self, node: &syn::ExprIndex) {
-        let range = if let syn::Expr::Range(..) = &*node.index {
-            true
-        } else {
-            false
-        };
-
-        return self.set_help(node, HelpItem::ExprIndex { range });
-    }
-    fn visit_expr_loop(&mut self, node: &syn::ExprLoop) {
-        token![self, node.loop_token, ExprLoopToken];
-    }
-    fn visit_expr_match(&mut self, node: &syn::ExprMatch) {
-        token![self, node.match_token, ExprMatchToken];
-    }
-    fn visit_expr_range(&mut self, node: &syn::ExprRange) {
-        let from = node.from.is_some();
-        let to = node.to.is_some();
-        return match node.limits {
-            syn::RangeLimits::HalfOpen(..) => {
-                self.set_help(node, HelpItem::ExprRangeHalfOpen { from, to })
-            }
-            syn::RangeLimits::Closed(..) => {
-                self.set_help(node, HelpItem::ExprRangeClosed { from, to })
-            }
-        };
-    }
-    fn visit_expr_reference(&mut self, node: &syn::ExprReference) {
-        let item = if let syn::Expr::Array(_) = &*node.expr {
-            HelpItem::ExprArraySlice
-        } else {
-            HelpItem::ExprReference {
-                mutable: node.mutability.is_some(),
-            }
-        };
-
-        return self.set_help(node, item);
-    }
-    fn visit_expr_repeat(&mut self, node: &syn::ExprRepeat) {
-        return self.set_help(
-            node,
-            HelpItem::ExprRepeat {
-                len: (&*node.len).to_token_stream().to_string(),
-            },
-        );
-    }
-    fn visit_expr_return(&mut self, node: &syn::ExprReturn) {
-        let of = self
-            .ancestors
-            .iter()
-            .rev()
-            .find_map(|(_, node)| match node {
-                Syn::ItemFn(_) => Some(ReturnOf::Function),
-                Syn::ImplItemMethod(_) => Some(ReturnOf::Method),
-                Syn::TraitItemMethod(_) => Some(ReturnOf::Method),
-                Syn::ExprClosure(_) => Some(ReturnOf::Closure),
-                Syn::ExprAsync(_) => Some(ReturnOf::AsyncBlock),
-                _ => None,
-            })
-            .unwrap_or(ReturnOf::Function);
-        token![self, node.return_token, *HelpItem::ExprReturn { of }];
-    }
-    fn visit_expr_struct(&mut self, node: &syn::ExprStruct) {
-        if self.within(&node.path) {
-            return self.set_help(node, HelpItem::ExprStruct);
-        }
-
-        if let Some((dot2_token, rest)) = node
-            .dot2_token
-            .and_then(|t| node.rest.as_ref().map(|r| (t, r)))
-        {
-            if self.between_spans(dot2_token.span(), rest.span()) {
-                return self.set_help_between(
-                    dot2_token.span(),
-                    rest.span(),
-                    HelpItem::ExprStructRest,
-                );
-            }
-        }
-    }
-    fn visit_expr_try(&mut self, node: &syn::ExprTry) {
-        token![self, node.question_token, ExprTryQuestionMark];
-    }
-    fn visit_expr_try_block(&mut self, node: &syn::ExprTryBlock) {
-        token![self, node.try_token, ExprTryBlock];
-    }
-    fn visit_expr_tuple(&mut self, node: &syn::ExprTuple) {
-        return self.set_help(
-            node,
-            if node.elems.is_empty() {
-                HelpItem::ExprUnitTuple
-            } else {
-                HelpItem::ExprTuple {
-                    single_comma: node.elems.len() == 1 && node.elems.trailing_punct(),
-                }
-            },
-        );
-    }
-    fn visit_expr_type(&mut self, node: &syn::ExprType) {
-        return self.set_help(node, HelpItem::ExprType);
-    }
-    fn visit_expr_unsafe(&mut self, node: &syn::ExprUnsafe) {
-        token![self, node.unsafe_token, ExprUnsafe];
-    }
-    fn visit_expr_while(&mut self, node: &syn::ExprWhile) {
-        let let_token = if let syn::Expr::Let(syn::ExprLet { let_token, .. }) = *node.cond {
-            Some(let_token)
-        } else {
-            None
-        };
-
-        token![self, some node.label, * HelpItem::Label {
-            loop_of: if let_token.is_some() { LoopOf::WhileLet } else { LoopOf::While },
-        }];
-
-        match let_token {
-            Some(let_token) => {
-                token![self, node.while_token => let_token, ExprWhileLet];
-            }
-            None => token![self, node.while_token, ExprWhile],
-        }
-    }
-    fn visit_expr_yield(&mut self, node: &syn::ExprYield) {
-        token![self, node.yield_token, ExprYield];
-    }
     fn visit_field(&mut self, node: &syn::Field) {
         let field_data = loop {
             if let Some(variant) = get_ancestor![self, Variant, 3] {
@@ -1093,137 +869,6 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_impl_item_type(&mut self, node: &syn::ImplItemType) {
         token![self, node.type_token, ImplItemType];
     }
-    fn visit_item_const(&mut self, node: &syn::ItemConst) {
-        token![self, node.const_token, ItemConst];
-    }
-    fn visit_item_enum(&mut self, node: &syn::ItemEnum) {
-        token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
-            empty: node.variants.is_empty()
-        }];
-    }
-    fn visit_item_extern_crate(&mut self, node: &syn::ItemExternCrate) {
-        if let Some((as_token, _)) = node.rename {
-            token![self, as_token, AsRenameExternCrate];
-        }
-        token![self, node.extern_token, ItemExternCrate];
-    }
-    fn visit_item_fn(&mut self, node: &syn::ItemFn) {
-        token![self, node.sig.fn_token => node.sig.ident, ItemFn];
-    }
-    fn visit_item_foreign_mod(&mut self, node: &syn::ItemForeignMod) {
-        token![self, node.abi, ItemForeignModAbi];
-    }
-    fn visit_item_impl(&mut self, node: &syn::ItemImpl) {
-        token![self, some node.unsafety, ItemUnsafeImpl];
-        if let Some((_, _, for_token)) = node.trait_ {
-            token![self, for_token, ItemImplForTrait];
-        }
-        token![
-            self,
-            node.impl_token,
-            *HelpItem::ItemImpl {
-                trait_: node.trait_.is_some(),
-                negative: node
-                    .trait_
-                    .as_ref()
-                    .and_then(|(bang, _, _)| bang.as_ref())
-                    .is_some()
-            }
-        ];
-    }
-    fn visit_item_macro(&mut self, node: &syn::ItemMacro) {
-        if let Some(ident) = &node.ident {
-            if node.mac.path.is_ident("macro_rules") {
-                return self.set_help(
-                    node,
-                    HelpItem::ItemMacroRules {
-                        name: ident.to_string(),
-                    },
-                );
-            }
-        }
-    }
-    fn visit_item_mod(&mut self, node: &syn::ItemMod) {
-        if node.content.is_some() {
-            if self.between(&node.mod_token, &node.ident) {
-                return self.set_help_between(
-                    node.mod_token.span(),
-                    node.ident.span(),
-                    HelpItem::ItemInlineMod,
-                );
-            }
-        } else {
-            return self.set_help(&node, HelpItem::ItemExternMod);
-        }
-    }
-    fn visit_item_static(&mut self, node: &syn::ItemStatic) {
-        let end = node
-            .mutability
-            .as_ref()
-            .map(Spanned::span)
-            .unwrap_or_else(|| node.static_token.span());
-
-        if self.between_spans(node.static_token.span(), end) {
-            return self.set_help_between(
-                node.static_token.span(),
-                end,
-                if node.mutability.is_some() {
-                    HelpItem::StaticMut
-                } else {
-                    HelpItem::Static
-                },
-            );
-        }
-    }
-    fn visit_item_struct(&mut self, node: &syn::ItemStruct) {
-        let unit = match node.fields {
-            syn::Fields::Unit => true,
-            _ => false,
-        };
-        if self.between_spans(node.struct_token.span(), node.ident.span()) {
-            return self.set_help_between(
-                node.struct_token.span(),
-                node.ident.span(),
-                HelpItem::ItemStruct {
-                    unit,
-                    name: node.ident.to_string(),
-                },
-            );
-        }
-    }
-    fn visit_item_trait(&mut self, node: &syn::ItemTrait) {
-        token![self, some node.unsafety, ItemUnsafeTrait];
-        token![self, some node.auto_token, ItemAutoTrait];
-        token![self, node.trait_token, ItemTrait];
-        if let Some(colon_token) = node.colon_token {
-            if self.within(colon_token) {
-                let last = node
-                    .supertraits
-                    .last()
-                    .map(|t| t.span())
-                    .unwrap_or(colon_token.span());
-                return self.set_help_between(
-                    colon_token.span(),
-                    last,
-                    HelpItem::ItemTraitSupertraits,
-                );
-            }
-        }
-    }
-    fn visit_item_trait_alias(&mut self, node: &syn::ItemTraitAlias) {
-        token![self, node.trait_token, ItemTraitAlias];
-    }
-    fn visit_item_type(&mut self, node: &syn::ItemType) {
-        token![self, node.type_token => node.ident, ItemType];
-    }
-    fn visit_item_union(&mut self, node: &syn::ItemUnion) {
-        token![self, node.union_token, ItemUnion];
-    }
-    fn visit_item_use(&mut self, node: &syn::ItemUse) {
-        token![self, some node.leading_colon, PathLeadingColon];
-        let start = vis_span(&node.vis).unwrap_or_else(|| node.use_token.span());
-        return self.set_help_between(start, node.span(), HelpItem::ItemUse);
-    }
     fn visit_label(&mut self, node: &syn::Label) {
         let loop_of = if get_ancestor![self, ExprLoop, 1].is_some() {
             LoopOf::Loop
@@ -1359,131 +1004,6 @@ impl<'a> NodeAnalyzer<'a> {
     }
     fn visit_method_turbofish(&mut self, node: &syn::MethodTurbofish) {
         return self.set_help(node, HelpItem::Turbofish);
-    }
-    fn visit_pat_box(&mut self, node: &syn::PatBox) {
-        token![self, node.box_token, PatBox];
-    }
-    fn visit_pat_ident(&mut self, node: &syn::PatIdent) {
-        if let Some((at_token, subpat)) = &node.subpat {
-            if self.between(at_token, subpat) {
-                return self.set_help(
-                    node,
-                    HelpItem::PatIdentSubPat {
-                        ident: node.ident.to_string(),
-                    },
-                );
-            }
-        }
-
-        if node.mutability.is_some() && self.has_ancestor(3, SynKind::FnArg) {
-            return self.set_help(
-                node,
-                HelpItem::PatIdentMutableArg {
-                    ident: node.ident.to_string(),
-                },
-            );
-        }
-
-        let item = HelpItem::PatIdent {
-            mutability: node.mutability.is_some(),
-            by_ref: node.by_ref.is_some(),
-            ident: node.ident.to_string(),
-        };
-        match (node.by_ref, node.mutability) {
-            (Some(by_ref), Some(mutability)) => token![self, by_ref => mutability, * item],
-            (Some(by_ref), None) => token![self, by_ref, *item],
-            (None, Some(mutability)) => token![self, mutability, *item],
-            _ => {}
-        }
-    }
-    fn visit_pat_or(&mut self, node: &syn::PatOr) {
-        token![self, some node.leading_vert, PatOrLeading];
-        for pair in node.cases.pairs() {
-            token![self, some pair.punct(), PatOr];
-        }
-    }
-    fn visit_pat_range(&mut self, node: &syn::PatRange) {
-        return self.set_help(
-            node,
-            HelpItem::PatRange {
-                closed: if let syn::RangeLimits::Closed(..) = node.limits {
-                    true
-                } else {
-                    false
-                },
-            },
-        );
-    }
-    fn visit_pat_struct(&mut self, node: &syn::PatStruct) {
-        if node.fields.is_empty() {
-            token![self, some node.dot2_token, * HelpItem::PatStruct {
-                empty: true,
-                bindings: pattern_bindings(&self)
-            }];
-        }
-        token![self, some node.dot2_token, * HelpItem::PatRest {
-            of: RestOf::Struct
-        }];
-
-        return self.set_help(
-            node,
-            HelpItem::PatStruct {
-                empty: false,
-                bindings: pattern_bindings(&self),
-            },
-        );
-    }
-    fn visit_pat_tuple(&mut self, node: &syn::PatTuple) {
-        if get_ancestor![self, PatTupleStruct, 1].is_some() {
-            return;
-        }
-
-        if let Some(pat @ syn::Pat::Rest(..)) = node.elems.last() {
-            token![self, pat, *HelpItem::PatRest { of: RestOf::Tuple }];
-        }
-
-        let item = if node.elems.is_empty() {
-            HelpItem::PatUnit
-        } else {
-            HelpItem::PatTuple {
-                bindings: pattern_bindings(&self),
-                single_comma: node.elems.len() == 1 && node.elems.trailing_punct(),
-            }
-        };
-        return self.set_help(node, item);
-    }
-    fn visit_pat_tuple_struct(&mut self, node: &syn::PatTupleStruct) {
-        if let Some(pat @ syn::Pat::Rest(..)) = node.pat.elems.last() {
-            token![
-                self,
-                pat,
-                *HelpItem::PatRest {
-                    of: RestOf::TupleStruct
-                }
-            ];
-        }
-
-        return self.set_help(
-            node,
-            HelpItem::PatTupleStruct {
-                bindings: pattern_bindings(&self),
-            },
-        );
-    }
-    fn visit_pat_wild(&mut self, node: &syn::PatWild) {
-        let last_arm = match (
-            get_ancestor![self, ExprMatch, 3],
-            get_ancestor![self, Arm, 2],
-        ) {
-            (Some(match_expr), Some(arm)) => match_expr
-                .arms
-                .last()
-                .map(|match_arm| std::ptr::eq(match_arm, arm))
-                .unwrap_or(false),
-            _ => false,
-        };
-
-        return self.set_help(node, HelpItem::PatWild { last_arm });
     }
     fn visit_path(&mut self, node: &syn::Path) {
         let qself = loop {
@@ -1635,27 +1155,14 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_trait_item_type(&mut self, node: &syn::TraitItemType) {
         token![self, node.type_token, TraitItemType];
     }
-    fn visit_type_array(&mut self, node: &syn::TypeArray) {
-        if self.between_locations(node.span().start(), node.elem.span().start())
-            || self.between_spans(node.semi_token.span(), node.span())
-        {
-            return self.set_help(node, HelpItem::TypeArray);
+    fn visit_type_param_first_pass(&mut self, _: &syn::TypeParam) {
+        let scope_id = match self.get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER) {
+            Some(i @ Syn::ItemStruct(_)) => self.ptr_to_id.get(&Ptr::new(i.clone())).cloned(),
+            _ => None,
+        };
+        if let Some(scope_id) = scope_id {
+            self.state.insert(self.id, scope_id);
         }
-    }
-    fn visit_type_bare_fn(&mut self, node: &syn::TypeBareFn) {
-        token![self, some node.abi, TypeBareFnAbi];
-        token![self, some node.unsafety, TypeBareUnsafeFn];
-        token![self, some node.lifetimes, BoundLifetimesBareFnType];
-        return self.set_help(node, HelpItem::TypeBareFn);
-    }
-    fn visit_type_impl_trait(&mut self, node: &syn::TypeImplTrait) {
-        token![self, node.impl_token, TypeImplTrait];
-    }
-    fn visit_type_infer(&mut self, node: &syn::TypeInfer) {
-        return self.set_help(node, HelpItem::TypeInfer);
-    }
-    fn visit_type_never(&mut self, node: &syn::TypeNever) {
-        return self.set_help(node, HelpItem::TypeNever);
     }
     fn visit_type_param(&mut self, node: &syn::TypeParam) {
         let is_def = self
@@ -1672,137 +1179,6 @@ impl<'a> NodeAnalyzer<'a> {
                 },
             );
         }
-    }
-    fn visit_type_path(&mut self, node: &syn::TypePath) {
-        if let Some(item) = well_known_type(node) {
-            // SHORTCUT
-            if let HelpItem::KnownTypeStr = item {
-                if self.has_ancestor(2, SynKind::TypeReference) {
-                    return;
-                }
-            }
-            return self.set_help(node, item);
-        }
-    }
-    fn visit_type_ptr(&mut self, node: &syn::TypePtr) {
-        let end = node
-            .const_token
-            .map(|t| t.span())
-            .or_else(|| node.mutability.map(|t| t.span()));
-
-        if let Some(end) = end {
-            return self.set_help_between(
-                node.span(),
-                end,
-                if node.const_token.is_some() {
-                    HelpItem::TypeConstPtr
-                } else {
-                    HelpItem::TypeMutPtr
-                },
-            );
-        }
-    }
-    fn visit_type_reference(&mut self, node: &syn::TypeReference) {
-        if let syn::Type::Path(type_path) = &*node.elem {
-            if let Some(HelpItem::KnownTypeStr) = well_known_type(type_path) {
-                return self.set_help(
-                    node,
-                    HelpItem::KnownTypeStrSlice {
-                        mutability: node.mutability.is_some(),
-                    },
-                );
-            }
-        }
-        let last_span = node
-            .mutability
-            .map(|t| t.span())
-            .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
-            .unwrap_or_else(|| node.and_token.span());
-
-        if self.between_spans(node.and_token.span(), last_span) {
-            return self.set_help(
-                &node,
-                HelpItem::TypeReference {
-                    lifetime: node.lifetime.is_some(),
-                    mutable: node.mutability.is_some(),
-                    ty: format!("{}", node.elem.to_token_stream()),
-                },
-            );
-        }
-    }
-    fn visit_type_slice(&mut self, node: &syn::TypeSlice) {
-        let (dynamic, start) = if let Some(type_ref) = get_ancestor![self, TypeReference, 2] {
-            (true, type_ref.span())
-        } else {
-            (false, node.span())
-        };
-        return self.set_help_between(
-            start,
-            node.span(),
-            HelpItem::TypeSlice {
-                dynamic,
-                ty: node.elem.to_token_stream().to_string(),
-            },
-        );
-    }
-    // Fun fact: a legacy trait object without `dyn` can probably only be recognized
-    // by compiling the code.
-    fn visit_type_trait_object(&mut self, node: &syn::TypeTraitObject) {
-        if let Some(plus_token) = node
-            .bounds
-            .pairs()
-            .filter_map(|pair| pair.punct().cloned())
-            .find(|punct| self.within(punct))
-        {
-            return self.set_help(&plus_token, HelpItem::TypeParamBoundAdd);
-        }
-
-        let ty = if let Some(syn::TypeParamBound::Trait(trait_bound)) = node.bounds.first() {
-            trait_bound
-        } else {
-            return;
-        };
-
-        let lifetime = node
-            .bounds
-            .iter()
-            .filter_map(|bound| match bound {
-                syn::TypeParamBound::Lifetime(lifetime) => Some(lifetime),
-                _ => None,
-            })
-            .next();
-
-        let multiple = node
-            .bounds
-            .iter()
-            .filter(|bound| match bound {
-                syn::TypeParamBound::Trait(..) => true,
-                _ => false,
-            })
-            .skip(1)
-            .next()
-            .is_some();
-
-        return self.set_help(
-            node,
-            HelpItem::TypeTraitObject {
-                lifetime: lifetime.map(|lt| format!("{}", lt)),
-                multiple,
-                dyn_: node.dyn_token.is_some(),
-                ty: format!("{}", ty.path.to_token_stream()),
-            },
-        );
-    }
-    fn visit_type_tuple(&mut self, node: &syn::TypeTuple) {
-        if node.elems.is_empty() {
-            return self.set_help(node, HelpItem::TypeTupleUnit);
-        }
-        return self.set_help(
-            node,
-            HelpItem::TypeTuple {
-                single_comma: node.elems.len() == 1 && node.elems.trailing_punct(),
-            },
-        );
     }
     fn visit_use_glob(&mut self, node: &syn::UseGlob) {
         return self.set_help(node, HelpItem::UseGlob);
@@ -1889,15 +1265,6 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_vis_public(&mut self, node: &syn::VisPublic) {
         return self.set_help(node, HelpItem::VisPublic);
     }
-    fn visit_type_param_first_pass(&mut self, _: &syn::TypeParam) {
-        let scope_id = match self.get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER) {
-            Some(i @ Syn::ItemStruct(_)) => self.ptr_to_id.get(&Ptr::new(i.clone())).cloned(),
-            _ => None,
-        };
-        if let Some(scope_id) = scope_id {
-            self.state.insert(self.id, scope_id);
-        }
-    }
     fn visit_vis_restricted_first_pass(&mut self, node: &syn::VisRestricted) {
         let path = match &*node.path {
             path if path.is_ident("self") => VisRestrictedPath::Self_,
@@ -1916,26 +1283,16 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_where_clause(&mut self, node: &syn::WhereClause) {
         token![self, node.where_token, WhereClause];
     }
-
     fn visit_comment(&mut self, node: &Comment) {
         if node.doc.is_some() {
             return;
         }
         self.help = Some((node.range, HelpItem::Comment { block: node.block }));
     }
-
     fn visit_explicit_attribute(&mut self, node: &syn::Attribute) {
         let outer = outer_attr(node);
 
         return self.set_help(&node, HelpItem::Attribute { outer, known: None });
-    }
-}
-
-fn vis_span(vis: &syn::Visibility) -> Option<Span> {
-    if let syn::Visibility::Inherited = vis {
-        None
-    } else {
-        Some(vis.span())
     }
 }
 
@@ -1997,73 +1354,6 @@ fn special_path_help(
     }
 
     settled
-}
-
-fn pattern_bindings(analyzer: &NodeAnalyzer) -> Option<BindingOf> {
-    if analyzer.has_ancestor(2, SynKind::Local)
-        || (analyzer.has_ancestor(4, SynKind::Local) && analyzer.has_ancestor(2, SynKind::PatType))
-    {
-        return Some(BindingOf::Let);
-    }
-    if analyzer.has_ancestor(3, SynKind::FnArg) {
-        return Some(BindingOf::Arg);
-    }
-
-    if analyzer.has_ancestor(2, SynKind::ExprForLoop) {
-        return Some(BindingOf::ForLoop);
-    }
-
-    None
-}
-
-pub fn well_known_type(type_path: &syn::TypePath) -> Option<HelpItem> {
-    let path = &type_path.path;
-    if type_path.qself.is_some() || path.leading_colon.is_some() || path.segments.len() > 1 {
-        return None;
-    }
-
-    let ident = match path.segments.first() {
-        Some(segment) if segment.arguments.is_empty() => &segment.ident,
-        _ => return None,
-    };
-
-    if ident == "u8" {
-        Some(HelpItem::KnownTypeU8)
-    } else if ident == "u16" {
-        Some(HelpItem::KnownTypeU16)
-    } else if ident == "u32" {
-        Some(HelpItem::KnownTypeU32)
-    } else if ident == "u64" {
-        Some(HelpItem::KnownTypeU64)
-    } else if ident == "u128" {
-        Some(HelpItem::KnownTypeU128)
-    } else if ident == "usize" {
-        Some(HelpItem::KnownTypeUSize)
-    } else if ident == "i8" {
-        Some(HelpItem::KnownTypeI8)
-    } else if ident == "i16" {
-        Some(HelpItem::KnownTypeI16)
-    } else if ident == "i32" {
-        Some(HelpItem::KnownTypeI32)
-    } else if ident == "i64" {
-        Some(HelpItem::KnownTypeI64)
-    } else if ident == "i128" {
-        Some(HelpItem::KnownTypeI128)
-    } else if ident == "isize" {
-        Some(HelpItem::KnownTypeISize)
-    } else if ident == "char" {
-        Some(HelpItem::KnownTypeChar)
-    } else if ident == "bool" {
-        Some(HelpItem::KnownTypeBool)
-    } else if ident == "f32" {
-        Some(HelpItem::KnownTypeF32)
-    } else if ident == "f64" {
-        Some(HelpItem::KnownTypeF64)
-    } else if ident == "str" {
-        Some(HelpItem::KnownTypeStr)
-    } else {
-        None
-    }
 }
 
 fn raw_string_literal(mut literal: String, prefix: &str) -> Option<String> {
