@@ -1,5 +1,6 @@
-use super::NodeAnalyzer;
+use super::{generics::Generics, NodeAnalyzer};
 use crate::{
+    ir::NodeId,
     syn_wrappers::{Syn, SynKind},
     HelpItem,
 };
@@ -38,6 +39,35 @@ impl<'a> NodeAnalyzer<'a> {
                 }
             }
             return self.set_help(node, item);
+        }
+
+        if let Some(ident) = node.path.get_ident() {
+            let find_generics = |id| {
+                self.generics_state
+                    .from_item
+                    .get(id)
+                    .and_then(|idx| self.generics_state.generics.get(*idx))
+                    .filter(|generics| {
+                        generics
+                            .types
+                            .iter()
+                            .filter_map(|&ident_id| self.id_to_syn(ident_id))
+                            .any(|syn| match syn {
+                                Syn::Ident(id) if id == ident => true,
+                                _ => false,
+                            })
+                    })
+            };
+
+            if let Some((item_id, declaration)) = self
+                .generics_state
+                .stack
+                .iter()
+                .rev()
+                .find_map(|item_id| find_generics(item_id).map(|gen| (*item_id, gen)))
+            {
+                return self.set_help(node, HelpItem::TypeParamUse);
+            }
         }
     }
     pub(super) fn visit_type_ptr(&mut self, node: &syn::TypePtr) {
@@ -81,7 +111,7 @@ impl<'a> NodeAnalyzer<'a> {
                 HelpItem::TypeReference {
                     lifetime: node.lifetime.is_some(),
                     mutable: node.mutability.is_some(),
-                    ty: format!("{}", node.elem.to_token_stream()),
+                    ty: node.elem.to_token_stream().to_string(),
                 },
             );
         }
@@ -142,10 +172,10 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help(
             node,
             HelpItem::TypeTraitObject {
-                lifetime: lifetime.map(|lt| format!("{}", lt)),
+                lifetime: lifetime.map(|lt| lt.to_string()),
                 multiple,
                 dyn_: node.dyn_token.is_some(),
-                ty: format!("{}", ty.path.to_token_stream()),
+                ty: ty.path.to_token_stream().to_string(),
             },
         );
     }

@@ -4,7 +4,10 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 pub fn test_example(source: &str) {
-    let lines: Vec<_> = source.lines().collect();
+    let lines: Vec<_> = source
+        .lines()
+        .filter(|l| !l.trim().starts_with("#"))
+        .collect();
     let blocks = lines.iter().fold(vec![vec![]], |mut acc, line| {
         if line.starts_with("---") {
             acc.push(vec![]);
@@ -15,7 +18,11 @@ pub fn test_example(source: &str) {
         }
     });
 
-    assert!(blocks.len() % 2 == 0, "Expected even number of blocks: data + source; found {}", blocks.len());
+    assert!(
+        blocks.len() % 2 == 0,
+        "Expected even number of blocks: data + source; found {}",
+        blocks.len()
+    );
 
     for case in 0..(blocks.len() / 2) {
         let data_lines = &blocks[2 * case];

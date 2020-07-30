@@ -100,7 +100,7 @@ fn main() {
     );
 
     init.into_iter().for_each(|init_call| {
-        source.push_str(&format!("template.{}.unwrap();\n", init_call));
+        source.push_str(&format!("on_add_template(template.{});\n", init_call));
     });
 
     source.push_str("template\n}");

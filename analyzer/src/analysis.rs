@@ -4,7 +4,10 @@ use crate::syn_wrappers::{Comment, Syn, SynKind};
 use generics::Generics;
 use proc_macro2::{LineColumn, Span};
 use quote::ToTokens;
-use std::{rc::Rc, collections::{HashMap, HashSet}};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 use syn::spanned::Spanned;
 
 macro_rules! token {
@@ -87,7 +90,6 @@ struct NodeAnalyzer<'a> {
     id_to_ptr: &'a HashMap<NodeId, PtrData>,
     ptr_to_id: &'a HashMap<Ptr, NodeId>,
     ancestors: &'a [(NodeId, Syn<'a>)],
-    state: &'a mut HashMap<NodeId, NodeId>,
     generics_state: &'a mut GenericsState,
     help: Option<(Range, HelpItem)>,
 }
@@ -97,6 +99,7 @@ struct GenericsState {
     generics: Vec<Generics>,
     from_item: HashMap<NodeId, usize>,
     from_node: HashMap<NodeId, usize>,
+    stack: Vec<NodeId>
 }
 
 pub struct AnalysisResult {
@@ -226,7 +229,6 @@ impl Analyzer {
             ancestors
         };
 
-        let mut state = HashMap::new();
         let mut generics_state = Default::default();
 
         for (idx, &(node_id, node)) in ancestors.iter().enumerate() {
@@ -235,7 +237,7 @@ impl Analyzer {
             }
 
             let mut node_analyzer =
-                NodeAnalyzer::new(node_id, location, &self, &mut state, &mut generics_state);
+                NodeAnalyzer::new(node_id, location, &self, &mut generics_state);
             node_analyzer.ancestors = &ancestors[0..idx];
 
             node_analyzer.analyze_node_first_pass(node);
@@ -248,10 +250,10 @@ impl Analyzer {
         let mut ancestors = ancestors;
         while let Some((id, node)) = ancestors.pop() {
             let mut node_analyzer =
-                NodeAnalyzer::new(id, location, &self, &mut state, &mut generics_state);
+                NodeAnalyzer::new(id, location, &self, &mut generics_state);
             node_analyzer.ancestors = &ancestors[..];
             node_analyzer.analyze_node(node);
-            
+
             if node_analyzer.help.is_some() {
                 return node_analyzer.result();
             }
@@ -303,7 +305,6 @@ impl<'a> NodeAnalyzer<'a> {
         id: NodeId,
         location: Location,
         analyzer: &'a Analyzer,
-        state: &'a mut HashMap<NodeId, NodeId>,
         generics_state: &'a mut GenericsState,
     ) -> NodeAnalyzer<'a> {
         NodeAnalyzer {
@@ -313,7 +314,6 @@ impl<'a> NodeAnalyzer<'a> {
             ptr_to_id: &analyzer.ptr_to_id,
             ancestors: &[],
             help: None,
-            state,
             generics_state,
         }
     }
@@ -331,7 +331,6 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::ItemTrait(i) => self.visit_item_trait_first_pass(i),
             Syn::ItemUnion(i) => self.visit_item_union_first_pass(i),
             Syn::Local(i) => self.visit_local_first_pass(i),
-            Syn::TypeParam(i) => self.visit_type_param_first_pass(i),
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
             _ => {}
         }
@@ -409,7 +408,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::ForeignItemType(i) => self.visit_foreign_item_type(i),
             Syn::GenericArgument(_i) => { /* self.visit_generic_argument(i) */ }
             Syn::GenericMethodArgument(_i) => { /* self.visit_generic_method_argument(i) */ }
-            Syn::GenericParam(_i) => { /* self.visit_generic_param(i) */ }
+            Syn::GenericParam(i) => self.visit_generic_param(i),
             Syn::Generics(_i) => { /* self.visit_generics(i) */ }
             Syn::Ident(i) => self.visit_ident(i),
             Syn::ImplItem(_i) => { /* self.visit_impl_item(i) */ }
@@ -570,6 +569,16 @@ impl<'a> NodeAnalyzer<'a> {
             .map(|(_, node)| *node)
     }
 
+    fn get_ancestor_id(&self, ancestor: usize) -> Option<NodeId> {
+        self.ancestors
+            .get(self.ancestors.len() - ancestor)
+            .map(|(node_id, _)| *node_id)
+    }
+
+    fn id_to_syn(&self, id: NodeId) -> Option<Syn> {
+        self.id_to_ptr.get(&id).map(|ptr| ptr.ptr.as_syn())
+    }
+
     fn syn_to_id(&self, syn: Syn) -> Option<NodeId> {
         self.ptr_to_id.get(&Ptr::new(syn)).cloned()
     }
@@ -578,13 +587,26 @@ impl<'a> NodeAnalyzer<'a> {
         if self.generics_state.from_item.contains_key(&item_id) {
             return;
         }
+
         if let Some(generics) = self.analyze_generics(generics) {
+            // TODO(generics): we'll have to push here at some point
+            self.generics_state.stack = vec![item_id];
             self.generics_state.generics.push(generics);
             let id = self.generics_state.generics.len() - 1;
             self.generics_state.from_item.insert(item_id, id);
             self.generics_state.from_node.insert(node_id, id);
+        } else {
+            self.generics_state.stack = vec![];
         }
     }
+
+    fn generics_for(&self, id: NodeId) -> Option<&Generics> {
+        self.generics_state
+            .from_item
+            .get(&id)
+            .and_then(|&idx| self.generics_state.generics.get(idx))
+    }
+
     //============= VISIT METHODS
 
     fn visit_angle_bracketed_generic_arguments(
@@ -1139,9 +1161,9 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(
                 bound_lifetimes,
                 HelpItem::BoundLifetimesTraitBound {
-                    lifetime: format!("{}", lifetime.lifetime),
+                    lifetime: lifetime.lifetime.to_string(),
                     multiple,
-                    ty: format!("{}", node.path.to_token_stream()),
+                    ty: node.path.to_token_stream().to_string(),
                 },
             );
         }

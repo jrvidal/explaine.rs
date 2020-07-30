@@ -631,6 +631,12 @@ keyword = "const"
 
 [help.ConstParam]
 title = "`const` parameter"
+info = """`{ name }` is a _const_ parameter of the generic `{ of_name }` { of }.
+Const generics is an unstable feature that allows generalizing { of }s and other types of items based on concrete values."""
+keyword = "const"
+
+[help.ConstParamSimple]
+title = "`const` parameter"
 info = "A `const` generic parameter."
 keyword = "const"
 
@@ -692,17 +698,6 @@ book = "ch06-00-enums.html"
 title = "Variant Discriminant"
 info = "An explicit discriminant for the `{ name }` variant."
 # TODO: reference
-
-[help.ItemEnum]
-title = "`enum` Declaration"
-info = """The declaration for an `enum`, a data type specified through a list of variants.
-{{if empty}}
-
-This is an _empty enum_ without variants, which constitutes an [empty type](https://doc.rust-lang.org/nomicon/exotic-sizes.html#empty-types)
-which cannot be instantiated.
-{{endif}}"""
-keyword = "enum"
-book = "ch06-00-enums.html"
 
 [help.ItemForeignModAbi]
 title = "Extern Module"
@@ -961,12 +956,22 @@ title = "Unsafe Trait Implementation"
 info = "An `unsafe` trait implementation must be marked as such when the trait being implemented is `unsafe`."
 keyword = "unsafe"
 
+[help.ItemEnum]
+title = "`enum` Declaration"
+info = """The declaration for {{if generic}}a generic {{else}}an {{endif}}`enum`, a data type specified through a list of variants.
+{{if empty}}
+
+This is an _empty enum_ without variants, which constitutes an [empty type](https://doc.rust-lang.org/nomicon/exotic-sizes.html#empty-types)
+which cannot be instantiated.
+{{endif}}"""
+keyword = "enum"
+book = "ch06-00-enums.html"
+
 [help.ItemStruct]
 title = "`struct` Declaration"
-info = """The declaration for a `struct`, a data type{{if unit}} (usually){{endif}} defined by a list of fields.{{if unit}}
+info = """The declaration for a {{if generic}}generic {{endif}}`struct`, a data type{{if unit}} (usually){{endif}} defined by a list of fields.{{if unit}}
 
-In this case, `{ name }` is a _unit_ struct, with no fields.{{endif}}{{if generics}}
-{ @root | generics }{{endif}}"""
+In this case, `{ name }` is a _unit_ struct, with no fields.{{endif}}"""
 keyword = "struct"
 book = "ch05-01-defining-structs.html"
 pattern = ".."
@@ -983,9 +988,10 @@ for a given type, and such that those guarantees cannot be ensured by the compil
 keyword ="unsafe"
 
 [help.ItemTrait]
-title = "Trait Definition"
-info = "A trait declaration."
+title = "Trait Declaration"
+info = "The declaration for a {{if generic}}generic {{endif}}trait, that defines behavior for each type that implements it."
 keyword = "trait"
+book = "ch10-02-traits.html"
 
 [help.ItemTraitSupertraits]
 title = "Supertraits"
@@ -1052,8 +1058,14 @@ std = "primitive.never.html"
 
 [help.TypeParam]
 title = "Type Parameter"
-info = "This type parameter `{ name }` introduces generics!"
-# TODO
+info = """`{ name }` is a type parameter of the `{ of_name }` { of }, which is _generic_.
+It can be _instantiated_ for different types taking the place of `{ name }`."""
+book = "ch10-01-syntax.html"
+
+[help.TypeParamUse]
+title = "Type Parameter"
+info = """This is a type param usage!"""
+# TODO(generics)
 
 [help.TypeParamBoundAdd]
 title = "Trait Bounds"
@@ -1256,6 +1268,12 @@ info = "A right arrow token `->` used to signify the return type of this { retur
 title = "`'static` lifetime"
 info = "The `'static` lifetime is a special, constant lifetime that represents a value that can potentially live indefinitely."
 book = "ch10-03-lifetime-syntax.html#the-static-lifetime"
+
+[help.LifetimeParam]
+title = "Lifetime generic parameter"
+info = """`'{ name }` is a generic lifetime parameter of the `{ of_name }` { of }.
+A generic lifetime parameter indicates that this { of } is subject to the borrow checker."""
+# TODO
 
 [help.Comment-block]
 title = "Block Comment"

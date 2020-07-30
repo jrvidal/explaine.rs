@@ -107,7 +107,7 @@ impl SessionResult {
         self.result
             .as_ref()
             .err()
-            .map(|(err, _)| format!("{}", err))
+            .map(|(err, _)| err.to_string())
             .into()
     }
 
@@ -157,7 +157,8 @@ impl Session {
                 })
             }
             Err(err) => {
-                let block_result = syn::parse_str::<syn::Block>(&format!("{{{}}}", &source));
+                let wrapped_code = "{".to_string() + &source + "}";
+                let block_result = syn::parse_str::<syn::Block>(&wrapped_code);
                 Err((err, block_result.is_ok()))
             }
         };

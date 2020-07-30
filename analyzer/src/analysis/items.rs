@@ -1,5 +1,5 @@
 use super::NodeAnalyzer;
-use crate::help::{HelpItem, Generics};
+use crate::help::{GenericsOf, HelpItem};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 
@@ -7,7 +7,6 @@ macro_rules! generics {
     ($self:expr, $node:expr) => {
         let wrapped = (&$node.generics).into();
         if let Some(node_id) = $self.syn_to_id(wrapped) {
-            eprintln!("Filling with {:?}, {:?}", $self.id, node_id);
             $self.fill_generics_info($self.id, node_id, &$node.generics);
         }
     };
@@ -22,7 +21,8 @@ impl<'a> NodeAnalyzer<'a> {
     }
     pub(super) fn visit_item_enum(&mut self, node: &syn::ItemEnum) {
         token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
-            empty: node.variants.is_empty()
+            empty: node.variants.is_empty(),
+            generic: self.generics_for(self.id).is_some()
         }];
     }
     pub(super) fn visit_item_extern_crate(&mut self, node: &syn::ItemExternCrate) {
@@ -107,7 +107,6 @@ impl<'a> NodeAnalyzer<'a> {
             syn::Fields::Unit => true,
             _ => false,
         };
-        dbg![self.id, &self.generics_state.from_item];
         if self.between_spans(node.struct_token.span(), node.ident.span()) {
             return self.set_help_between(
                 node.struct_token.span(),
@@ -115,12 +114,7 @@ impl<'a> NodeAnalyzer<'a> {
                 HelpItem::ItemStruct {
                     unit,
                     name: node.ident.to_string(),
-                    generics: self
-                        .generics_state
-                        .from_item
-                        .get(&self.id)
-                        .map(|&idx| &self.generics_state.generics[idx])
-                        .map(|gen| Generics::from(gen)),
+                    generic: self.generics_for(self.id).is_some(),
                 },
             );
         }
@@ -131,7 +125,9 @@ impl<'a> NodeAnalyzer<'a> {
     pub(super) fn visit_item_trait(&mut self, node: &syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
         token![self, some node.auto_token, ItemAutoTrait];
-        token![self, node.trait_token, ItemTrait];
+        token![self, node.trait_token => node.ident, * HelpItem::ItemTrait {
+            generic: self.generics_for(self.id).is_some()
+        } ];
         if let Some(colon_token) = node.colon_token {
             if self.within(colon_token) {
                 let last = node
@@ -157,7 +153,13 @@ impl<'a> NodeAnalyzer<'a> {
         generics![self, node];
     }
     pub(super) fn visit_item_union(&mut self, node: &syn::ItemUnion) {
-        token![self, node.union_token, ItemUnion];
+        token![
+            self,
+            node.union_token,
+            *HelpItem::ItemUnion {
+                generic: self.generics_for(self.id).is_some()
+            }
+        ];
     }
     pub(super) fn visit_item_use(&mut self, node: &syn::ItemUse) {
         token![self, some node.leading_colon, PathLeadingColon];

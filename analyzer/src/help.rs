@@ -222,7 +222,13 @@ pub enum HelpItem {
     ImplItemConst,
     TraitItemConst,
     ItemConst,
-    ConstParam,
+    ConstParam {
+        name: String,
+        of: GenericsOf,
+        of_name: String
+    },
+    // TODO: fallback for retro-compatibility, remove when confident
+    ConstParamSimple,
     ConstFn,
     // TODO: specify `field` or `item` for visibility
     VisPublic,
@@ -238,9 +244,6 @@ pub enum HelpItem {
     },
     VariantDiscriminant {
         name: String,
-    },
-    ItemEnum {
-        empty: bool,
     },
     ItemForeignModAbi,
     FnAbi,
@@ -343,17 +346,25 @@ pub enum HelpItem {
     RawIdent,
     ImplItemType,
     ItemUnsafeImpl,
+    ItemEnum {
+        empty: bool,
+        generic: bool,
+    },
     ItemStruct {
         unit: bool,
         name: String,
-        generics: Option<Generics>
+        generic: bool,
     },
     ItemAutoTrait,
     ItemUnsafeTrait,
-    ItemTrait,
+    ItemTrait {
+        generic: bool,
+    },
     ItemTraitSupertraits,
     ItemType,
-    ItemUnion,
+    ItemUnion {
+        generic: bool,
+    },
     ItemUse,
     UnsafeFn,
     TraitBoundModifierQuestion {
@@ -368,7 +379,10 @@ pub enum HelpItem {
     TypeNever,
     TypeParam {
         name: String,
+        of: GenericsOf,
+        of_name: String
     },
+    TypeParamUse,
     TypeParamBoundAdd,
     TypeTupleUnit,
     TypeTuple {
@@ -426,6 +440,11 @@ pub enum HelpItem {
         return_of: ReturnOf,
     },
     StaticLifetime,
+    LifetimeParam {
+        of: GenericsOf,
+        name: String,
+        of_name: String,
+    },
     Comment {
         block: bool,
     },
@@ -535,6 +554,22 @@ help_data![
         pub type_: bool,
         pub lifetime: bool,
         pub const_: bool,
+        pub has_lifetime: bool,
+        pub has_const: bool,
+        pub of: GenericsOf,
+    }
+];
+
+help_data![
+    pub enum GenericsOf {
+        #[serde(rename(serialize = "struct"))]
+        Struct,
+        #[serde(rename(serialize = "trait"))]
+        Trait,
+        #[serde(rename(serialize = "union"))]
+        Union,
+        #[serde(rename(serialize = "enum"))]
+        Enum,
     }
 ];
 
@@ -565,17 +600,38 @@ impl HelpItem {
 }
 
 fn render_generics(value: &serde_json::Value, buffer: &mut String) {
-    let type_ = match value.get("type").and_then(|ty| ty.as_str()) {
-        Some("ItemStruct") => "struct",
-        _ => return
-    };
+    let lifetime = value
+        .get("lifetime")
+        .and_then(|val| val.as_bool())
+        .unwrap_or(false);
+    let type_ = value
+        .get("type_")
+        .and_then(|val| val.as_bool())
+        .unwrap_or(false);
+    let const_ = value
+        .get("const_")
+        .and_then(|val| val.as_bool())
+        .unwrap_or(false);
+    let of = value.get("of").and_then(|val| val.as_str()).unwrap_or("");
 
-    let generics = if let Some(generics) = value.get("generics").and_then(|gen| gen.as_object()) {
-        generics
-    } else {
-        return;
-    };
+    buffer.push_str("This ");
+    buffer.push_str(of);
+    buffer.push_str(" is _generic_ ");
 
+    // if type_ {
+    //     buffer.push_str("which means it can be _instantiated_ for particular values of ")
+    // }
 
-    buffer.push_str(&format!("This {type_} is _generic_", type_ = type_));
+    // buffer.push_str(context);
+}
+
+fn on_add_template<E>(result: Result<(), E>) {
+    #[cfg(features = "dev")]
+    {
+        result.unwrap();
+    }
+    #[cfg(not(features = "dev"))]
+    {
+        let _ = result;
+    }
 }

@@ -1,6 +1,7 @@
 use super::{NodeAnalyzer, Ptr};
 use crate::{
-    help::{self, HelpItem},
+    help::{self, GenericsOf, HelpItem},
+    ir::NodeId,
     syn_wrappers::Syn,
 };
 use quote::ToTokens;
@@ -9,9 +10,7 @@ const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 
 #[derive(Default, Clone)]
 pub(super) struct Generics {
-    pub type_: usize,
-    pub lifetime: usize,
-    pub const_: usize,
+    pub types: Vec<NodeId>,
 }
 
 impl<'a> NodeAnalyzer<'a> {
@@ -19,44 +18,74 @@ impl<'a> NodeAnalyzer<'a> {
         if node.lt_token.is_none() {
             return None;
         }
-        let mut generics = Generics::default();
-        for param in &node.params {
-            let count = match param {
-                syn::GenericParam::Type(_) => &mut generics.type_,
-                syn::GenericParam::Lifetime(_) => &mut generics.lifetime,
-                syn::GenericParam::Const(_) => &mut generics.const_,
-            };
-            *count = *count + 1;
-        }
-        Some(generics)
+
+        let types = node
+            .params
+            .iter()
+            .filter_map(|param| match param {
+                syn::GenericParam::Type(ty) => Some(ty),
+                _ => None,
+            })
+            .filter_map(|ty| self.syn_to_id((&ty.ident).into()))
+            .collect();
+
+        Some(Generics { types })
     }
     pub(super) fn visit_const_param(&mut self, node: &syn::ConstParam) {
-        token![self, node.const_token, ConstParam];
+        if let Some(declaration) = self.find_declaration() {
+            let (of, of_name) = (&declaration).into();
+            return self.set_help(
+                node,
+                HelpItem::ConstParam {
+                    name: node.ident.to_token_stream().to_string(),
+                    of,
+                    of_name,
+                },
+            );
+        }
+        token![self, node.const_token, ConstParamSimple];
     }
-    pub(super) fn visit_type_param_first_pass(&mut self, _: &syn::TypeParam) {
-        let scope_id = match self.get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER) {
-            Some(i @ Syn::ItemStruct(_)) => self.ptr_to_id.get(&Ptr::new(i.clone())).cloned(),
-            _ => None,
+    pub(super) fn visit_generic_param(&mut self, node: &syn::GenericParam) {
+        let node = match node {
+            syn::GenericParam::Lifetime(lifetime) => lifetime,
+            _ => return,
         };
-        if let Some(scope_id) = scope_id {
-            self.state.insert(self.id, scope_id);
+
+        let lifetime_range = (node.lifetime.apostrophe, node.lifetime.ident.span());
+
+        if !self.between_spans(lifetime_range.0, lifetime_range.1) {
+            return;
+        }
+
+        if let Some(declaration) = self.find_declaration_at(DISTANCE_TYPE_PARAM_TO_CONTAINER - 1) {
+            let (of, of_name) = (&declaration).into();
+            return self.set_help_between(
+                lifetime_range.0,
+                lifetime_range.1,
+                HelpItem::LifetimeParam {
+                    name: node.lifetime.ident.to_string(),
+                    of,
+                    of_name,
+                },
+            );
         }
     }
+
     pub(super) fn visit_predicate_type(&mut self, node: &syn::PredicateType) {
         token![self, node.lifetimes, BoundLifetimes];
     }
     pub(super) fn visit_type_param(&mut self, node: &syn::TypeParam) {
-        let is_def = self
-            .get_ancestor(DISTANCE_TYPE_PARAM_TO_CONTAINER)
-            .and_then(|container| self.ptr_to_id.get(&Ptr::new(container.clone())))
-            .map(|container_id| Some(container_id) == self.state.get(&self.id))
-            .unwrap_or(false);
-
-        if is_def {
+        if !self.between_spans(node.ident.span(), node.ident.span()) {
+            return;
+        }
+        if let Some(declaration) = self.find_declaration() {
+            let (of, of_name) = (&declaration).into();
             return self.set_help(
                 &node.ident,
                 HelpItem::TypeParam {
                     name: node.ident.to_token_stream().to_string(),
+                    of,
+                    of_name,
                 },
             );
         }
@@ -64,14 +93,29 @@ impl<'a> NodeAnalyzer<'a> {
     pub(super) fn visit_where_clause(&mut self, node: &syn::WhereClause) {
         token![self, node.where_token, WhereClause];
     }
+
+    fn find_declaration(&self) -> Option<Syn> {
+        self.find_declaration_at(DISTANCE_TYPE_PARAM_TO_CONTAINER)
+    }
+    fn find_declaration_at(&self, height: usize) -> Option<Syn> {
+        self.get_ancestor_id(height)
+            .and_then(|container_id| self.generics_state.from_item.get(&container_id))
+            .and_then(|&idx| self.generics_state.generics.get(idx))
+            .and_then(|_| self.get_ancestor(height))
+    }
 }
 
-impl<'a> From<&'a Generics> for help::Generics {
-    fn from(generics: &'a Generics) -> Self {
-        Self {
-            type_: generics.type_ > 0,
-            lifetime: generics.lifetime > 0,
-            const_: generics.const_ > 0,
+impl<'a, 'b> From<&'a Syn<'b>> for (GenericsOf, String) {
+    fn from(node: &'a Syn<'b>) -> Self {
+        match node {
+            Syn::ItemStruct(item) => (GenericsOf::Struct, item.ident.to_string()),
+            Syn::ItemEnum(item) => (GenericsOf::Enum, item.ident.to_string()),
+            Syn::ItemUnion(item) => (GenericsOf::Union, item.ident.to_string()),
+            Syn::ItemTrait(item) => (GenericsOf::Trait, item.ident.to_string()),
+            node => {
+                debug_assert!(false, "unreachable {:?}", node.kind());
+                (GenericsOf::Struct, "".to_string())
+            }
         }
     }
 }
