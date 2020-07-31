@@ -1,6 +1,6 @@
-use super::{generics::Generics, NodeAnalyzer};
+use super::NodeAnalyzer;
 use crate::{
-    ir::NodeId,
+    help::GenericsOf,
     syn_wrappers::{Syn, SynKind},
     HelpItem,
 };
@@ -59,15 +59,27 @@ impl<'a> NodeAnalyzer<'a> {
                     })
             };
 
-            if let Some((item_id, declaration)) = self
+            let help = if let Some((_, declaration)) = self
                 .generics_state
                 .stack
                 .iter()
                 .rev()
                 .find_map(|item_id| find_generics(item_id).map(|gen| (*item_id, gen)))
             {
-                return self.set_help(node, HelpItem::TypeParamUse);
-            }
+                HelpItem::TypeParamUse {
+                    of: declaration.of,
+                    of_name: declaration.of_name.clone(),
+                    name: ident.to_string(),
+                    implementation: match declaration.of {
+                        GenericsOf::Impl => true,
+                        _ => false,
+                    },
+                }
+            } else {
+                return;
+            };
+
+            self.set_help(node, help);
         }
     }
     pub(super) fn visit_type_ptr(&mut self, node: &syn::TypePtr) {

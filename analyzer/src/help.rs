@@ -5,14 +5,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 
 std::thread_local! {
-    static TEMPLATE: tinytemplate::TinyTemplate<'static> = {
-        let mut template = init_template();
-        template.add_formatter("generics", |value, bf| {
-            render_generics(value, bf);
-            Ok(())
-        });
-        template
-    };
+    static TEMPLATE: tinytemplate::TinyTemplate<'static> = init_template();
 }
 
 struct HelpData {
@@ -225,7 +218,7 @@ pub enum HelpItem {
     ConstParam {
         name: String,
         of: GenericsOf,
-        of_name: String
+        of_name: String,
     },
     // TODO: fallback for retro-compatibility, remove when confident
     ConstParamSimple,
@@ -380,9 +373,14 @@ pub enum HelpItem {
     TypeParam {
         name: String,
         of: GenericsOf,
-        of_name: String
+        of_name: String,
     },
-    TypeParamUse,
+    TypeParamUse {
+        name: String,
+        of: GenericsOf,
+        of_name: String,
+        implementation: bool,
+    },
     TypeParamBoundAdd,
     TypeTupleUnit,
     TypeTuple {
@@ -570,6 +568,18 @@ help_data![
         Union,
         #[serde(rename(serialize = "enum"))]
         Enum,
+        #[serde(rename(serialize = "function"))]
+        Fn,
+        #[serde(rename(serialize = "impl"))]
+        Impl,
+        #[serde(rename(serialize = "type alias"))]
+        Type,
+        #[serde(rename(serialize = "method"))]
+        ImplMethod,
+        #[serde(rename(serialize = "trait alias"))]
+        TraitAlias,
+        #[serde(rename(serialize = "type alias"))]
+        TraitType,
     }
 ];
 
@@ -597,32 +607,6 @@ impl HelpItem {
     fn data(&self) -> HelpData {
         help_to_template_data(self)
     }
-}
-
-fn render_generics(value: &serde_json::Value, buffer: &mut String) {
-    let lifetime = value
-        .get("lifetime")
-        .and_then(|val| val.as_bool())
-        .unwrap_or(false);
-    let type_ = value
-        .get("type_")
-        .and_then(|val| val.as_bool())
-        .unwrap_or(false);
-    let const_ = value
-        .get("const_")
-        .and_then(|val| val.as_bool())
-        .unwrap_or(false);
-    let of = value.get("of").and_then(|val| val.as_str()).unwrap_or("");
-
-    buffer.push_str("This ");
-    buffer.push_str(of);
-    buffer.push_str(" is _generic_ ");
-
-    // if type_ {
-    //     buffer.push_str("which means it can be _instantiated_ for particular values of ")
-    // }
-
-    // buffer.push_str(context);
 }
 
 fn on_add_template<E>(result: Result<(), E>) {

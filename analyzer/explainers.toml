@@ -1064,7 +1064,8 @@ book = "ch10-01-syntax.html"
 
 [help.TypeParamUse]
 title = "Type Parameter"
-info = """This is a type param usage!"""
+info = """This `{ name }` refers to the type parameter in{{if implementation}} the surrounding implementation{{else}}
+the declaration of the `{ of_name }` { of }{{endif}}."""
 # TODO(generics)
 
 [help.TypeParamBoundAdd]

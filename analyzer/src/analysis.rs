@@ -36,7 +36,6 @@ macro_rules! token {
         }
     };
 }
-
 macro_rules! get_ancestor {
     ($self:ident, $ty:ident, $depth:expr) => {
         match $self.get_ancestor($depth) {
@@ -49,6 +48,7 @@ macro_rules! get_ancestor {
 mod expressions;
 mod generics;
 mod items;
+mod nested_items;
 mod patterns;
 mod types;
 
@@ -99,7 +99,7 @@ struct GenericsState {
     generics: Vec<Generics>,
     from_item: HashMap<NodeId, usize>,
     from_node: HashMap<NodeId, usize>,
-    stack: Vec<NodeId>
+    stack: Vec<NodeId>,
 }
 
 pub struct AnalysisResult {
@@ -249,8 +249,7 @@ impl Analyzer {
 
         let mut ancestors = ancestors;
         while let Some((id, node)) = ancestors.pop() {
-            let mut node_analyzer =
-                NodeAnalyzer::new(id, location, &self, &mut generics_state);
+            let mut node_analyzer = NodeAnalyzer::new(id, location, &self, &mut generics_state);
             node_analyzer.ancestors = &ancestors[..];
             node_analyzer.analyze_node(node);
 
@@ -327,9 +326,14 @@ impl<'a> NodeAnalyzer<'a> {
         match node {
             Syn::ExprForLoop(i) => self.visit_expr_for_loop_first_pass(i),
             Syn::ItemEnum(i) => self.visit_item_enum_first_pass(i),
+            Syn::ItemFn(i) => self.visit_item_fn_first_pass(i),
+            Syn::ItemImpl(i) => self.visit_item_impl_first_pass(i),
             Syn::ItemStruct(i) => self.visit_item_struct_first_pass(i),
             Syn::ItemTrait(i) => self.visit_item_trait_first_pass(i),
+            Syn::ItemTraitAlias(i) => self.visit_item_trait_alias_first_pass(i),
             Syn::ItemUnion(i) => self.visit_item_union_first_pass(i),
+            Syn::ImplItemMethod(i) => self.visit_impl_item_method_first_pass(i),
+            Syn::TraitItemMethod(i) => self.visit_trait_item_method_first_pass(i),
             Syn::Local(i) => self.visit_local_first_pass(i),
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
             _ => {}
@@ -583,20 +587,32 @@ impl<'a> NodeAnalyzer<'a> {
         self.ptr_to_id.get(&Ptr::new(syn)).cloned()
     }
 
-    fn fill_generics_info(&mut self, item_id: NodeId, node_id: NodeId, generics: &syn::Generics) {
+    fn fill_generics_info(&mut self, item_id: NodeId, generics: &syn::Generics, reset: bool) {
         if self.generics_state.from_item.contains_key(&item_id) {
             return;
         }
 
+        let node_id = if let Some(node_id) = self.syn_to_id(generics.into()) {
+            node_id
+        } else {
+            return;
+        };
+
         if let Some(generics) = self.analyze_generics(generics) {
-            // TODO(generics): we'll have to push here at some point
-            self.generics_state.stack = vec![item_id];
+            if reset {
+                self.generics_state.stack = vec![item_id];
+            } else {
+                self.generics_state.stack.push(item_id);
+            }
+
             self.generics_state.generics.push(generics);
             let id = self.generics_state.generics.len() - 1;
             self.generics_state.from_item.insert(item_id, id);
             self.generics_state.from_node.insert(node_id, id);
         } else {
-            self.generics_state.stack = vec![];
+            if reset {
+                self.generics_state.stack = vec![];
+            }
         }
     }
 
@@ -885,42 +901,6 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(node, HelpItem::RawIdent);
         }
     }
-    fn visit_impl_item_const(&mut self, node: &syn::ImplItemConst) {
-        token![self, node.const_token, ImplItemConst];
-    }
-    fn visit_impl_item_method(&mut self, node: &syn::ImplItemMethod) {
-        if !self.between(&node.sig.fn_token, &node.sig.ident) {
-            return;
-        }
-
-        let is_method = receiver_help(&node.sig).is_some();
-        let trait_ = get_ancestor![self, ItemImpl, 2].and_then(|item| item.trait_.as_ref());
-
-        let of = if is_method {
-            FnOf::Method
-        } else {
-            FnOf::AssociatedFunction
-        };
-
-        if let Some(impl_) = get_ancestor![self, ItemImpl, 2] {
-            // TODO: handle bang
-            // TODO: better formatting
-            let trait_ = trait_.map(|(_bang, path, _)| path.to_token_stream().to_string());
-            let self_ty = (&*impl_.self_ty).to_token_stream().to_string();
-            return self.set_help_between(
-                node.sig.fn_token.span(),
-                node.sig.ident.span(),
-                HelpItem::ImplItemMethod {
-                    of,
-                    trait_,
-                    self_ty,
-                },
-            );
-        }
-    }
-    fn visit_impl_item_type(&mut self, node: &syn::ImplItemType) {
-        token![self, node.type_token, ImplItemType];
-    }
     fn visit_label(&mut self, node: &syn::Label) {
         let loop_of = if get_ancestor![self, ExprLoop, 1].is_some() {
             LoopOf::Loop
@@ -1175,34 +1155,6 @@ impl<'a> NodeAnalyzer<'a> {
                 },
             );
         }
-    }
-    fn visit_trait_item_const(&mut self, node: &syn::TraitItemConst) {
-        token![self, node.const_token, TraitItemConst];
-    }
-    fn visit_trait_item_method(&mut self, node: &syn::TraitItemMethod) {
-        let of = if receiver_help(&node.sig).is_some() {
-            FnOf::Method
-        } else {
-            FnOf::AssociatedFunction
-        };
-        if !self.between(&node.sig.fn_token, &node.sig.ident) {
-            return;
-        }
-        if let Some(trait_) = get_ancestor![self, ItemTrait, 2] {
-            let trait_ = trait_.ident.to_string();
-            return self.set_help_between(
-                node.sig.fn_token.span(),
-                node.sig.ident.span(),
-                HelpItem::TraitItemMethod {
-                    of,
-                    default: node.default.is_some(),
-                    trait_,
-                },
-            );
-        }
-    }
-    fn visit_trait_item_type(&mut self, node: &syn::TraitItemType) {
-        token![self, node.type_token, TraitItemType];
     }
     fn visit_use_glob(&mut self, node: &syn::UseGlob) {
         return self.set_help(node, HelpItem::UseGlob);

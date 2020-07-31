@@ -1,6 +1,6 @@
-use super::{NodeAnalyzer, Ptr};
+use super::NodeAnalyzer;
 use crate::{
-    help::{self, GenericsOf, HelpItem},
+    help::{GenericsOf, HelpItem},
     ir::NodeId,
     syn_wrappers::Syn,
 };
@@ -8,9 +8,11 @@ use quote::ToTokens;
 
 const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub(super) struct Generics {
     pub types: Vec<NodeId>,
+    pub of: GenericsOf,
+    pub of_name: String,
 }
 
 impl<'a> NodeAnalyzer<'a> {
@@ -29,7 +31,10 @@ impl<'a> NodeAnalyzer<'a> {
             .filter_map(|ty| self.syn_to_id((&ty.ident).into()))
             .collect();
 
-        Some(Generics { types })
+        // TODO(generics): a bit absurd, given that we are already at the item
+        let (of, of_name) = self.id_to_syn(self.id).map(|syn| (&syn).into())?;
+
+        Some(Generics { types, of, of_name })
     }
     pub(super) fn visit_const_param(&mut self, node: &syn::ConstParam) {
         if let Some(declaration) = self.find_declaration() {
@@ -112,6 +117,11 @@ impl<'a, 'b> From<&'a Syn<'b>> for (GenericsOf, String) {
             Syn::ItemEnum(item) => (GenericsOf::Enum, item.ident.to_string()),
             Syn::ItemUnion(item) => (GenericsOf::Union, item.ident.to_string()),
             Syn::ItemTrait(item) => (GenericsOf::Trait, item.ident.to_string()),
+            Syn::ItemTraitAlias(item) => (GenericsOf::TraitAlias, item.ident.to_string()),
+            Syn::ItemFn(item) => (GenericsOf::Fn, item.sig.ident.to_string()),
+            Syn::ItemImpl(_) => (GenericsOf::Impl, "".to_string()),
+            Syn::ImplItemMethod(item) => (GenericsOf::ImplMethod, item.sig.ident.to_string()),
+            Syn::TraitItemMethod(item) => (GenericsOf::ImplMethod, item.sig.ident.to_string()),
             node => {
                 debug_assert!(false, "unreachable {:?}", node.kind());
                 (GenericsOf::Struct, "".to_string())

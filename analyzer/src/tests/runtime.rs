@@ -34,12 +34,12 @@ pub fn test_example(source: &str) {
 
 struct RunData {
     naked: bool,
-    expected_item: HelpItem,
+    expected_item: Option<HelpItem>,
     span: (Location, Location),
 }
 
 fn parse_run_data(lines: &[&str]) -> RunData {
-    let mut item: Option<HelpItem> = None;
+    let mut item: Result<Option<HelpItem>, ()> = Err(());
     let mut span = None;
     let mut naked = false;
 
@@ -65,6 +65,10 @@ fn parse_run_data(lines: &[&str]) -> RunData {
         }
         if line.starts_with("item:") {
             let item_line = &line[("item:".len())..].trim();
+            if item_line == &"null" {
+                item = Ok(None);
+                continue;
+            }
             let variant = item_line.split(" ").next().expect("variant first element");
             let data_line = format!("{{{}}}", &item_line[variant.len()..].trim());
             let mut help_data: serde_yaml::Mapping =
@@ -72,7 +76,7 @@ fn parse_run_data(lines: &[&str]) -> RunData {
             help_data.insert("type".into(), variant.into());
             let help_item: HelpItem =
                 serde_yaml::from_value(help_data.into()).expect("item parsing");
-            item = Some(help_item);
+            item = Ok(Some(help_item));
             continue;
         }
         if line.starts_with("naked:") {
@@ -123,16 +127,24 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
 
     let analyzer = ir_visitor.visit();
 
-    let result = if let Some(result) = analyzer.analyze(Location {
+    let result = analyzer.analyze(Location {
         line: line + 1 + offset,
         column,
-    }) {
-        result
+    });
+
+    assert_eq!(
+        run_data.expected_item.as_ref(),
+        result.as_ref().map(|r| &r.help),
+        "Case #{}",
+        case
+    );
+
+    let result = if result.is_some() {
+        result.unwrap()
     } else {
-        panic!("Should find help (case #{})", case);
+        return;
     };
 
-    assert_eq!(run_data.expected_item, result.help, "Case #{}", case);
     let adjusted = (
         Location {
             line: result.start.line - offset,

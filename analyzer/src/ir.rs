@@ -2,7 +2,7 @@ use crate::syn_wrappers::{Comment, Syn, SynKind};
 use proc_macro2::Span;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
-use std::{rc::Rc, ptr::NonNull};
+use std::{ptr::NonNull, rc::Rc};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -129,7 +129,6 @@ impl IrVisitor {
 
         self.add_comments(&mut locations);
 
-        
         crate::analysis::Analyzer {
             locations,
             id_to_ptr: self.id_to_ptr,

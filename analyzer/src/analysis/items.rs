@@ -5,10 +5,7 @@ use syn::spanned::Spanned;
 
 macro_rules! generics {
     ($self:expr, $node:expr) => {
-        let wrapped = (&$node.generics).into();
-        if let Some(node_id) = $self.syn_to_id(wrapped) {
-            $self.fill_generics_info($self.id, node_id, &$node.generics);
-        }
+        $self.fill_generics_info($self.id, &$node.generics, true);
     };
 }
 
@@ -31,11 +28,17 @@ impl<'a> NodeAnalyzer<'a> {
         }
         token![self, node.extern_token, ItemExternCrate];
     }
+    pub(super) fn visit_item_fn_first_pass(&mut self, node: &syn::ItemFn) {
+        self.fill_generics_info(self.id, &node.sig.generics, true);
+    }
     pub(super) fn visit_item_fn(&mut self, node: &syn::ItemFn) {
         token![self, node.sig.fn_token => node.sig.ident, ItemFn];
     }
     pub(super) fn visit_item_foreign_mod(&mut self, node: &syn::ItemForeignMod) {
         token![self, node.abi, ItemForeignModAbi];
+    }
+    pub(super) fn visit_item_impl_first_pass(&mut self, node: &syn::ItemImpl) {
+        generics![self, node];
     }
     pub(super) fn visit_item_impl(&mut self, node: &syn::ItemImpl) {
         token![self, some node.unsafety, ItemUnsafeImpl];
@@ -142,6 +145,9 @@ impl<'a> NodeAnalyzer<'a> {
                 );
             }
         }
+    }
+    pub(super) fn visit_item_trait_alias_first_pass(&mut self, node: &syn::ItemTraitAlias) {
+        generics![self, node];
     }
     pub(super) fn visit_item_trait_alias(&mut self, node: &syn::ItemTraitAlias) {
         token![self, node.trait_token, ItemTraitAlias];
