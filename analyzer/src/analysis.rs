@@ -1,5 +1,5 @@
 use crate::help::*;
-use crate::ir::{Location, NodeId, Owner, Ptr, PtrData, Range};
+use crate::ir::{Location, Node, NodeId, NodeMap, Owner, Range, RawSyn};
 use crate::syn_wrappers::{Comment, Syn, SynKind};
 use generics::Generics;
 use proc_macro2::{LineColumn, Span};
@@ -78,8 +78,7 @@ impl<'a, I: Iterator<Item = Location>> Iterator for ExplorationIterator<'a, I> {
 }
 
 pub struct Analyzer {
-    pub(crate) id_to_ptr: HashMap<NodeId, PtrData>,
-    pub(crate) ptr_to_id: HashMap<Ptr, NodeId>,
+    pub(crate) node_map: NodeMap,
     pub(crate) locations: Vec<(NodeId, Range)>,
     pub(crate) owner: Rc<Owner>,
 }
@@ -87,8 +86,7 @@ pub struct Analyzer {
 struct NodeAnalyzer<'a> {
     id: NodeId,
     location: Location,
-    id_to_ptr: &'a HashMap<NodeId, PtrData>,
-    ptr_to_id: &'a HashMap<Ptr, NodeId>,
+    analyzer: &'a Analyzer,
     ancestors: &'a [(NodeId, Syn<'a>)],
     generics_state: &'a mut GenericsState,
     help: Option<(Range, HelpItem)>,
@@ -219,9 +217,13 @@ impl Analyzer {
             let mut ancestors = vec![];
             let mut id = id;
 
-            while let Some(data) = self.id_to_ptr.get(&id) {
-                ancestors.push((id, data.ptr.as_syn()));
-                id = data.parent;
+            while let Some(node) = self.node_map.get(id) {
+                ancestors.push((id, unsafe { node.element.as_syn() }));
+                id = if let Some(parent_id) = node.parent() {
+                    parent_id
+                } else {
+                    break;
+                }
             }
 
             ancestors.reverse();
@@ -261,41 +263,49 @@ impl Analyzer {
         None
     }
 
-    fn descendant_of(&self, child: NodeId, ancestor: NodeId) -> Option<std::cmp::Ordering> {
-        let mut node = child;
+    fn descendant_of(&self, child_id: NodeId, ancestor_id: NodeId) -> Option<std::cmp::Ordering> {
+        let mut node_id = child_id;
         let mut ancestors = HashSet::new();
 
         loop {
-            node = if let Some(ptr) = self.id_to_ptr.get(&node) {
-                ptr.parent
+            node_id = if let Some(parent_id) = self.node_map.get_parent(node_id) {
+                parent_id
             } else {
                 break;
             };
 
-            ancestors.insert(node);
+            ancestors.insert(node_id);
 
-            if node == ancestor {
+            if node_id == ancestor_id {
                 return Some(std::cmp::Ordering::Less);
             }
         }
 
-        node = ancestor;
+        node_id = ancestor_id;
 
         loop {
-            node = if let Some(ptr) = self.id_to_ptr.get(&node) {
-                ptr.parent
+            node_id = if let Some(parent_id) = self.node_map.get_parent(node_id) {
+                parent_id
             } else {
                 break;
             };
 
-            if node == child {
+            if node_id == child_id {
                 return Some(std::cmp::Ordering::Greater);
-            } else if ancestors.contains(&node) {
+            } else if ancestors.contains(&node_id) {
                 return None;
             }
         }
 
         None
+    }
+
+    fn id_to_syn(&self, id: NodeId) -> Option<Syn> {
+        self.node_map.id_to_syn(id)
+    }
+
+    fn syn_to_id(&self, syn: Syn) -> Option<NodeId> {
+        self.node_map.syn_to_id(syn)
     }
 }
 
@@ -309,8 +319,7 @@ impl<'a> NodeAnalyzer<'a> {
         NodeAnalyzer {
             id,
             location,
-            id_to_ptr: &analyzer.id_to_ptr,
-            ptr_to_id: &analyzer.ptr_to_id,
+            analyzer,
             ancestors: &[],
             help: None,
             generics_state,
@@ -580,11 +589,11 @@ impl<'a> NodeAnalyzer<'a> {
     }
 
     fn id_to_syn(&self, id: NodeId) -> Option<Syn> {
-        self.id_to_ptr.get(&id).map(|ptr| ptr.ptr.as_syn())
+        self.analyzer.id_to_syn(id)
     }
 
     fn syn_to_id(&self, syn: Syn) -> Option<NodeId> {
-        self.ptr_to_id.get(&Ptr::new(syn)).cloned()
+        self.analyzer.syn_to_id(syn)
     }
 
     fn fill_generics_info(&mut self, item_id: NodeId, generics: &syn::Generics, reset: bool) {
@@ -641,27 +650,26 @@ impl<'a> NodeAnalyzer<'a> {
     }
     fn visit_attribute(&mut self, node: &syn::Attribute) {
         let is_comment = |id| {
-            self.id_to_ptr
+            self.analyzer
+                .node_map
                 .get(id)
                 .into_iter()
-                .flat_map(|data| data.children.iter())
-                .filter_map(|child| self.id_to_ptr.get(child))
-                .any(|child_data| child_data.ptr.kind() == SynKind::Comment)
+                .flat_map(|n| n.children.iter())
+                .filter_map(|&child_id| self.analyzer.node_map.get(child_id))
+                .any(|child_node| child_node.element.kind() == SynKind::Comment)
         };
 
-        if !node.path.is_ident("doc") || !is_comment(&self.id) {
+        if !node.path.is_ident("doc") || !is_comment(self.id) {
             return self.visit_explicit_attribute(node);
         }
 
         let outer = outer_attr(node);
 
-        let parent_data = self
-            .id_to_ptr
-            .get(&self.id)
-            .map(|data| data.parent)
-            .and_then(|parent_id| self.id_to_ptr.get(&parent_id));
+        let parent_id = self.analyzer.node_map.get_parent(self.id);
 
-        let parent = parent_data.map(|data| data.ptr.as_syn());
+        let parent_node = parent_id.and_then(|parent_id| self.analyzer.node_map.get(parent_id));
+
+        let parent = parent_id.and_then(|parent_id| self.id_to_syn(parent_id));
 
         let attributes = parent
             .as_ref()
@@ -675,11 +683,10 @@ impl<'a> NodeAnalyzer<'a> {
         let attribute_ids: Vec<NodeId> = {
             let mut ids = vec![];
 
-            let node_to_id = parent_data
+            let node_to_id = parent_node
                 .into_iter()
-                .flat_map(|data| &data.children)
-                .filter_map(|id| self.id_to_ptr.get(id).map(|data| (data, id)))
-                .map(|(data, id)| (data.ptr.as_syn().data(), *id))
+                .flat_map(|n| &n.children)
+                .filter_map(|&id| self.id_to_syn(id).map(|syn| (syn.data(), id)))
                 .collect::<HashMap<_, _>>();
 
             for attr in attributes {
@@ -711,7 +718,7 @@ impl<'a> NodeAnalyzer<'a> {
                 i >= this_idx
                     && attr.path.is_ident("doc")
                     && outer_attr(attr) == outer
-                    && is_comment(&attribute_ids[i])
+                    && is_comment(attribute_ids[i])
             })
             .last()
             .expect("last")
@@ -725,13 +732,16 @@ impl<'a> NodeAnalyzer<'a> {
                 i <= this_idx
                     && !(attr.path.is_ident("doc")
                         && outer_attr(attr) == outer
-                        && is_comment(&attribute_ids[i]))
+                        && is_comment(attribute_ids[i]))
             })
             .next()
             .map(|(i, _)| &attributes[i - 1])
             .unwrap_or(&attributes[0]);
 
-        return self.set_help_between(start.span(), last.span(), HelpItem::DocBlock { outer });
+        let start_span = start.span();
+        let end_span = last.span();
+
+        return self.set_help_between(start_span, end_span, HelpItem::DocBlock { outer });
     }
 
     fn visit_bin_op(&mut self, node: &syn::BinOp) {
@@ -1040,11 +1050,12 @@ impl<'a> NodeAnalyzer<'a> {
     fn visit_path(&mut self, node: &syn::Path) {
         let qself = loop {
             let ancestor = if let Some(ancestor) = self
-                .id_to_ptr
-                .get(&self.id)
-                .and_then(|data| self.id_to_ptr.get(&data.parent))
+                .analyzer
+                .node_map
+                .get_parent(self.id)
+                .and_then(|parent_id| self.id_to_syn(parent_id))
             {
-                ancestor.ptr.as_syn()
+                ancestor
             } else {
                 return;
             };

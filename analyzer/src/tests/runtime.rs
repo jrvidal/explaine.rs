@@ -4,10 +4,7 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 pub fn test_example(source: &str) {
-    let lines: Vec<_> = source
-        .lines()
-        .filter(|l| !l.trim().starts_with("#"))
-        .collect();
+    let lines: Vec<_> = source.lines().collect();
     let blocks = lines.iter().fold(vec![vec![]], |mut acc, line| {
         if line.starts_with("---") {
             acc.push(vec![]);
@@ -109,7 +106,12 @@ fn run_case(code: &[&str], run_data: RunData, case: usize) {
         .flat_map(|(ln, l)| l.match_indices("<|>").map(move |m| (ln, m)))
         .collect::<Vec<_>>();
 
-    assert_eq!(cursors.len(), 1, "Only one cursor per spec");
+    assert_eq!(
+        cursors.len(),
+        1,
+        "One, and only one cursor per spec {:?}",
+        code
+    );
     let (line, (column, _)) = cursors.pop().unwrap();
 
     source_lines[line]

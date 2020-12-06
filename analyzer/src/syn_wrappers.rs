@@ -185,6 +185,7 @@ pub enum Syn<'a> {
     Visibility(&'a syn::Visibility),
     WhereClause(&'a syn::WhereClause),
     WherePredicate(&'a syn::WherePredicate),
+    // This is a fake node that does not actually come from Syn
     Comment(&'a Comment),
 }
 

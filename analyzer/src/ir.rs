@@ -6,14 +6,10 @@ use std::{ptr::NonNull, rc::Rc};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
+const NO_PARENT: NodeId = NodeId(std::usize::MAX);
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Debug)]
 pub struct NodeId(usize);
-
-impl From<usize> for NodeId {
-    fn from(n: usize) -> Self {
-        NodeId(n)
-    }
-}
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Copy, Debug)]
 pub struct Location {
@@ -34,22 +30,24 @@ impl From<proc_macro2::LineColumn> for Location {
 
 pub type Owner = (syn::File, Vec<Comment>);
 
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub(crate) struct Ptr {
-    ptr: NonNull<()>,
+#[derive(Clone, PartialEq, Hash, Eq, Debug)]
+pub(crate) struct RawSyn {
+    pointer: NonNull<()>,
     kind: SynKind,
 }
 
-impl Ptr {
-    pub fn new(node: Syn) -> Self {
-        Ptr {
-            kind: (&node).into(),
-            ptr: unsafe { NonNull::new_unchecked(node.data() as *mut _) },
+impl<'a> From<Syn<'a>> for RawSyn {
+    fn from(syn: Syn<'a>) -> Self {
+        RawSyn {
+            kind: (&syn).into(),
+            pointer: unsafe { NonNull::new_unchecked(syn.data() as *mut _) },
         }
     }
+}
 
-    pub fn as_syn(&self) -> Syn {
-        unsafe { Syn::from_raw(self.ptr.as_ptr() as *const _, self.kind) }
+impl RawSyn {
+    pub unsafe fn as_syn<'a, 'b>(&'a self) -> Syn<'b> {
+        Syn::from_raw(self.pointer.as_ptr() as *const _, self.kind)
     }
 
     pub fn kind(&self) -> SynKind {
@@ -57,20 +55,59 @@ impl Ptr {
     }
 }
 
-pub(crate) struct PtrData {
-    pub parent: NodeId,
-    pub ptr: Ptr,
+pub(crate) struct Node {
+    parent: NodeId,
+    pub element: RawSyn,
     pub children: HashSet<NodeId>,
 }
+
+impl Node {
+    pub fn parent(&self) -> Option<NodeId> {
+        if self.parent == NO_PARENT {
+            None
+        } else {
+            Some(self.parent)
+        }
+    }
+}
+
 pub type Range = (Location, Location);
 
 pub struct IrVisitor {
-    counter: usize,
     owner: Rc<Owner>,
-    id_to_ptr: HashMap<NodeId, PtrData>,
-    ptr_to_id: HashMap<Ptr, NodeId>,
+    id_to_node: Vec<Node>,
+    element_to_id: HashMap<RawSyn, NodeId>,
     locations: HashMap<NodeId, LocationData>,
     ancestors: Vec<NodeId>,
+}
+
+pub(crate) struct NodeMap {
+    id_to_node: Vec<Node>,
+    element_to_id: HashMap<RawSyn, NodeId>,
+}
+
+impl NodeMap {
+    pub fn get(&self, id: NodeId) -> Option<&Node> {
+        self.id_to_node.get(id.0)
+    }
+
+    pub fn get_parent(&self, id: NodeId) -> Option<NodeId> {
+        if id == NO_PARENT {
+            None
+        } else {
+            self.get(id).map(|node| node.parent)
+        }
+    }
+
+    pub fn id_to_syn(&self, id: NodeId) -> Option<Syn> {
+        self.id_to_node
+            .get(id.0)
+            .map(|node| unsafe { node.element.as_syn() })
+    }
+
+    pub fn syn_to_id(&self, syn: Syn) -> Option<NodeId> {
+        self.element_to_id.get(&syn.into()).cloned()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -80,14 +117,35 @@ struct LocationData {
     blocked: Vec<Range>,
 }
 
+macro_rules! unexpected {
+    ($msg:expr) => {
+        #[cfg(feature = "dev")]
+        {
+            panic!($msg);
+        }
+    };
+    ($fmt:expr, $($arg:tt)+) => {
+        #[cfg(feature = "dev")]
+        {
+            panic!($fmt, $($arg)*)
+        }
+    };
+}
+
+macro_rules! assert_dev {
+    ($cond:block) => {
+        #[cfg(feature = "dev")]
+        $cond
+    };
+}
+
 impl IrVisitor {
     pub fn new(file: syn::File, source: String) -> Self {
         let comments = parse_comments(&source);
 
         IrVisitor {
-            counter: 1,
-            id_to_ptr: Default::default(),
-            ptr_to_id: Default::default(),
+            id_to_node: Default::default(),
+            element_to_id: Default::default(),
             ancestors: vec![],
             owner: Rc::new((file, comments)),
             locations: Default::default(),
@@ -98,8 +156,7 @@ impl IrVisitor {
         let owner = self.owner.clone();
         self.visit_file(&owner.0);
 
-        #[cfg(feature = "dev")]
-        {
+        assert_dev![{
             let clone: Vec<_> = self
                 .locations
                 .clone()
@@ -115,7 +172,7 @@ impl IrVisitor {
                     panic!("Unexpected overlap between {:?} and {:?}", range, other);
                 }
             }
-        }
+        }];
 
         let mut locations: Vec<_> = self
             .locations
@@ -131,8 +188,10 @@ impl IrVisitor {
 
         crate::analysis::Analyzer {
             locations,
-            id_to_ptr: self.id_to_ptr,
-            ptr_to_id: self.ptr_to_id,
+            node_map: NodeMap {
+                id_to_node: self.id_to_node,
+                element_to_id: self.element_to_id,
+            },
             owner: self.owner,
         }
     }
@@ -143,16 +202,16 @@ impl IrVisitor {
 
         for comment in &self.owner.1 {
             let is_doc = comment.doc.is_some();
-            let id = self.counter.into();
-            self.counter += 1;
 
-            let ptr_data = PtrData {
-                parent: NodeId(0),
-                ptr: Ptr::new(Syn::Comment(&comment)),
+            let element: RawSyn = Syn::Comment(&comment).into();
+            let node = Node {
+                parent: NO_PARENT,
+                element: element.clone(),
                 children: HashSet::new(),
             };
-            self.ptr_to_id.insert(ptr_data.ptr.clone(), id);
-            self.id_to_ptr.insert(id, ptr_data);
+            self.id_to_node.push(node);
+            let id = NodeId(self.id_to_node.len() - 1);
+            self.element_to_id.insert(element, id);
 
             let range = comment.range;
 
@@ -161,11 +220,7 @@ impl IrVisitor {
                     (node_id, node_range)
                 } else {
                     if is_doc {
-                        #[cfg(feature = "dev")]
-                        {
-                            panic!("Unexpected end of items {:?}", range);
-                        }
-                        #[cfg(not(feature = "dev"))]
+                        unexpected!("Unexpected end of items {:?}", range);
                         return;
                     }
                     new_locs.push((id, range));
@@ -178,20 +233,17 @@ impl IrVisitor {
                     continue;
                 // node starts after range
                 } else if range.1 <= node_range.0 {
-                    #[cfg(feature = "dev")]
-                    {
-                        if is_doc {
-                            panic!("Doc comment should always be present");
-                        }
+                    if is_doc {
+                        unexpected!("Doc comment should always be present")
                     }
                     new_locs.push((id, range));
                     break;
                 }
 
                 let is_macro = self
-                    .id_to_ptr
-                    .get(&node_id)
-                    .map(|data| data.ptr.kind == SynKind::Macro)
+                    .id_to_node
+                    .get(node_id.0)
+                    .map(|node| node.element.kind == SynKind::Macro)
                     .unwrap_or(false);
 
                 if is_macro {
@@ -199,11 +251,8 @@ impl IrVisitor {
                 }
 
                 if is_doc {
-                    #[cfg(feature = "dev")]
-                    {
-                        if range != node_range {
-                            panic!("Doc comment should match element {:?}", (range, node_range));
-                        }
+                    if range != node_range {
+                        unexpected!("Doc comment should match element {:?}", (range, node_range));
                     }
                     let _ = queue.pop_front();
                     new_locs.push((id, range));
@@ -211,27 +260,24 @@ impl IrVisitor {
                     let parent_id = {
                         let mut node_id = node_id;
                         loop {
-                            if let Some(data) = self.id_to_ptr.get(&node_id) {
-                                if data.ptr.kind == SynKind::Attribute {
+                            if let Some(node) = self.id_to_node.get(node_id.0) {
+                                if node.element.kind == SynKind::Attribute {
                                     break node_id;
                                 } else {
-                                    node_id = data.parent;
+                                    node_id = node.parent;
                                 }
                             } else {
-                                #[cfg(feature = "dev")]
-                                {
-                                    panic!("Unable to find parent");
-                                }
+                                unexpected!("Unable to find parent");
                                 return;
                             }
                         }
                     };
 
-                    if let Some(data) = self.id_to_ptr.get_mut(&id) {
-                        data.parent = parent_id;
+                    if let Some(node) = self.id_to_node.get_mut(id.0) {
+                        node.parent = parent_id;
                     }
-                    if let Some(data) = self.id_to_ptr.get_mut(&parent_id) {
-                        data.children.insert(id);
+                    if let Some(node) = self.id_to_node.get_mut(parent_id.0) {
+                        node.children.insert(id);
                     }
                     break;
                 }
@@ -250,10 +296,7 @@ impl IrVisitor {
                     break;
                 }
 
-                #[cfg(feature = "dev")]
-                {
-                    panic!("Unexpected non-overlap {:?}", (range, node_range));
-                }
+                unexpected!("Unexpected non-overlap {:?}", (range, node_range));
                 break;
             }
         }
@@ -263,48 +306,36 @@ impl IrVisitor {
         *locations = new_locs;
     }
 
-    fn prepare(&mut self, node: Syn, span: Span) -> NodeId {
+    fn insert_with_span(&mut self, syn: Syn, span: Span) -> NodeId {
         let start: Location = span.start().into();
         let end: Location = span.end().into();
-        self.prepare_precise(node, (start, end))
+        self.insert(syn, &[(start, end)])
     }
 
-    #[inline(never)]
-    fn prepare_precise(&mut self, node: Syn, (start, end): Range) -> NodeId {
-        self.prepare_precise_ranges(node, &[(start, end)])
-    }
-
-    fn prepare_precise_ranges(&mut self, node: Syn, ranges: &[Range]) -> NodeId {
-        #[cfg(feature = "dev")]
-        {
-            for range in ranges {
-                let (start, end) = range;
-                if start == end {
-                    match node {
-                        Syn::File(..) => {}
-                        _ => {
-                            panic!("Unexpected start == end {:?}", start);
-                        }
-                    }
-                }
+    fn insert(&mut self, syn: Syn, ranges: &[Range]) -> NodeId {
+        assert_dev![{
+            let empty = ranges.iter().any(|(start, end)| start == end);
+            match (empty, syn) {
+                (false, _) | (true, Syn::File(..)) => {}
+                (true, _) => panic!("Unexpected start == end {:?}", ranges),
             }
-        }
-        let ptr = Ptr::new(node);
+        }];
+        let element: RawSyn = syn.into();
 
-        let id = self.counter.into();
-        self.counter += 1;
-
-        let mut data = PtrData {
-            parent: NodeId(0),
+        let mut node = Node {
+            parent: NO_PARENT,
             children: Default::default(),
-            ptr: ptr.clone(),
+            element: element.clone(),
         };
 
-        let blocked = if let Some(&ancestor_id) = self.ancestors.last() {
-            data.parent = ancestor_id;
+        // Before inserting!
+        let id = NodeId(self.id_to_node.len());
 
-            if let Some(ancestor_data) = self.id_to_ptr.get_mut(&ancestor_id) {
-                ancestor_data.children.insert(id);
+        let blocked = if let Some(&ancestor_id) = self.ancestors.last() {
+            node.parent = ancestor_id;
+
+            if let Some(ancestor_node) = self.id_to_node.get_mut(ancestor_id.0) {
+                ancestor_node.children.insert(id);
             }
 
             for range in ranges {
@@ -322,11 +353,11 @@ impl IrVisitor {
         let mut ranges: Vec<_> = ranges.iter().cloned().collect();
 
         for blocked_range in blocked {
-            IrVisitor::recalculate_location(*blocked_range, &mut ranges);
+            substract_from_ranges(*blocked_range, &mut ranges);
         }
 
-        self.ptr_to_id.insert(data.ptr.clone(), id);
-        self.id_to_ptr.insert(id, data);
+        self.id_to_node.push(node);
+        self.element_to_id.insert(element, id);
         self.locations.insert(
             id,
             LocationData {
@@ -345,10 +376,9 @@ impl IrVisitor {
                 return;
             };
 
-        let _changed = IrVisitor::recalculate_location(child, &mut ancestor_locations.ranges);
+        let _changed = substract_from_ranges(child, &mut ancestor_locations.ranges);
 
-        #[cfg(feature = "dev")]
-        {
+        assert_dev![{
             if _changed {
                 ancestor_locations.ranges.sort();
 
@@ -368,33 +398,38 @@ impl IrVisitor {
                     }
                 }
             }
-        }
-    }
-
-    fn recalculate_location(child: Range, locations: &mut Vec<Range>) -> bool {
-        let mut changed = false;
-
-        let new_locations = locations.drain(..).fold(vec![], |mut acc, range| {
-            let diff = range_difference(range, child);
-
-            for interval in diff.iter().cloned().filter_map(|x| x) {
-                changed = changed || (interval != range);
-                acc.push(interval);
-            }
-
-            acc
-        });
-
-        *locations = new_locations;
-        changed
+        }];
     }
 }
 
+fn substract_from_ranges(child: Range, locations: &mut Vec<Range>) -> bool {
+    let mut changed = false;
+
+    let new_locations = locations.drain(..).fold(vec![], |mut acc, range| {
+        let diff = range_difference(range, child);
+
+        let mut erased = true;
+
+        for interval in diff.iter().cloned().filter_map(|x| x) {
+            changed = changed || (interval != range);
+            erased = false;
+            acc.push(interval);
+        }
+
+        changed = changed || erased;
+        acc
+    });
+
+    *locations = new_locations;
+    changed
+}
+
+/// Returns `parent - child` as at most 2 ranges
 fn range_difference(parent: Range, child: Range) -> [Option<Range>; 2] {
     let mut ret = [None; 2];
     let (start, end) = child;
-    let child_to_left = end < parent.0;
-    let child_to_right = start > parent.1;
+    let child_to_left = end <= parent.0;
+    let child_to_right = start >= parent.1;
 
     if child_to_left || child_to_right {
         ret[0] = Some(parent);
@@ -428,10 +463,10 @@ fn range_difference(parent: Range, child: Range) -> [Option<Range>; 2] {
 }
 
 macro_rules! visit {
-    ($self:ident, $node:ident, $name:ident) => {
-        let id = $self.prepare(Syn::from($node), $node.span());
+    ($self:ident, $syn_node:ident, $name:ident) => {
+        let id = $self.insert_with_span(Syn::from($syn_node), $syn_node.span());
         $self.ancestors.push(id);
-        syn::visit::$name($self, $node);
+        syn::visit::$name($self, $syn_node);
         let _ = $self.ancestors.pop();
     };
 }
@@ -458,15 +493,17 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_attribute];
             return;
         }
-        let id = self.prepare(i.into(), i.span());
-        if let Some(data) = self
+        let id = self.insert_with_span(i.into(), i.span());
+        if let Some(ancestor_location) = self
             .ancestors
             .last()
             .cloned()
             .and_then(|ancestor_id| self.locations.get_mut(&ancestor_id))
         {
             let span = i.span();
-            data.blocked.push((span.start().into(), span.end().into()))
+            ancestor_location
+                .blocked
+                .push((span.start().into(), span.end().into()))
         }
         self.ancestors.push(id);
         syn::visit::visit_attribute(self, i);
@@ -641,7 +678,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_field_pat];
             return;
         }
-        let id = self.prepare(i.into(), i.span());
+        let id = self.insert_with_span(i.into(), i.span());
         self.ancestors.push(id);
         for attr in &i.attrs {
             self.visit_attribute(attr);
@@ -655,7 +692,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             visit![self, i, visit_field_value];
             return;
         }
-        let id = self.prepare(i.into(), i.span());
+        let id = self.insert_with_span(i.into(), i.span());
         self.ancestors.push(id);
         for attr in &i.attrs {
             self.visit_attribute(attr);
@@ -730,14 +767,14 @@ impl<'ast> Visit<'ast> for IrVisitor {
             _ => &[],
         };
 
-        let id = self.prepare_precise_ranges(i.into(), ranges);
+        let id = self.insert(i.into(), ranges);
         self.ancestors.push(id);
         syn::visit::visit_generics(self, i);
         let _ = self.ancestors.pop();
     }
     fn visit_ident(&mut self, i: &'ast proc_macro2::Ident) {
         // SPECIAL: DO NOT VISIT
-        let _ = self.prepare(i.into(), i.span());
+        let _ = self.insert_with_span(i.into(), i.span());
     }
     fn visit_impl_item(&mut self, i: &'ast syn::ImplItem) {
         visit![self, i, visit_impl_item];
@@ -849,9 +886,9 @@ impl<'ast> Visit<'ast> for IrVisitor {
         let item_parent_ident = self
             .ancestors
             .last()
-            .and_then(|id| self.id_to_ptr.get(id))
-            .and_then(|data| {
-                if let Syn::ItemMacro(i) = data.ptr.as_syn() {
+            .and_then(|id| self.id_to_node.get(id.0))
+            .and_then(|node| {
+                if let Syn::ItemMacro(i) = unsafe { node.element.as_syn() } {
                     Some(i)
                 } else {
                     None
@@ -871,7 +908,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             (ident_end.into(), i.span().end().into()),
         ];
 
-        let id = self.prepare_precise_ranges(i.into(), &ranges);
+        let id = self.insert(i.into(), &ranges);
         self.ancestors.push(id);
         syn::visit::visit_macro(self, i);
         let _ = self.ancestors.pop();
@@ -982,7 +1019,7 @@ impl<'ast> Visit<'ast> for IrVisitor {
             i.gt_token.span().end()
         };
 
-        let id = self.prepare_precise(i.into(), (i.lt_token.span().start().into(), end.into()));
+        let id = self.insert(i.into(), &[(i.lt_token.span().start().into(), end.into())]);
 
         self.ancestors.push(id);
         syn::visit::visit_qself(self, i);

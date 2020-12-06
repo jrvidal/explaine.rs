@@ -15,6 +15,7 @@ macro_rules! case {
 }
 
 case![arrays];
+case![attributes];
 case![binding_patterns];
 case![bound_lifetimes];
 case![comments];
@@ -32,10 +33,10 @@ case![paths];
 case![qself];
 case![raw_ident];
 case![receiver];
+case![returns];
 case![struct_field];
 case![tuple_struct_pat];
 case![type_array];
 case![type_reference];
-case![returns];
 case![unit];
 case![visibility];
