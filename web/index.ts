@@ -141,9 +141,7 @@ export type Elaboration = {
   location: Span;
   title: string;
   elaboration: string;
-  book: string | null;
-  keyword: string | null;
-  std: string | null;
+  extraInfo: { link: string; kind: string }[];
 };
 
 type State = {

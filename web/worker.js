@@ -35,7 +35,7 @@ self.onmessage = (e) => {
     case messages.COMPILE:
       compile(data.source);
       return;
-    case messages.EXPLAIN:
+    case messages.HITBOX:
       if (isMain) {
         computeHitbox(data.location);
       }
@@ -197,10 +197,9 @@ function notifyElaboration() {
     type: messages.ELABORATION,
     location: explanationLocation(state.explanation),
     elaboration: state.explanation && state.explanation.elaborate(),
+    extraInfo:
+      state.explanation && computeExtraInfo(state.explanation.extra_info()),
     title: state.explanation && state.explanation.title(),
-    book: state.explanation && state.explanation.book(),
-    keyword: state.explanation && state.explanation.keyword(),
-    std: state.explanation && state.explanation.std(),
   });
 }
 
@@ -217,6 +216,22 @@ function explanationLocation(explanation) {
         },
       }
     : null;
+}
+
+function computeExtraInfo(info) {
+  let ret = [];
+  let obj = null;
+  info.forEach((item) => {
+    if (obj == null) {
+      obj = { link: item };
+    } else {
+      obj.kind = item;
+      ret.push(obj);
+      obj = null;
+    }
+  });
+
+  return ret;
 }
 
 const setImmediate = (() => {

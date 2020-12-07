@@ -259,8 +259,12 @@ header {
   display: inline-block;
 }
 
-.more-info, .book, .keyword {
+.more-info {
   display: none;
+}
+
+.info-row {
+  margin-bottom: 10px;
 }
 
 .loaded {

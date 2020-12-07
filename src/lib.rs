@@ -258,15 +258,16 @@ impl Explanation {
         self.item.title().into()
     }
 
-    pub fn keyword(&self) -> JsValue {
-        self.item.keyword().into()
-    }
-
-    pub fn book(&self) -> JsValue {
-        self.item.book().into()
-    }
-
-    pub fn std(&self) -> JsValue {
-        self.item.std().into()
+    pub fn extra_info(&self) -> Box<[JsValue]> {
+        [
+            (self.item.keyword(), "keyword"),
+            (self.item.std(), "std"),
+            (self.item.book(), "book"),
+        ]
+        .iter()
+        .filter_map(|(entry, kind)| entry.map(|e| (e, *kind)))
+        .flat_map(|(entry, kind)| std::iter::once(entry).chain(std::iter::once(kind)))
+        .map(JsValue::from)
+        .collect::<Box<[_]>>()
     }
 }

@@ -250,18 +250,21 @@ export function aside({ onWrapInBlock }: { onWrapInBlock: () => void }) {
     elaboration: Elaboration | null;
   }) {
     if (elaboration != null) {
+      const byKind = elaboration.extraInfo.reduce((acc, item) => {
+        acc[item.kind] = item.link;
+        return acc;
+      }, {} as { [kind: string]: string });
+
       setDisplay(moreInfoHeader, "block");
-      setDisplay(bookRow, elaboration.book ? "block" : "none");
-      setDisplay(keywordRow, elaboration.keyword ? "block" : "none");
-      setDisplay(stdRow, elaboration.std ? "block" : "none");
-      bookLink.href = elaboration.book || "";
-      keywordLink.href = elaboration.keyword || "";
-      stdLink.href = elaboration.std || "";
+      setDisplay(bookRow, byKind.book ? "block" : "none");
+      setDisplay(keywordRow, byKind.keyword ? "block" : "none");
+      setDisplay(stdRow, byKind.std ? "block" : "none");
+      bookLink.href = byKind.book || "";
+      keywordLink.href = byKind.keyword || "";
+      stdLink.href = byKind.std || "";
       setDisplay(
         infoWipEl,
-        elaboration.book || elaboration.keyword || elaboration.std
-          ? "none"
-          : "initial"
+        elaboration.extraInfo.length !== 0 ? "none" : "initial"
       );
     } else {
       setDisplay(moreInfoHeader, "none");
