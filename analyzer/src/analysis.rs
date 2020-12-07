@@ -115,13 +115,13 @@ impl Analyzer {
         let &(id, range) = self.locations.get(state.location_index)?;
 
         if range.0 <= location && location <= range.1 {
-            return Some(self.analyze_at_location(id, location, state.location_index, range));
+            return Some(self.analyze_candidates_at(id, location, state.location_index, range));
         }
 
         for (idx, &(id, range)) in self.locations[state.location_index..].iter().enumerate() {
             if range.0 <= location && location <= range.1 {
                 state.location_index += idx;
-                return Some(self.analyze_at_location(id, location, state.location_index, range));
+                return Some(self.analyze_candidates_at(id, location, state.location_index, range));
             }
         }
 
@@ -154,31 +154,31 @@ impl Analyzer {
     }
 
     pub fn analyze(&self, location: Location) -> Option<AnalysisResult> {
-        let idx = self
+        let loc_idx = self
             .locations
             .binary_search_by(|(_, range)| range.0.cmp(&location))
             .map(|idx| Some(idx))
             .unwrap_or_else(|err| if err == 0 { None } else { Some(err - 1) })?;
 
-        let (id, range) = self.locations.get(idx).cloned()?;
+        let (id, range) = self.locations.get(loc_idx).cloned()?;
 
-        self.analyze_at_location(id, location, idx, range)
+        self.analyze_candidates_at(id, location, loc_idx, range)
     }
 
-    fn analyze_at_location(
+    fn analyze_candidates_at(
         &self,
         id: NodeId,
         location: Location,
-        idx: usize,
+        loc_idx: usize,
         range: Range,
     ) -> Option<AnalysisResult> {
         let mut candidates = [None; 3];
         candidates[0] = Some(id);
 
-        if location == range.0 && idx > 0 {
+        if location == range.0 && loc_idx > 0 {
             if let Some(&(prev_id, _)) = self
                 .locations
-                .get(idx - 1)
+                .get(loc_idx - 1)
                 .filter(|(_, prev_range)| prev_range.1 == range.0)
             {
                 candidates[1] = Some(prev_id);
@@ -188,7 +188,7 @@ impl Analyzer {
         if location == range.1 {
             if let Some(&(next_id, _)) = self
                 .locations
-                .get(idx + 1)
+                .get(loc_idx + 1)
                 .filter(|(_, next_range)| next_range.0 == range.1)
             {
                 candidates[2] = Some(next_id);
@@ -208,11 +208,11 @@ impl Analyzer {
         candidates
             .iter()
             .filter_map(|id| *id)
-            .flat_map(|id| self.analyze_node_at_location(id, location))
+            .flat_map(|id| self.analyze_node(id, location))
             .next()
     }
 
-    fn analyze_node_at_location(&self, id: NodeId, location: Location) -> Option<AnalysisResult> {
+    fn analyze_node(&self, id: NodeId, location: Location) -> Option<AnalysisResult> {
         let ancestors = {
             let mut ancestors = vec![];
             let mut id = id;

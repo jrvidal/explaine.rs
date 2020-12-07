@@ -7,8 +7,8 @@ export const COMPILE = "compile";
 export const COMPILED = "compiled";
 export const COMPILATION_ERROR = "compilation-error";
 
-export const EXPLAIN = "explain";
-export const EXPLANATION = "explanation";
+export const GET_HITBOX = "get-hitbox";
+export const HITBOX = "hitbox";
 
 export const ELABORATE = "elaborate";
 export const ELABORATION = "elaboration";

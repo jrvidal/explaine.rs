@@ -152,7 +152,7 @@ type State = {
     state: CompilationState;
     hoverEl: EventTarget | null;
     elaboration: Elaboration | null;
-    explanation: Span | null;
+    hitbox: Span | null;
     exploration: {
       showAll: boolean;
     } | null;
@@ -173,7 +173,7 @@ let state: State = {
   compilation: {
     state: PENDING,
     hoverEl: null,
-    explanation: null,
+    hitbox: null,
     elaboration: null,
     exploration: null,
     error: null,
@@ -223,7 +223,7 @@ const setState = renderer<State>(
     renderHover({ hoverEl: compilation.hoverEl });
     renderErrorMarks({ error: compilation.error });
     renderElaborationMark({ elaboration: compilation.elaboration });
-    renderExplanationMark({ explanation: compilation.explanation });
+    renderHitboxMark({ hitbox: compilation.hitbox });
     renderCodeEditor({
       showAll: compilation.exploration?.showAll ?? false,
       editable: state.editable,
@@ -290,11 +290,11 @@ let { postMessage: postToWorker, ready: workerIsReadyPromise } = worker({
           },
         });
         break;
-      case messages.EXPLANATION:
+      case messages.HITBOX:
         setState(({ compilation }: State) => ({
-          compilation: { ...compilation, explanation: data.location },
+          compilation: { ...compilation, hitbox: data.location },
         }));
-        onExplanation();
+        onHitboxReceived();
         break;
       case messages.ELABORATION:
         onElaboration(data);
@@ -403,7 +403,7 @@ function onCmMouseMove(e: MouseEvent) {
     return;
   }
 
-  explain(e);
+  computeHitbox(e);
 }
 
 function onCmClick() {
@@ -422,8 +422,8 @@ function elaborate(location: Location, isReady = false) {
   });
 }
 
-const { debounced: explain, done: doneAfterExplanation } = debounceUntilDone(
-  function explain(
+const { debounced: computeHitbox, done: doneAfterHitbox } = debounceUntilDone(
+  function computeHitbox(
     { clientX: left, clientY: top }: MouseEvent,
     done: () => void
   ) {
@@ -435,19 +435,19 @@ const { debounced: explain, done: doneAfterExplanation } = debounceUntilDone(
 
     let { line, ch } = cm.coordsChar({ left, top }, "window");
 
-    explainLocation({ line, ch });
+    computeHitboxAtLocation({ line, ch });
 
-    if (explainLocation.cached) {
+    if (computeHitboxAtLocation.cached) {
       done();
     }
   },
   200
 );
 
-const explainLocation = memoize(
-  function explainLocation({ line, ch }: Location) {
+const computeHitboxAtLocation = memoize(
+  function computeHitboxAtLocation({ line, ch }: Location) {
     postToWorker({
-      type: messages.EXPLAIN,
+      type: messages.GET_HITBOX,
       location: { line, ch },
     });
   },
@@ -456,12 +456,9 @@ const explainLocation = memoize(
       return true;
     }
 
-    const { explanation } = state.compilation;
+    const { hitbox } = state.compilation;
 
-    return (
-      explanation != null &&
-      withinRange(current, explanation.start, explanation.end)
-    );
+    return hitbox != null && withinRange(current, hitbox.start, hitbox.end);
   }
 );
 
@@ -473,9 +470,9 @@ function onCompilation() {
   }
 }
 
-function onExplanation() {
+function onHitboxReceived() {
   if (nonUiState.computedMarks) return;
-  doneAfterExplanation();
+  doneAfterHitbox();
 }
 
 function onElaboration(elaboration: Elaboration | { location: null }) {
@@ -676,14 +673,14 @@ const renderElaborationMark = pure(function renderElaborationMark({
   }
 });
 
-const renderExplanationMark = pure(function renderExplanationMark({
-  explanation,
+const renderHitboxMark = pure(function renderHitboxMark({
+  hitbox,
 }: {
-  explanation: Span | null;
+  hitbox: Span | null;
 }) {
   nonUiState.hoverMark && nonUiState.hoverMark.clear();
-  if (explanation == null || nonUiState.computedMarks != null) return;
-  nonUiState.hoverMark = getMark(explanation, "hover-highlight");
+  if (hitbox == null || nonUiState.computedMarks != null) return;
+  nonUiState.hoverMark = getMark(hitbox, "hover-highlight");
 });
 
 const renderCodeEditor = pure(function renderCodeEditor({

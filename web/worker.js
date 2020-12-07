@@ -37,7 +37,7 @@ self.onmessage = (e) => {
       return;
     case messages.EXPLAIN:
       if (isMain) {
-        explain(data.location);
+        computeHitbox(data.location);
       }
       return;
     case messages.ELABORATE:
@@ -165,17 +165,17 @@ function exploreLoop(session, init = false) {
   setImmediate(() => exploreLoop(session));
 }
 
-function explain(location) {
-  doExplain(location);
-  notifyExplanation();
+function computeHitbox(location) {
+  explain(location);
+  notifyHitbox();
 }
 
 function elaborate(location) {
-  doExplain(location);
+  explain(location);
   notifyElaboration();
 }
 
-function doExplain(location) {
+function explain(location) {
   if (state.explanation) {
     state.explanation.free();
     state.explanation = null;
@@ -185,9 +185,9 @@ function doExplain(location) {
     state.session && state.session.explain(location.line + 1, location.ch);
 }
 
-function notifyExplanation() {
+function notifyHitbox() {
   postMessage({
-    type: messages.EXPLANATION,
+    type: messages.HITBOX,
     location: explanationLocation(state.explanation),
   });
 }
