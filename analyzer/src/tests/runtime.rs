@@ -4,7 +4,10 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 pub fn test_example(source: &str) {
-    let lines: Vec<_> = source.lines().collect();
+    let lines: Vec<_> = source
+        .lines()
+        .filter(|l| !l.trim().starts_with("##"))
+        .collect();
     let blocks = lines.iter().fold(vec![vec![]], |mut acc, line| {
         if line.starts_with("---") {
             acc.push(vec![]);

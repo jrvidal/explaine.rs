@@ -827,12 +827,22 @@ impl<'a> NodeAnalyzer<'a> {
             );
         }
 
-        if let (None, syn::Pat::Ident(syn::PatIdent { ident, .. })) = (node.colon_token, &*node.pat)
-        {
+        if let (None, syn::Pat::Ident(pat)) = (node.colon_token, &*node.pat) {
+            // We need to replicate visit_pat_ident partially, because the pattern node is not
+            // inserted (see visit_pat_struct in IR generation)
+
+            self.visit_simple_pat_ident(pat);
+
+            if self.help.is_some() {
+                return;
+            }
+
             return self.set_help(
                 node,
                 HelpItem::FieldPatShorthand {
-                    ident: ident.to_string(),
+                    ident: pat.ident.to_string(),
+                    mutability: pat.mutability.is_some(),
+                    by_ref: pat.by_ref.is_some(),
                 },
             );
         }

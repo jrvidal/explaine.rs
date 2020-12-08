@@ -425,6 +425,8 @@ pub enum HelpItem {
     },
     FieldPatShorthand {
         ident: String,
+        by_ref: bool,
+        mutability: bool,
     },
     FieldValueShorthand {
         name: String,

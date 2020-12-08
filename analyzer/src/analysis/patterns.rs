@@ -29,6 +29,9 @@ impl<'a> NodeAnalyzer<'a> {
             );
         }
 
+        self.visit_simple_pat_ident(node);
+    }
+    pub(super) fn visit_simple_pat_ident(&mut self, node: &syn::PatIdent) {
         let item = HelpItem::PatIdent {
             mutability: node.mutability.is_some(),
             by_ref: node.by_ref.is_some(),

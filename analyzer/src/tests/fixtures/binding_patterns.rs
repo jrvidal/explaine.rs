@@ -32,3 +32,9 @@ span: [1, 4] => [1, 9]
 item: ForLoopLocal mutability: true, ident: x
 ---
 for <|>mut x in x {}
+
+---
+span: [1, 10] => [1, 13]
+item: PatIdent mutability: false, by_ref: true, ident: x
+---
+let Foo { ref<|> x } = y;

@@ -445,6 +445,7 @@ reference = "patterns.html#identifier-patterns"
 variant = "PatIdent"
 patterns = ["by_ref: true, ..", "by_ref: false, mutability: false, .."]
 title = "By Ref Pattern"
+# TODO: strictly speaking, a pattern used in destructuring is not "matching" anything
 info = """A by-reference pattern, that ensures that given the value that matches,
 `{ ident }` is just a {{if mutability}}(mutable) {{endif}} borrow of it."""
 keyword = "ref"
@@ -482,7 +483,7 @@ book = "ch18-03-pattern-syntax.html#ignoring-remaining-parts-of-a-value-with-"
 
 [help.PatStruct]
 title = "Struct Pattern"
-info = """A struct pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches struct values or struct enum variants.{{if emtpy}}
+info = """A struct pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches struct values or struct enum variants.{{if empty}}
 
 An struct pattern that ignores all its fields with `..` can even match non-struct enum variants.{{endif}}{{endif}}"""
 book = "ch18-03-pattern-syntax.html#destructuring-structs"
@@ -1295,7 +1296,7 @@ reference = "patterns.html#struct-patterns"
 
 [help.FieldPatShorthand]
 title = "Field Pattern Shorthand"
-info = "Shorthand pattern equivalent to `{ ident }: { ident }`."
+info = "Shorthand pattern equivalent to `{ ident }: {{if by_ref}}ref {{endif}}{{if mutability}}mut {{endif}}{ ident }`."
 book = "ch18-03-pattern-syntax.html#destructuring-structs"
 
 [help.FieldValueShorthand]
