@@ -33,10 +33,12 @@ std = "ops/trait.Rem.html"
 [help.AndBinOp]
 title = "Logical AND Operator"
 info = "The logical AND operator `&&`."
+reference = "expressions/operator-expr.html#lazy-boolean-operators"
 
 [help.OrBinOp]
 title = "Logical OR Operator"
 info = "The logical OR operator `||`."
+reference = "expressions/operator-expr.html#lazy-boolean-operators"
 
 [help.BitXorBinOp]
 title = "Bitwise XOR Operator"
@@ -162,10 +164,12 @@ std = "primitive.slice.html"
 [help.ExprAssign]
 title = "Assignment"
 info = "An assignment of a value to a variable or place."
+book = "ch03-01-variables-and-mutability.html"
 
 [help.ExprAssignOp]
 title = "Operation plus Assignment"
-info = "An assignment of a computed value to a variable or place."
+info = "A compound assignment expression, that mutates a value in place"
+reference = "expressions/operator-expr.html#compound-assignment-expressions"
 
 [help.ExprAsync]
 title = "Async Block"
@@ -183,6 +187,12 @@ keyword ="move"
 title = "`await` Expression"
 info = "An `.await` expression suspends the computation of an `async` function until the awaited expression (a future) is ready."
 keyword ="await"
+
+[help.ExprBox]
+title = "`box` Expression"
+info = "An expression that builds a Box<..>. Box expressions are an unstable feature"
+std = "boxed/struct.Box.html"
+unstable = "language-features/box-syntax.html"
 
 [help.ExprBreak]
 title = "`break`"
@@ -210,13 +220,15 @@ book = "ch13-01-closures.html"
 
 [help.ExprClosureAsync]
 title = "Async closure"
-info = "An `async` closure (an [experimental feature](https://github.com/rust-lang/rust/issues/62290))."
+info = "An `async` closure (an experimental feature)."
 keyword ="async"
+unstable = "language-features/async-closure.html"
 
 [help.ExprClosureStatic]
 title = "Static Closure"
-info = "Static closures are an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
+info = "Static `async` closures are an experimental feature."
 keyword = "static"
+unstable = "language-features/async-closure.html"
 
 [help.ExprContinue]
 title = "`continue` expression"
@@ -229,24 +241,29 @@ book = "ch03-05-control-flow.html"
 [help.ExprUnnamedField]
 title = "Unnamed Field"
 info = "This expression accesses an unnamed, indexed field of a tuple or a tuple struct."
+book = "ch03-02-data-types.html#the-tuple-type"
+std = "std/primitive.tuple.html"
 
 [help.ExprForLoopToken]
 title = "`for` - `in` loop"
 info = "The `for` - `in` keywords indicate a loop over the values of an iterator."
 keyword = "for"
-book = "ch03-05-control-flow.html"
+book = "ch03-05-control-flow.html?looping-through-a-collection-with-for"
 
 [help.ForLoopLocal-variable]
 variant = "ForLoopLocal"
 pattern = "ident: Some(..), .."
 title = "`for` Loop Variable"
 info = "Each element in the interator gets assigned to the `{ ident }` variable{{if mutability}}, which is mutable as if introduced with `let mut`{{endif}}."
+reference = "patterns.html#identifier-patterns"
+book = "ch03-05-control-flow.html?looping-through-a-collection-with-for"
 
 [help.ForLoopLocal]
 variant = "ForLoopLocal"
 pattern = "ident: None, .."
 title = "`for` Loop without Variable"
 info = "By using the wildcard pattern `_`, this `for` loop iterates over every value of the iterator without actually using the values it yields."
+book = "ch18-03-pattern-syntax.html#ignoring-values-in-a-pattern"
 
 [help.ExprIf]
 title = "`if`"
@@ -295,22 +312,27 @@ keyword = "match"
 [help.ExprRangeHalfOpen]
 title = "Half-open range"
 info = "A half open range expression `(..)`, that generates a range of elements with an inclusive lower bound and an exclusive upper bound."
+std = "ops/struct.Range.html"
 
 [help.ExprRangeClosed]
 title = "Closed range"
 info = "A closed range expression `(..=)`, that generates a range of elements with inclusive lower and upper bounds."
+std = "ops/struct.RangeInclusive.html"
+blog = "2018/05/10/Rust-1.26.html"
 
 [help.ExprReference-immutable]
 title = "Immutable reference"
 variant = "ExprReference"
 pattern = "mutable: false"
 info = "An immutable (shared) borrow of another value."
+book = "ch04-02-references-and-borrowing.html"
 
 [help.ExprReference-mutable]
 title = "Mutable reference"
 variant = "ExprReference"
 info = "A mutable (exclusive) borrow of another value."
 pattern = "mutable: true"
+book = "ch04-02-references-and-borrowing.html?highlight=refere#mutable-references"
 
 [help.ExprRepeat]
 title = "Array Initialization"
@@ -341,8 +363,9 @@ std = "ops/trait.Try.html"
 
 [help.ExprTryBlock]
 title = "Try Block"
-info = "`try` blocks are an [unstable feature](https://github.com/rust-lang/rust/issues/31436)."
+info = "`try` blocks are an unstable feature."
 std = "ops/trait.Try.html"
+unstable = "language-features/try-blocks.html"
 
 [help.ExprTuple]
 title = "Tuple Expression"
@@ -357,7 +380,8 @@ std = "primitive.unit.html"
 
 [help.ExprType]
 title = "Type Ascription"
-info = "A type ascription expression, an [experimental feature](https://github.com/rust-lang/rust/issues/23416)."
+info = "A type ascription expression, an experimental feature."
+unstable = "language-features/type-ascription.html"
 
 [help.ExprUnsafe]
 title = "Unsafe block"
@@ -378,7 +402,8 @@ book = "ch03-05-control-flow.html"
 
 [help.ExprYield]
 title = "Yield Expression"
-info = "A `yield` expression, an [experimental feature](https://github.com/rust-lang/rust/issues/43122)."
+info = "A `yield` expression, an experimental feature."
+unstable = "language-features/generators.html"
 
 [help.Macro]
 title = "Macro Invocation"
@@ -393,6 +418,7 @@ book = "ch19-06-macros.html"
 [help.Turbofish]
 title = "Turbofish"
 info = "The venerable [turbofish](https://turbo.fish/random) `::<>`. It is sometimes needed to specify generic arguments in paths to avoid ambiguity with the less than operator `<`."
+reference = "paths.html#paths-in-expressions"
 
 [help.ParenthesizedGenericArguments]
 title = "`Fn`-like Generic Arguments"
@@ -404,13 +430,16 @@ std = "ops/trait.Fn.html"
 
 [help.PatBox]
 title = "Box Pattern"
-info = "A pattern that matches a `Box<..>`. This is an [experimental feature](https://doc.rust-lang.org/unstable-book/language-features/box-patterns.html)."
+info = "A pattern that matches a `Box<..>`. This is an experimental feature."
+unstable = "language-features/box-patterns.html"
+std = "boxed/struct.Box.html"
 
 [help.PatIdent-value]
 variant = "PatIdent"
 pattern = "mutability: true, by_ref: false, .."
 title = "Mutable Pattern Binding"
 info = "The `{ ident }` binding this pattern introduces is mutable, as if introduced with a `let mut` declaration."
+reference = "patterns.html#identifier-patterns"
 
 [help.PatIdent-ref]
 variant = "PatIdent"
@@ -433,6 +462,7 @@ keyword = "mut"
 [help.PatOrLeading]
 title = "Leading Pattern Separator"
 info = "All patterns can be preceded by a leading `|` which has no further effect."
+reference = "expressions/match-expr.html#match-expressions"
 
 [help.PatOr]
 title = "Pattern 'or' Operator"
@@ -442,6 +472,8 @@ book = "ch18-03-pattern-syntax.html#multiple-patterns"
 [help.PatRange]
 title = "Range Pattern"
 info = "A {{if closed}}closed{{else}}half-open{{endif}} range pattern that matches any value within its bounds ({{if closed}}including{{else}}excluding{{endif}} the upper bound)."
+# TODO: not great docs for the open case
+book = "ch18-03-pattern-syntax.html#matching-ranges-of-values-with-"
 
 [help.PatRest]
 title = "Rest Pattern"
@@ -453,6 +485,7 @@ title = "Struct Pattern"
 info = """A struct pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches struct values or struct enum variants.{{if emtpy}}
 
 An struct pattern that ignores all its fields with `..` can even match non-struct enum variants.{{endif}}{{endif}}"""
+book = "ch18-03-pattern-syntax.html#destructuring-structs"
 
 [help.PatUnit]
 title = "Unit Tuple Pattern"
@@ -464,10 +497,12 @@ title = "Tuple Pattern"
 info = """A tuple pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is a tuple of the same length.{{endif}}{{if single_comma}}
 
 The trailing comma helps disambiguate tuples of length 1.{{endif}}"""
+book = "ch18-03-pattern-syntax.html#destructuring-structs-and-tuples"
 
 [help.PatTupleStruct]
 title = "Tuple Struct Pattern"
 info = "A pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is of a particular tuple struct type (or enum tuple variant), and that can bind individual fields.{{endif}}"
+book = "ch18-03-pattern-syntax.html#destructuring-enums"
 
 [help.PatWild-normal]
 title = "Wildcard Pattern"
@@ -503,11 +538,16 @@ title = "`crate` Root Module"
 info = "A reference to the root module of the current crate."
 keyword = "crate"
 
-[help.QSelf]
+[help.QSelf-inherent]
+variant = "QSelf"
+pattern = "as_trait: false"
 title = "Explicit Self Type"
-info = """This syntax allows to explicitly specify the type for which we access a method or another associated item."""
+info = """This syntax allows to explicitly specify the type for which we access an inherent method or another associated item."""
+reference = "paths.html#canonical-paths"
 
-[help.QSelfAsTrait]
+[help.QSelf-as-trait]
+variant = "QSelf"
+pattern = "as_trait: true"
 title = "Fully Qualified Syntax for Traits"
 info = """This syntax allows to unambigously specify the trait for which we access a method or another associated item."""
 keyword = "as"
@@ -530,6 +570,7 @@ Attributes assign metadata to expressions, statements and other elements.
 In particular, this is an _inner_ attribute (because it has the "bang" form:
 `#![foo]` instead of `#[foo]`), which means it applies to the item that contains it.{{ endif }}
 """
+reference = "attributes.html"
 
 [help.ItemExternCrate]
 title = "`extern crate`"
@@ -539,6 +580,7 @@ keyword = "extern"
 [help.ItemFn]
 title = "Function Declaration"
 info = "A function declaration."
+book = "ch03-03-how-functions-work.html"
 
 [help.ItemInlineMod]
 title = "Inline `mod`"
@@ -608,6 +650,7 @@ keyword = "as"
 title = "Cast"
 info = "The `as` keyword allows casting between certain types."
 keyword = "as"
+nomicon = "casts.html"
 
 [help.AsyncFn]
 title = "Async Function"
@@ -653,8 +696,9 @@ book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
 
 [help.VisCrate]
 title = "`crate` Visibility"
-info = "This item is accessible and re-exportable from the parent module, but can only be used from within the current crate. This [experimental syntax](https://github.com/rust-lang/rust/issues/53120) is equivalent to `pub(crate)`."
+info = "This item is accessible and re-exportable from the parent module, but can only be used from within the current crate. This experimental syntax is equivalent to `pub(crate)`."
 keyword = "crate"
+unstable = "language-features/crate-visibility-modifier.html"
 
 [help.VisRestricted-super]
 variant = "VisRestricted"
@@ -697,7 +741,7 @@ book = "ch06-00-enums.html"
 [help.VariantDiscriminant]
 title = "Variant Discriminant"
 info = "An explicit discriminant for the `{ name }` variant."
-# TODO: reference
+reference = "items/enumerations.html"
 
 [help.ItemForeignModAbi]
 title = "Extern Module"
@@ -713,12 +757,14 @@ keyword = "extern"
 title = "Higher-Rank Lifetime Bound"
 info = "The `for` keyword indicates a generic bound over an infinite set of lifetimes."
 keyword = "for"
+nomicon = "hrtb.html#higher-rank-trait-bounds-hrtbs"
 
 [help.BoundLifetimesTraitBound]
 title = "Higher-Rank Lifetime Bound"
 info = """The `for<..>` construct indicates that the trait bound `{ ty }` is in fact an _infinite_ collection of
 bounds, for every value of `{ lifetime }`{{if multiple}} and the rest of the lifetimes within `<..>`{{endif}}."""
 keyword = "for"
+nomicon = "hrtb.html#higher-rank-trait-bounds-hrtbs"
 
 [help.BoundLifetimesBareFnType]
 title = "Higher-Rank Lifetime in Function Type"
@@ -739,10 +785,11 @@ title = "Trait Implementation Block"
 info = """{{if negative}}A negative{{else}}An{{endif}} `impl` block that
 {{if negative}}asserts that a trait is not implemented{{else}}implements a trait{{endif}} for a given type.{{if negative}}
 
-Negative implementations are an [experimental feature](https://github.com/rust-lang/rust/issues/13231).{{endif}}"""
+Negative implementations are an experimental feature.{{endif}}"""
 keyword = "impl"
 variant = "ItemImpl"
 pattern = "trait_: true, .."
+unstable = "language-features/optin-builtin-traits.html"
 
 [help.ItemImplForTrait]
 title = "Trait implementation"
@@ -785,12 +832,14 @@ It enables `break` and `continue` expressions to specify the particular loop the
 (instead of simply the innermost enclosing one)."""
 variant = "Label"
 patterns = ["loop_of: LoopOf::While", "loop_of: LoopOf::WhileLet", "loop_of: LoopOf::For", "loop_of: LoopOf::Loop"]
+reference = "expressions/loop-expr.html#loop-labels"
 
 [help.Label-unstable]
 title = "Block Label"
-info = "Block labels are an [unstable feature](https://github.com/rust-lang/rust/issues/48594)."
+info = "Block labels are an unstable feature."
 variant = "Label"
 pattern = "loop_of: LoopOf::Block"
+unstable = "language-features/label-break-value.html"
 
 [help.True]
 title = "`true` boolean value"
@@ -812,6 +861,7 @@ std = "primitive.char.html"
 [help.LitByte]
 title = "Byte Literal"
 info = "A byte literal of type `u8`."
+reference = "reference/tokens.html#byte-and-byte-string-literals"
 
 [help.LitByteStr]
 title = "Byte String Literal"
@@ -819,13 +869,14 @@ info = """A literal string with a leading `b` is a _byte literal string_, of typ
 
 This is a _raw_ byte string literal (given its `r{ prefix }` prefix) that does not process escapes{{if prefix}}
 and which needs to be closed by a matching number of `#` symbols{{endif}}.{{endif}}"""
-# reference/tokens.html#byte-string-literals
+reference = "reference/tokens.html#byte-and-byte-string-literals"
 
 [help.LitFloat]
 title = "Floating-point Literal"
 info = """A floating-point number literal{{if suffix}} of type `{ suffix }` (explicited by its suffix){{endif}}.{{if separators}}
 
 The underscores `_` are merely for readability reasons.{{endif}}"""
+book = "ch03-02-data-types.html#floating-point-types"
 
 [help.LitInt]
 title = "Integer Literal"
@@ -833,6 +884,8 @@ info = """An integer literal{{if suffix}} of type `{ suffix }` (explicited by it
 in { mode } notation (as indicated by the `{ prefix }` prefix){{endif}}.{{if separators}}
 
 The underscores `_` are merely for readability reasons.{{endif}}"""
+book = "ch03-02-data-types.html#integer-types"
+
 
 [help.LitStr]
 title = "String Literal"
@@ -840,6 +893,7 @@ info = """A literal string, of type `&'static str`.{{if raw}}
 
 This is a _raw_ string literal (given its `r{ prefix }` prefix) that does not process escapes{{if prefix}}
 and which needs to be closed by a matching number of `#` symbols{{endif}}.{{endif}}"""
+book = "ch04-03-slices.html#string-literals-are-slices"
 
 [help.ArmIfGuard]
 title = "`if` guard"
@@ -883,27 +937,33 @@ keyword = "Self"
 [help.PathLeadingColon]
 title = "Referencing External Crates"
 info = "A leading `::` in a path means that the path refers to an external crate."
+reference = "items/use-declarations.html#use-paths"
 
 [help.StaticMut]
 title = "Mutable Static"
 info = "A `static mut` item is a value that is embedded in the memory of the final executable _and_ that can be mutated (though it is highly unsafe to do so)."
+keyword = "static"
+book = "ch19-01-unsafe-rust.html#accessing-or-modifying-a-mutable-static-variable"
 
 [help.Static]
 title = "Static Item"
 info = "A `static` item is a value that is embedded in the memory of the final executable."
 keyword = "static"
+book = "ch19-01-unsafe-rust.html#accessing-or-modifying-a-mutable-static-variable"
 
 [help.TypeReference-immutable]
 title = "Immutable Reference Type"
 info = "The type of an immutable (shared) borrow over a value of type `{ ty }`."
 variant = "TypeReference"
 pattern = "mutable: false, .."
+book = "ch04-02-references-and-borrowing.html"
 
 [help.TypeReference-mutable]
 title = "Mutable Reference Type"
 info = "The type of a mutable (exclusive) borrow over a value of type `{ ty }`."
 variant = "TypeReference"
 pattern = "mutable: true, .."
+book = "ch04-02-references-and-borrowing.html"
 
 [help.TypeSlice]
 title = "Slice Type"
@@ -929,6 +989,7 @@ book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#the-glob-ope
 [help.UseGroup]
 title = "Group Import"
 info = "A group of several items imported from `{ parent }`, grouped together in a single import."
+book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#using-nested-paths-to-clean-up-large-use-lists"
 
 [help.UseGroupSelf]
 title = "Self Module Import"
@@ -938,12 +999,14 @@ book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#using-nested
 
 [help.ForeignItemType]
 title = "`extern` Type"
-info = "Extern types are an [experimental feature](https://github.com/rust-lang/rust/issues/43467)."
+info = "Extern types are an experimental feature."
 keyword = "type"
+unstable = "language-features/extern-types.html"
 
 [help.RawIdent]
 title = "Raw Identifier"
 info = "A raw identifier (as indicated by the `r#` prefix), that allows using keywords (like `match` or `dyn`) as variable names, field names, etc."
+book = "appendix-01-keywords.html#raw-identifiers"
 
 [help.ImplItemType]
 title = "Associated Type"
@@ -978,8 +1041,8 @@ pattern = ".."
 
 [help.ItemAutoTrait]
 title = "Auto Trait"
-info = "`auto` traits are automatically implemented by the compiler in a structural fashion. `auto` traits are an unstable feature."
-# TODO: nomicon
+info = "`auto` traits are automatically implemented by the compiler in a structural fashion. Creating your own `auto` traits is an unstable feature."
+unstable = "language-features/optin-builtin-traits.html#automatic-trait-implementations"
 
 [help.ItemUnsafeTrait]
 title = "Unsafe trait"
@@ -1033,6 +1096,7 @@ info = """The `?` modifier in a trait bound indicates that the trait is an _impl
 except when marked with this modifier. It is currently only valid for the `Sized` trait."""
 variant = "TraitBoundModifierQuestion"
 pattern = "sized: false"
+book = "ch19-04-advanced-types.html#dynamically-sized-types-and-the-sized-trait"
 
 [help.TraitItemType]
 title = "Associated Type"
@@ -1066,11 +1130,12 @@ book = "ch10-01-syntax.html"
 title = "Type Parameter"
 info = """This `{ name }` refers to the type parameter in{{if implementation}} the surrounding implementation{{else}}
 the declaration of the `{ of_name }` { of }{{endif}}."""
-# TODO(generics)
+book = "ch10-01-syntax.html"
 
 [help.TypeParamBoundAdd]
 title = "Trait Bounds"
 info = "The plus sign `+` joins several bounds that a given type must fulfill."
+book = "ch10-02-traits.html#specifying-multiple-trait-bounds-with-the--syntax"
 
 [help.TypeTuple]
 title = "Tuple Type"
@@ -1205,45 +1270,55 @@ std = "primitive.fn.html"
 
 [help.ItemTraitAlias]
 title = "Trait Alias"
-info = "A trait alias, an [experimental feature](https://github.com/rust-lang/rust/issues/41517)."
+info = "A trait alias, an experimental feature."
 keyword = "trait"
+unstable = "language-features/trait-alias.html"
 
 [help.Field-named]
 variant = "Field"
 title = "Named Field"
 info = "The field `{name}` in the `{ of_name }` { of }."
 pattern = "name: Some(..), .."
+book = "ch05-01-defining-structs.html"
 
 [help.Field-unnamed]
 variant = "Field"
 title = "Unnamed Field"
 info = "An unnamed field in the `{ of_name }` { of }."
 pattern = "name: None, .."
+book = "ch05-01-defining-structs.html#using-tuple-structs-without-named-fields-to-create-different-types"
 
 [help.FieldPatUnnamed]
 title = "Tuple Struct Explicit Field Pattern"
 info = "This is a pattern for a _tuple_ struct, where instead of positional patterns, explicit indices are being used."
+reference = "patterns.html#struct-patterns"
 
 [help.FieldPatShorthand]
 title = "Field Pattern Shorthand"
 info = "Shorthand pattern equivalent to `{ ident }: { ident }`."
+book = "ch18-03-pattern-syntax.html#destructuring-structs"
 
 [help.FieldValueShorthand]
 title = "Field Init Shorthand"
 info = "Shorthand expression equivalent to `{ name }: { name }`."
+book = "ch05-01-defining-structs.html#using-the-field-init-shorthand-when-variables-and-fields-have-the-same-name"
+blog = "2017/04/27/Rust-1.17.html"
 
 [help.FieldUnnamedValue]
 title = "Unnamed Field Value"
 info = "The unnamed fields of this tuple struct (or tuple enum variant) are being initialized explicitly by specifying their indices."
+reference = "expressions/struct-expr.html"
+
 
 [help.Shebang]
 title = "Shebang"
 info = "The Rust compiler accepts a shebang in source files, but ignores it."
-# TODO: reference
+reference = "crates-and-source-files.html#shebang"
 
 [help.FatArrow]
 title = "Fat Arrow"
 info = "Each branch of a `match` expression has a fat arrow `=>` that links a pattern on the left with an expression to be evaluated on the right when said pattern is a match."
+book = "ch06-02-match.html"
 
 # TODO: distinguish between /// and #[doc(...)]
 
@@ -1264,6 +1339,7 @@ book = "ch14-02-publishing-to-crates-io.html#commenting-contained-items"
 [help.RArrow]
 title = "Right Arrow `->`"
 info = "A right arrow token `->` used to signify the return type of this { return_of }."
+book = "ch03-03-how-functions-work.html"
 
 [help.StaticLifetime]
 title = "`'static` lifetime"
@@ -1274,16 +1350,18 @@ book = "ch10-03-lifetime-syntax.html#the-static-lifetime"
 title = "Lifetime generic parameter"
 info = """`'{ name }` is a generic lifetime parameter of the `{ of_name }` { of }.
 A generic lifetime parameter indicates that this { of } is subject to the borrow checker."""
-# TODO
+book = "ch10-03-lifetime-syntax.html"
 
 [help.Comment-block]
 title = "Block Comment"
 variant = "Comment"
 pattern = "block: true"
 info = "A block comment."
+reference = "comments.html"
 
 [help.Comment-line]
 title = "Line Comment"
 variant = "Comment"
 pattern = "block: false"
 info = "A line comment."
+reference = "comments.html"

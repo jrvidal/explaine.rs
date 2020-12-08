@@ -197,8 +197,7 @@ function notifyElaboration() {
     type: messages.ELABORATION,
     location: explanationLocation(state.explanation),
     elaboration: state.explanation && state.explanation.elaborate(),
-    extraInfo:
-      state.explanation && computeExtraInfo(state.explanation.extra_info()),
+    extraInfo: state.explanation && computeExtraInfo(state.explanation.info()),
     title: state.explanation && state.explanation.title(),
   });
 }

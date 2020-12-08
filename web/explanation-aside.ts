@@ -233,11 +233,12 @@ export function aside({ onWrapInBlock }: { onWrapInBlock: () => void }) {
   const explanationEl = querySelector(".explanation");
   const moreInfoHeader = explanationEl.querySelector(".more-info")!!;
   const bookRow = moreInfoHeader.querySelector(".book-row")!!;
-  const bookLink = bookRow.querySelector("a")!!;
   const keywordRow = moreInfoHeader.querySelector(".keyword-row")!!;
-  const keywordLink = keywordRow.querySelector("a")!!;
   const stdRow = moreInfoHeader.querySelector(".std-row")!!;
-  const stdLink = stdRow.querySelector("a")!!;
+  const referenceRow = moreInfoHeader.querySelector(".reference-row")!!;
+  const nomiconRow = moreInfoHeader.querySelector(".nomicon-row")!!;
+  const unstableRow = moreInfoHeader.querySelector(".unstable-row")!!;
+  const blogRow = moreInfoHeader.querySelector(".blog-row")!!;
   const infoWipEl = querySelector(".info-wip");
 
   const renderWrapInBlock = wrapInBlock({ onWrapInBlock });
@@ -256,12 +257,41 @@ export function aside({ onWrapInBlock }: { onWrapInBlock: () => void }) {
       }, {} as { [kind: string]: string });
 
       setDisplay(moreInfoHeader, "block");
-      setDisplay(bookRow, byKind.book ? "block" : "none");
-      setDisplay(keywordRow, byKind.keyword ? "block" : "none");
-      setDisplay(stdRow, byKind.std ? "block" : "none");
-      bookLink.href = byKind.book || "";
-      keywordLink.href = byKind.keyword || "";
-      stdLink.href = byKind.std || "";
+      showInfo(
+        bookRow,
+        byKind.book,
+        (link) => `https://doc.rust-lang.org/book/${link}`
+      );
+      showInfo(
+        stdRow,
+        byKind.std,
+        (link) => `https://doc.rust-lang.org/std/${link}`
+      );
+      showInfo(
+        keywordRow,
+        byKind.keyword,
+        (link) => `https://doc.rust-lang.org/std/keyword.${link}.html`
+      );
+      showInfo(
+        referenceRow,
+        byKind.reference,
+        (link) => `https://doc.rust-lang.org/reference/${link}`
+      );
+      showInfo(
+        nomiconRow,
+        byKind.nomicon,
+        (link) => `https://doc.rust-lang.org/nomicon/${link}`
+      );
+      showInfo(
+        unstableRow,
+        byKind.unstable,
+        (link) => `https://doc.rust-lang.org/unstable-book/${link}`
+      );
+      showInfo(
+        blogRow,
+        byKind.blog,
+        (link) => `https://blog.rust-lang.org/${link}`
+      );
       setDisplay(
         infoWipEl,
         elaboration.extraInfo.length !== 0 ? "none" : "initial"
@@ -290,4 +320,13 @@ export function aside({ onWrapInBlock }: { onWrapInBlock: () => void }) {
     renderElaborationPure({ elaboration });
     renderSessionPure({ error, compilationState, elaboration, missing });
   };
+}
+
+function showInfo(
+  row: Element,
+  link: string | null,
+  href: (link: string) => string
+) {
+  setDisplay(row, link ? "block" : "none");
+  row.querySelector("a")!!.href = link ? href(link) : "";
 }

@@ -11,9 +11,12 @@ std::thread_local! {
 struct HelpData {
     template: &'static str,
     title: &'static str,
-    book: Option<&'static str>,
-    keyword: Option<&'static str>,
-    std: Option<&'static str>,
+    info: &'static [(&'static str, &'static str)],
+}
+
+pub struct HelpInfoBit {
+    pub link: &'static str,
+    pub kind: &'static str,
 }
 
 std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
@@ -69,6 +72,7 @@ pub enum HelpItem {
     ExprAsync,
     ExprAsyncMove,
     ExprAwait,
+    ExprBox,
     ExprBreak {
         label: Option<String>,
         expr: bool,
@@ -178,8 +182,9 @@ pub enum HelpItem {
     PathSegmentCrate,
     // TODO: reference the actual module if it is inline, or refer to the relevant ancestor
     PathSegmentSuper,
-    QSelf,
-    QSelfAsTrait,
+    QSelf {
+        as_trait: bool,
+    },
     ReceiverPath {
         method: Option<String>,
     },
@@ -592,16 +597,8 @@ impl HelpItem {
         self.data().title
     }
 
-    pub fn keyword(&self) -> Option<&'static str> {
-        self.data().keyword
-    }
-
-    pub fn std(&self) -> Option<&'static str> {
-        self.data().std
-    }
-
-    pub fn book(&self) -> Option<&'static str> {
-        self.data().book
+    pub fn info(&self) -> Vec<(&'static str, &'static str)> {
+        self.data().info.iter().cloned().collect()
     }
 
     fn data(&self) -> HelpData {

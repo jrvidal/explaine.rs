@@ -30,6 +30,9 @@ impl<'a> NodeAnalyzer<'a> {
     pub(super) fn visit_expr_await(&mut self, node: &syn::ExprAwait) {
         token![self, node.await_token, ExprAwait];
     }
+    pub(super) fn visit_expr_box(&mut self, node: &syn::ExprBox) {
+        return self.set_help(node, HelpItem::ExprBox);
+    }
     pub(super) fn visit_expr_break(&mut self, node: &syn::ExprBreak) {
         return self.set_help(
             &node,

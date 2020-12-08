@@ -2,8 +2,6 @@ use comrak::{markdown_to_html, ComrakOptions};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
-const BOOK: &str = "https://doc.rust-lang.org/book/";
-
 fn main() {
     println!("cargo:rerun-if-changed=explainers.toml");
 
@@ -19,20 +17,24 @@ fn main() {
             .trim_start_matches("<p>")
             .trim_end_matches("</p>\n");
 
-        let book = explanation
-            .book
-            .map(|book| format!("Some({:?})", format!("{}{}", BOOK, book)))
-            .unwrap_or("None".to_string());
+        let info = vec![
+            (explanation.book, "book"),
+            (explanation.std, "std"),
+            (explanation.keyword, "keyword"),
+            (explanation.unstable, "unstable"),
+            (explanation.reference, "reference"),
+            (explanation.nomicon, "nomicon"),
+            (explanation.blog, "blog"),
+        ]
+        .into_iter()
+        .map(|(entry, kind)| entry.map(|e| (e, kind)))
+        .filter_map(|x| x)
+        .collect::<Vec<_>>();
 
-        let keyword = explanation
-            .keyword
-            .map(|keyword| {
-                format!(
-                    "Some({:?})",
-                    format!("https://doc.rust-lang.org/std/keyword.{}.html", keyword)
-                )
-            })
-            .unwrap_or("None".to_string());
+        #[cfg(not(feature = "dev"))]
+        if info.is_empty() {
+            panic!("\n{} needs info\n", name);
+        }
 
         let variant = explanation
             .variant
@@ -53,21 +55,12 @@ fn main() {
                 }),
         };
 
-        let std = format!(
-            "{:?}",
-            explanation
-                .std
-                .map(|std| format!("https://doc.rust-lang.org/std/{}", std))
-        );
-
         data.push(format!(
-            "  {pattern} => HelpData {{ template: {template:?}, title: {title:?}, book: {book}, keyword: {keyword}, std: {std} }},\n",
+            "  {pattern} => HelpData {{ template: {template:?}, title: {title:?}, info: {info} }},\n",
             pattern = pattern,
             template = name,
             title = stripped_title,
-            book = book,
-            keyword = keyword,
-            std = std
+            info = format!("&{:?}", info)
         ));
 
         init.push(format!(
@@ -79,12 +72,14 @@ fn main() {
 
     let mut source = String::new();
 
-    source.push_str("
+    source.push_str(
+        "
         fn help_to_template_data(item: &HelpItem) -> HelpData {
             use HelpItem::*;
             match item {
-                HelpItem::Unknown => HelpData { template: \"\", book: None, keyword: None, title: \"\", std: None },
-    ");
+                HelpItem::Unknown => HelpData { template: \"\", title: \"\", info: &[] },
+    ",
+    );
 
     data.into_iter().for_each(|case| {
         source.push_str(&case);
@@ -123,4 +118,8 @@ struct Explanation {
     book: Option<String>,
     keyword: Option<String>,
     std: Option<String>,
+    unstable: Option<String>,
+    reference: Option<String>,
+    nomicon: Option<String>,
+    blog: Option<String>,
 }

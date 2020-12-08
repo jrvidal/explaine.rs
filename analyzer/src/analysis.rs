@@ -374,7 +374,7 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::ExprAwait(i) => self.visit_expr_await(i),
             Syn::ExprBinary(_i) => { /* self.visit_expr_binary(i) */ }
             Syn::ExprBlock(_i) => { /* self.visit_expr_block(i) */ }
-            Syn::ExprBox(_i) => { /* self.visit_expr_box(i) */ }
+            Syn::ExprBox(i) => self.visit_expr_box(i),
             Syn::ExprBreak(i) => self.visit_expr_break(i),
             Syn::ExprCall(_i) => { /* self.visit_expr_call(i) */ }
             Syn::ExprCast(i) => self.visit_expr_cast(i),
@@ -1104,10 +1104,8 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help_between(
             node.lt_token.span(),
             node.gt_token.span(),
-            if node.as_token.is_some() {
-                HelpItem::QSelfAsTrait
-            } else {
-                HelpItem::QSelf
+            HelpItem::QSelf {
+                as_trait: node.as_token.is_some(),
             },
         );
     }
