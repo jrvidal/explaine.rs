@@ -129,20 +129,22 @@ pub struct Session {
 }
 
 #[wasm_bindgen]
+pub fn init(debug: bool) {
+    if !debug {
+        return;
+    }
+
+    #[cfg(feature = "dev")]
+    {
+        console_log::init().unwrap();
+    }
+}
+
+#[wasm_bindgen]
 impl Session {
     #[wasm_bindgen]
     pub fn new(source: String) -> SessionResult {
         utils::set_panic_hook();
-        #[cfg(feature = "dev")]
-        {
-            use std::sync::Once;
-
-            static START: Once = Once::new();
-
-            START.call_once(|| {
-                console_log::init().unwrap();
-            });
-        }
         let parse_result = syn::parse_file(&source);
 
         let result = match parse_result {

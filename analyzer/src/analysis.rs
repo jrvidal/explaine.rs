@@ -1,5 +1,5 @@
 use crate::help::*;
-use crate::ir::{Location, Node, NodeId, NodeMap, Owner, Range, RawSyn};
+use crate::ir::{Location, NodeId, NodeMap, Owner, Range};
 use crate::syn_wrappers::{Comment, Syn, SynKind};
 use generics::Generics;
 use proc_macro2::{LineColumn, Span};

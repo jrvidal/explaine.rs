@@ -59,6 +59,7 @@ function compileWasm(compiledModule) {
   wasm_bindgen(compiledModule || wasmUrl)
     .then(() => {
       instance = wasm_bindgen;
+      instance.init(!isMain);
       postMessage({
         type: messages.READY,
         compiledModule: wasm_bindgen.__wbindgen_wasm_module,

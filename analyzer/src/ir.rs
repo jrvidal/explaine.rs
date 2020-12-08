@@ -61,6 +61,16 @@ pub(crate) struct Node {
     pub children: HashSet<NodeId>,
 }
 
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Node")
+            .field("parent", &self.parent.0)
+            .field("element", &self.element.kind())
+            .field("children", &self.children)
+            .finish()
+    }
+}
+
 impl Node {
     pub fn parent(&self) -> Option<NodeId> {
         if self.parent == NO_PARENT {
