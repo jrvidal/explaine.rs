@@ -34,6 +34,12 @@ item: RefSelf explicit: true, mutability: false
 fn foo(self:<|> &Self) {}
 
 ---
+span: [1, 7] => [1, 22]
+item: RefSelf explicit: true, mutability: true
+---
+fn foo(mu<|>t self: &Self) {}
+
+---
 span: [1, 7] => [1, 25]
 item: MutSelf explicit: true, mutability: false
 ---

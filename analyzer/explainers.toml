@@ -514,7 +514,7 @@ pattern = "last_arm: false"
 
 [help.PatWild-catchall]
 title = "Wildcard Pattern"
-info = "The wildcard pattern `_`, matches any value and discards it, and acts like a final \"catchall\" in this `match` expression."
+info = "The wildcard pattern `_`, that matches any value and discards it. In this case it acts like a final \"catchall\" in this `match` expression."
 book = "ch06-02-match.html#the-_-placeholder"
 variant = "PatWild"
 pattern = "last_arm: true"
@@ -641,6 +641,7 @@ book = "ch05-03-method-syntax.html"
 title = "Rename"
 info = "The `as` keyword allows renames of imported items, for instance, to avoid conflict with locally defined items."
 book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#providing-new-names-with-the-as-keyword"
+keyword = "as"
 
 [help.AsRenameExternCrate]
 title = "Rename"
@@ -688,7 +689,6 @@ keyword = "const"
 title = "`const` function"
 info = "A `const` function can be used to compute constants at compile time."
 keyword = "const"
-
 
 [help.VisPublic]
 title = "`pub` Visibility"
@@ -783,13 +783,19 @@ pattern = "trait_: false, .."
 
 [help.ItemImpl-trait]
 title = "Trait Implementation Block"
-info = """{{if negative}}A negative{{else}}An{{endif}} `impl` block that
-{{if negative}}asserts that a trait is not implemented{{else}}implements a trait{{endif}} for a given type.{{if negative}}
-
-Negative implementations are an experimental feature.{{endif}}"""
+info = """An `impl` block that implements a trait for a given type."""
 keyword = "impl"
 variant = "ItemImpl"
-pattern = "trait_: true, .."
+pattern = "trait_: true, negative: false"
+
+[help.ItemImpl-trait-negative]
+title = "Negative Trait Implementation"
+info = """An `impl` block that asserts that a given auto trait is not implemented for certain type.
+
+Negative implementations are an experimental feature."""
+keyword = "impl"
+variant = "ItemImpl"
+pattern = "trait_: true, negative: true"
 unstable = "language-features/optin-builtin-traits.html"
 
 [help.ItemImplForTrait]
@@ -944,7 +950,6 @@ reference = "items/use-declarations.html#use-paths"
 title = "Path Separator"
 info = "A double colon `::` separates elements in a path."
 reference = "paths.html"
-
 
 [help.StaticMut]
 title = "Mutable Static"

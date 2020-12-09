@@ -20,13 +20,19 @@ impl<'a> NodeAnalyzer<'a> {
             }
         }
 
-        if node.mutability.is_some() && self.has_ancestor(3, SynKind::FnArg) {
-            return self.set_help(
-                node,
-                HelpItem::PatIdentMutableArg {
-                    ident: node.ident.to_string(),
-                },
-            );
+        if self.has_ancestor(3, SynKind::FnArg) {
+            if node.ident == "self" {
+                return;
+            }
+
+            if node.mutability.is_some() {
+                return self.set_help(
+                    node,
+                    HelpItem::PatIdentMutableArg {
+                        ident: node.ident.to_string(),
+                    },
+                );
+            }
         }
 
         self.visit_simple_pat_ident(node);

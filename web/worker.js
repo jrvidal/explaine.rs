@@ -6,10 +6,9 @@ import { logInfo, reportError, handleLogging } from "./logging";
 logInfo("workerMain");
 
 let instance;
-let isMain = true;
+let isMain = undefined;
 
 const state = {
-  source: null,
   session: null,
   explanation: null,
   exploration: null,
@@ -17,16 +16,20 @@ const state = {
 
 self.onmessage = (e) => {
   const { data } = e;
-  logInfo(isMain ? "Main" : "Secondary", "worker received", data.type, data);
+  logInfo(
+    isMain === undefined ? "" : isMain ? "Main" : "Secondary",
+    "worker received",
+    data.type,
+    data
+  );
   switch (data.type) {
     case messages.MAIN_LOAD:
       compileWasm(null);
       return;
     case messages.SECONDARY_LOAD:
-      isMain = false;
       compileWasm(data.compiledModule);
       return;
-    case messages.STOP_COMPILATION:
+    case messages.STOP_EXPLORATION:
       if (!isMain && state.session) {
         state.session.free();
         state.session = null;
@@ -56,6 +59,13 @@ self.onmessage = (e) => {
 };
 
 function compileWasm(compiledModule) {
+  if (!self.__PRODUCTION__) {
+    if (isMain !== undefined) {
+      throw new Error("Unexpected compilation request");
+    }
+    isMain = compiledModule == null;
+  }
+
   wasm_bindgen(compiledModule || wasmUrl)
     .then(() => {
       instance = wasm_bindgen;
@@ -103,6 +113,7 @@ function compile(source) {
   }
 }
 
+/* Main worker */
 function notifySession() {
   postMessage({
     type:
@@ -111,6 +122,7 @@ function notifySession() {
   });
 }
 
+/* Secondary worker */
 function exploreLoop(session, init = false) {
   if (session != state.session || state.session == null) {
     return;
@@ -160,22 +172,28 @@ function exploreLoop(session, init = false) {
       type: messages.EXPLORATION,
       exploration: state.exploration.result,
     });
+    state.session && state.session.free();
+    state.session = null;
+    state.exploration = null;
     return;
   }
 
   setImmediate(() => exploreLoop(session));
 }
 
+/* Main worker */
 function computeHitbox(location) {
   explain(location);
   notifyHitbox();
 }
 
+/* Main worker */
 function elaborate(location) {
   explain(location);
   notifyElaboration();
 }
 
+/* Main worker */
 function explain(location) {
   if (state.explanation) {
     state.explanation.free();
@@ -186,6 +204,7 @@ function explain(location) {
     state.session && state.session.explain(location.line + 1, location.ch);
 }
 
+/* Main worker */
 function notifyHitbox() {
   postMessage({
     type: messages.HITBOX,
@@ -193,6 +212,7 @@ function notifyHitbox() {
   });
 }
 
+/* Main worker */
 function notifyElaboration() {
   postMessage({
     type: messages.ELABORATION,
