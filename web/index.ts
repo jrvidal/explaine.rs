@@ -572,7 +572,7 @@ function doCompile() {
   if (code.trim() === "") {
     setState({ compilation: { ...initialCompilation, state: SUCCESS } });
   } else {
-    postToWorker({ type: messages.STOP_COMPILATION });
+    postToWorker({ type: messages.STOP_EXPLORATION });
     debouncedCompile(cm.getValue());
   }
 
