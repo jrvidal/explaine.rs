@@ -11,9 +11,10 @@ std::thread_local! {
 struct HelpData {
     template: &'static str,
     title: &'static str,
-    info: &'static [(&'static str, &'static str)],
+    info: &'static [HelpInfoBit],
 }
 
+#[derive(Clone, Copy)]
 pub struct HelpInfoBit {
     pub link: &'static str,
     pub kind: &'static str,
@@ -602,7 +603,7 @@ impl HelpItem {
         self.data().title
     }
 
-    pub fn info(&self) -> Vec<(&'static str, &'static str)> {
+    pub fn info(&self) -> Vec<HelpInfoBit> {
         self.data().info.iter().cloned().collect()
     }
 

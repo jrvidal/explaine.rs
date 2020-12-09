@@ -7,5 +7,5 @@ mod syn_wrappers;
 mod tests;
 
 pub use analysis::{Analyzer, ExplorationIterator, ExplorationState};
-pub use help::HelpItem;
+pub use help::{HelpInfoBit, HelpItem};
 pub use ir::IrVisitor;

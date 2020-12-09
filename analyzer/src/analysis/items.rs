@@ -1,5 +1,5 @@
 use super::NodeAnalyzer;
-use crate::help::{GenericsOf, HelpItem};
+use crate::help::HelpItem;
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 

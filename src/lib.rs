@@ -1,4 +1,4 @@
-use analyzer::{Analyzer, ExplorationIterator, ExplorationState, HelpItem, IrVisitor};
+use analyzer::{Analyzer, ExplorationIterator, ExplorationState, HelpInfoBit, HelpItem, IrVisitor};
 use proc_macro2::{
     token_stream::IntoIter as TokenStreamIter, LineColumn, Span, TokenStream, TokenTree,
 };
@@ -258,7 +258,9 @@ impl Explanation {
         self.item
             .info()
             .into_iter()
-            .flat_map(|(entry, kind)| std::iter::once(entry).chain(std::iter::once(kind)))
+            .flat_map(|HelpInfoBit { link, kind }| {
+                std::iter::once(link).chain(std::iter::once(kind))
+            })
             .map(JsValue::from)
             .collect::<Box<[_]>>()
     }

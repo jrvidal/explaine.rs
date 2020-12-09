@@ -183,11 +183,11 @@ impl IrVisitor {
 
             let mut last = Location { line: 0, column: 0 };
 
-            for &(_, (start, end)) in &locations {
+            for &(id, (start, end)) in &locations {
                 if start > end {
                     panic!("Malformed location {:?}", (start, end));
                 }
-                if start == end {
+                if start == end && id != NodeId(0) {
                     panic!("0-size range {:?}", (start, end));
                 }
                 if last > start {

@@ -29,6 +29,7 @@ fn main() {
         .into_iter()
         .map(|(entry, kind)| entry.map(|e| (e, kind)))
         .filter_map(|x| x)
+        .map(|(entry, kind)| format!("HelpInfoBit {{ link: {:?}, kind: {:?} }}", entry, kind))
         .collect::<Vec<_>>();
 
         #[cfg(not(feature = "dev"))]
@@ -60,7 +61,7 @@ fn main() {
             pattern = pattern,
             template = name,
             title = stripped_title,
-            info = format!("&{:?}", info)
+            info = format!("&[{}]", info.join(","))
         ));
 
         init.push(format!(
