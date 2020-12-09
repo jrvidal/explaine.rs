@@ -111,22 +111,16 @@ impl<'a> NodeAnalyzer<'a> {
                 );
             }
         }
-        let last_span = node
-            .mutability
-            .map(|t| t.span())
-            .or_else(|| node.lifetime.as_ref().map(|t| t.span()))
-            .unwrap_or_else(|| node.and_token.span());
 
-        if self.between_spans(node.and_token.span(), last_span) {
-            return self.set_help(
-                &node,
-                HelpItem::TypeReference {
-                    lifetime: node.lifetime.is_some(),
-                    mutable: node.mutability.is_some(),
-                    ty: node.elem.to_token_stream().to_string(),
-                },
-            );
-        }
+        // TODO: see [HITBOX]. Used to have only the span of `&mut 'a` as clickable
+        return self.set_help(
+            &node,
+            HelpItem::TypeReference {
+                lifetime: node.lifetime.is_some(),
+                mutable: node.mutability.is_some(),
+                ty: node.elem.to_token_stream().to_string(),
+            },
+        );
     }
     pub(super) fn visit_type_slice(&mut self, node: &syn::TypeSlice) {
         let (dynamic, start) = if let Some(type_ref) = get_ancestor![self, TypeReference, 2] {

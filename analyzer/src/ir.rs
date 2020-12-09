@@ -166,24 +166,6 @@ impl IrVisitor {
         let owner = self.owner.clone();
         self.visit_file(&owner.0);
 
-        assert_dev![{
-            let clone: Vec<_> = self
-                .locations
-                .clone()
-                .into_iter()
-                .flat_map(|(_, data)| data.ranges.into_iter())
-                .collect();
-
-            for (i, range) in clone.iter().take(clone.len() - 1).enumerate() {
-                for other in &clone[(i + 1)..] {
-                    if range.1 <= other.0 || other.1 <= range.0 {
-                        continue;
-                    }
-                    panic!("Unexpected overlap between {:?} and {:?}", range, other);
-                }
-            }
-        }];
-
         let mut locations: Vec<_> = self
             .locations
             .drain()
@@ -195,6 +177,25 @@ impl IrVisitor {
         locations.sort_by_key(|(_, pos)| *pos);
 
         self.add_comments(&mut locations);
+
+        assert_dev![{
+            // INVARIANT: no two locations overlap, locations are ordered
+
+            let mut last = Location { line: 0, column: 0 };
+
+            for &(_, (start, end)) in &locations {
+                if start > end {
+                    panic!("Malformed location {:?}", (start, end));
+                }
+                if start == end {
+                    panic!("0-size range {:?}", (start, end));
+                }
+                if last > start {
+                    panic!("Unordered ranges {:?}", (start, end, last))
+                }
+                last = end;
+            }
+        }];
 
         crate::analysis::Analyzer {
             locations,

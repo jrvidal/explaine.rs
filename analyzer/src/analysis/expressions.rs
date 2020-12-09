@@ -178,22 +178,19 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.return_token, *HelpItem::ExprReturn { of }];
     }
     pub(super) fn visit_expr_struct(&mut self, node: &syn::ExprStruct) {
-        if self.within(&node.path) {
-            return self.set_help(node, HelpItem::ExprStruct);
-        }
-
         if let Some((dot2_token, rest)) = node
             .dot2_token
             .and_then(|t| node.rest.as_ref().map(|r| (t, r)))
         {
-            if self.between_spans(dot2_token.span(), rest.span()) {
-                return self.set_help_between(
-                    dot2_token.span(),
-                    rest.span(),
-                    HelpItem::ExprStructRest,
-                );
+            let start = dot2_token.span();
+            let end = rest.span();
+            if self.between_spans(start, end) {
+                return self.set_help_between(start, end, HelpItem::ExprStructRest);
             }
         }
+
+        // TODO: see [HITBOX]. Used to have only the path as clickable
+        return self.set_help(node, HelpItem::ExprStruct);
     }
     pub(super) fn visit_expr_try(&mut self, node: &syn::ExprTry) {
         token![self, node.question_token, ExprTryQuestionMark];

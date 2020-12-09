@@ -25,8 +25,11 @@ std::include!(concat!(env!("OUT_DIR"), "/help.rs"));
 // * Clicking on an unnamed field in a struct/enum results in a clash between help for the type
 //  and help for unnamed fields
 // * `Self { x: 1 }` is not identified as a struct instantiation expression (probably same with patterns)
-// * We need separate notions for "hitbox" and "highlight zone", so the user can hover over a token and
-// see that something is clickable, but then highlight the relevant extent of the help
+// * [HITBOX] We need separate notions for "hitbox" and "highlight zone", so the user can hover over a token and
+// see that something is clickable, but then highlight the relevant extent of the help. Now, in the few
+// places where we have a distinction (highlight an area but only if the cursor is within a certain hitbox)
+// it confuses the exploration phase, since we report the span of the AnalysisResult, which is _not_
+// the same as the clickable span.
 
 #[cfg_attr(all(not(test), not(feature = "dev")), derive(Serialize))]
 #[cfg_attr(test, derive(Debug, Clone, Serialize, Deserialize, PartialEq))]

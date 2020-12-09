@@ -180,27 +180,21 @@ impl Session {
             analyzer: &self.analyzer,
             state: &mut self.state,
             source,
-        };
+        }
+        .filter_map(|result| result)
+        .map(|result| Explanation {
+            item: result.help,
+            start_line: result.start.line,
+            start_column: result.start.column,
+            end_line: result.end.line,
+            end_column: result.end.column,
+        });
 
         loop {
-            let explanation = if let Some(explanation) = {
-                let result = if let Some(result) = exploration_iterator.next() {
-                    result
-                } else {
-                    break;
-                };
-
-                result.map(|result| Explanation {
-                    item: result.help,
-                    start_line: result.start.line,
-                    start_column: result.start.column,
-                    end_line: result.end.line,
-                    end_column: result.end.column,
-                })
-            } {
+            let explanation = if let Some(explanation) = exploration_iterator.next() {
                 explanation
             } else {
-                continue;
+                break;
             };
 
             #[cfg(feature = "dev")]
