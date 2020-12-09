@@ -7,13 +7,13 @@ use <|>::foo;
 span: [1, 4] => [1, 9]
 item: PathSegmentCrate
 ---
-use crate<|>::foo;
+use crat<|>e::foo;
 
 ---
 span: [1, 15] => [1, 20]
 item: PathSegmentCrate
 ---
-use {foo::bar, crate<|>::foo};
+use {foo::bar, crat<|>e::foo};
 
 ---
 span: [1, 16] => [1, 21]

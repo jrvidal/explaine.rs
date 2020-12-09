@@ -940,6 +940,12 @@ title = "Referencing External Crates"
 info = "A leading `::` in a path means that the path refers to an external crate."
 reference = "items/use-declarations.html#use-paths"
 
+[help.PathColonSeparator]
+title = "Path Separator"
+info = "A double colon `::` separates elements in a path."
+reference = "paths.html"
+
+
 [help.StaticMut]
 title = "Mutable Static"
 info = "A `static mut` item is a value that is embedded in the memory of the final executable _and_ that can be mutated (though it is highly unsafe to do so)."

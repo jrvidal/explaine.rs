@@ -1091,6 +1091,16 @@ impl<'a> NodeAnalyzer<'a> {
         ) {
             return;
         }
+
+        if let Some(colon2) = node
+            .segments
+            .pairs()
+            .filter_map(|pair| pair.punct().cloned())
+            .filter(|punct| self.within(punct))
+            .next()
+        {
+            return self.set_help(colon2, HelpItem::PathColonSeparator);
+        }
     }
     fn visit_path_segment(&mut self, node: &syn::PathSegment) {
         if node.ident == "super" {
@@ -1202,6 +1212,8 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help(node, HelpItem::UseGroupSelf { parent });
     }
     fn visit_use_path(&mut self, node: &syn::UsePath) {
+        token![self, node.colon2_token, PathColonSeparator];
+
         let mut root_path = true;
 
         for i in (2..).step_by(2) {
@@ -1308,41 +1320,46 @@ fn special_path_help(
         }
     }
 
-    let mut settled = false;
-    if let Some(ident) = leading_segment {
-        if analyzer.within(&ident) {
-            if ident == "super" {
-                analyzer.set_help(&ident, HelpItem::PathSegmentSuper);
-                settled = true;
-            } else if ident == "self" {
-                analyzer.set_help(
-                    &ident,
-                    if can_be_receiver {
-                        let method = analyzer
-                            .ancestors
-                            .iter()
-                            .rev()
-                            .find_map(|(_, node)| match node {
-                                Syn::ImplItemMethod(method) => Some(&method.sig),
-                                Syn::TraitItemMethod(method) => Some(&method.sig),
-                                _ => None,
-                            })
-                            .map(|sig| sig.ident.to_string());
+    let ident = match leading_segment {
+        Some(ident) => ident,
+        None => return false,
+    };
 
-                        HelpItem::ReceiverPath { method }
-                    } else {
-                        HelpItem::PathSegmentSelf
-                    },
-                );
-                settled = true;
-            } else if ident == "Self" {
-                analyzer.set_help(&ident, HelpItem::PathSegmentSelfType);
-                settled = true;
-            } else if ident == "crate" {
-                analyzer.set_help(&ident, HelpItem::PathSegmentCrate);
-                settled = true;
-            }
-        }
+    if !analyzer.within(&ident) {
+        return false;
+    }
+
+    let mut settled = false;
+    if ident == "super" {
+        analyzer.set_help(&ident, HelpItem::PathSegmentSuper);
+        settled = true;
+    } else if ident == "self" {
+        analyzer.set_help(
+            &ident,
+            if can_be_receiver {
+                let method = analyzer
+                    .ancestors
+                    .iter()
+                    .rev()
+                    .find_map(|(_, node)| match node {
+                        Syn::ImplItemMethod(method) => Some(&method.sig),
+                        Syn::TraitItemMethod(method) => Some(&method.sig),
+                        _ => None,
+                    })
+                    .map(|sig| sig.ident.to_string());
+
+                HelpItem::ReceiverPath { method }
+            } else {
+                HelpItem::PathSegmentSelf
+            },
+        );
+        settled = true;
+    } else if ident == "Self" {
+        analyzer.set_help(&ident, HelpItem::PathSegmentSelfType);
+        settled = true;
+    } else if ident == "crate" {
+        analyzer.set_help(&ident, HelpItem::PathSegmentCrate);
+        settled = true;
     }
 
     settled

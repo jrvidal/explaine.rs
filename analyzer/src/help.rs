@@ -180,6 +180,7 @@ pub enum HelpItem {
         last_arm: bool,
     },
     PathLeadingColon,
+    PathColonSeparator,
     PathSegmentSelf,
     // TODO: reference the implementing type in an impl Block
     PathSegmentSelfType,
