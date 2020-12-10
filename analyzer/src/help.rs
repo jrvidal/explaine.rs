@@ -596,8 +596,21 @@ help_data![
 ];
 
 impl HelpItem {
-    pub fn message(&self) -> String {
-        TEMPLATE.with(|tt| tt.render(self.data().template, &self).unwrap())
+    pub fn message(&self) -> Option<String> {
+        let result = TEMPLATE.try_with(|tt| tt.render(self.data().template, &self));
+
+        #[cfg(feature = "dev")]
+        {
+            Some(
+                result
+                    .expect("Error in template init")
+                    .expect("Error rendering template"),
+            )
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            result.ok().and_then(|res| res.ok())
+        }
     }
 
     pub fn title(&self) -> &'static str {
@@ -613,12 +626,12 @@ impl HelpItem {
     }
 }
 
-fn on_add_template<E>(result: Result<(), E>) {
-    #[cfg(features = "dev")]
+fn on_add_template<E: std::fmt::Debug>(result: Result<(), E>) {
+    #[cfg(feature = "dev")]
     {
-        result.unwrap();
+        result.expect("Unable to compile template");
     }
-    #[cfg(not(features = "dev"))]
+    #[cfg(not(feature = "dev"))]
     {
         let _ = result;
     }

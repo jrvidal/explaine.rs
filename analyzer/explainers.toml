@@ -984,11 +984,10 @@ std = "primitive.slice.html"
 
 [help.TypeTraitObject]
 title = "Trait Object Type"
-info = """The type of a _trait object_, an _unsized_ type that implements the trait `{ ty }` {{if multiple}}(and some others) {{endif}}through dynamic dispatch.
-{{if lifetime}}This trait object also has a lifetime bound `{ lifetime }`.{{endif}}
-{{if not dyn_}}
+info = """The type of a _trait object_, an _unsized_ type that implements the trait `{ ty }` {{if multiple}}(and some others) {{endif}}through dynamic dispatch{{if dyn_}}
+(signified by the `dyn` keyword){{endif}}.{{if lifetime}} This trait object also has a lifetime bound `{ lifetime }`.{{endif}}{{if not dyn_}}
 
-A trait object is usually marked with the `dyn` keyword.{{endif}}
+A trait object is usually marked with the `dyn` keyword, but omitting it is [still accepted](https://doc.rust-lang.org/edition-guide/rust-2018/trait-system/dyn-trait-for-trait-objects.html).{{endif}}
 """
 keyword = "dyn"
 book = "ch17-02-trait-objects.html"

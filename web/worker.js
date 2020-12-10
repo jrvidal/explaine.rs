@@ -214,12 +214,14 @@ function notifyHitbox() {
 
 /* Main worker */
 function notifyElaboration() {
+  const elaboration = state.explanation && state.explanation.elaborate();
+
   postMessage({
     type: messages.ELABORATION,
-    location: explanationLocation(state.explanation),
-    elaboration: state.explanation && state.explanation.elaborate(),
-    extraInfo: state.explanation && computeExtraInfo(state.explanation.info()),
-    title: state.explanation && state.explanation.title(),
+    location: elaboration && explanationLocation(state.explanation),
+    elaboration,
+    extraInfo: elaboration && computeExtraInfo(state.explanation.info()),
+    title: elaboration && state.explanation.title(),
   });
 }
 
