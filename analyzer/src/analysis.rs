@@ -234,10 +234,6 @@ impl Analyzer {
         let mut generics_state = Default::default();
 
         for (idx, &(node_id, node)) in ancestors.iter().enumerate() {
-            if node_id == id {
-                continue;
-            }
-
             let mut node_analyzer =
                 NodeAnalyzer::new(node_id, location, &self, &mut generics_state);
             node_analyzer.ancestors = &ancestors[0..idx];
