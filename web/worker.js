@@ -63,8 +63,9 @@ function compileWasm(compiledModule) {
     if (isMain !== undefined) {
       throw new Error("Unexpected compilation request");
     }
-    isMain = compiledModule == null;
   }
+
+  isMain = compiledModule == null;
 
   wasm_bindgen(compiledModule || wasmUrl)
     .then(() => {
