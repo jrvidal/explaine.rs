@@ -83,7 +83,7 @@ function compile(source) {
     state.session.free();
     state.session = null;
   }
-  const result = instance.Session.new(source);
+  const result = new instance.Session(source);
   const errorMsg = result.error_message();
   const location = result.error_location();
 

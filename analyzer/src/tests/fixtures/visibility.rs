@@ -1,7 +1,15 @@
 span: [1, 0] => [1, 3]
-item: VisPublic
+item: VisPublic field: false
 ---
 pub<|> type A = B;
+
+---
+span: [2, 2] => [2, 5]
+item: VisPublic field: true
+---
+struct Foo {
+  pub<|> foo: i32
+}
 
 ---
 span: [1, 0] => [1, 5]

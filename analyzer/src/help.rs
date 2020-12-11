@@ -217,9 +217,12 @@ pub enum HelpItem {
         self_ty: String,
         trait_: Option<String>,
     },
-    AsRename,
-    // TODO: special-case "as _"
-    AsRenameExternCrate,
+    AsRename {
+        underscore: bool,
+    },
+    AsRenameExternCrate {
+        underscore: bool,
+    },
     AsCast,
     AsyncFn,
     ImplItemConst,
@@ -233,8 +236,9 @@ pub enum HelpItem {
     // TODO: fallback for retro-compatibility, remove when confident
     ConstParamSimple,
     ConstFn,
-    // TODO: specify `field` or `item` for visibility
-    VisPublic,
+    VisPublic {
+        field: bool,
+    },
     VisCrate,
     VisRestricted {
         path: VisRestrictedPath,
@@ -263,6 +267,7 @@ pub enum HelpItem {
         negative: bool,
     },
     ItemImplForTrait,
+    // TODO: more details on definition, like matchers and stuff
     ItemMacroRules {
         name: String,
     },

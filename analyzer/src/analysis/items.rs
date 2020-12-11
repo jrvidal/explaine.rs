@@ -23,10 +23,10 @@ impl<'a> NodeAnalyzer<'a> {
         }];
     }
     pub(super) fn visit_item_extern_crate(&mut self, node: &syn::ItemExternCrate) {
-        if let Some((as_token, _)) = node.rename {
-            token![self, as_token, AsRenameExternCrate];
+        if let Some((as_token, ref rename)) = node.rename {
+            token![self, as_token => rename, * HelpItem::AsRenameExternCrate { underscore: rename == "_" }];
         }
-        token![self, node.extern_token, ItemExternCrate];
+        token![self, node.extern_token => node.crate_token, ItemExternCrate];
     }
     pub(super) fn visit_item_fn_first_pass(&mut self, node: &syn::ItemFn) {
         self.fill_generics_info(self.id, &node.sig.generics, true);

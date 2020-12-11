@@ -1230,7 +1230,7 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     fn visit_use_rename(&mut self, node: &syn::UseRename) {
-        token![self, node.as_token, AsRename];
+        token![self, node.as_token => node.rename, * HelpItem::AsRename { underscore: node.rename == "_"}];
     }
     fn visit_variant(&mut self, node: &syn::Variant) {
         if let Some((eq_token, discriminant)) = &node.discriminant {
@@ -1266,7 +1266,11 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help(node, HelpItem::VisCrate);
     }
     fn visit_vis_public(&mut self, node: &syn::VisPublic) {
-        return self.set_help(node, HelpItem::VisPublic);
+        let field = self
+            .get_ancestor(2)
+            .map(|syn| syn.kind() == SynKind::Field)
+            .unwrap_or(false);
+        return self.set_help(node, HelpItem::VisPublic { field });
     }
     fn visit_vis_restricted_first_pass(&mut self, node: &syn::VisRestricted) {
         let path = match &*node.path {

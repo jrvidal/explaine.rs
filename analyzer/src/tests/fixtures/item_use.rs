@@ -32,3 +32,14 @@ span: [1, 10] => [1, 15]
 item: PathSegmentSuper
 ---
 use self::su<|>per::foo;
+
+---
+span: [1, 8] => [1, 14]
+item: AsRename underscore: false
+---
+use foo as <|>bar;
+---
+span: [1, 8] => [1, 12]
+item: AsRename underscore: true
+---
+use foo as<|> _;

@@ -495,7 +495,7 @@ std = "primitive.unit.html"
 
 [help.PatTuple]
 title = "Tuple Pattern"
-info = """A tuple pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is a tuple of the same length.{{endif}}{{if single_comma}}
+info = """A tuple pattern {{if bindings}}that introduces bindings through destructuring{{else}}that matches if the value is a tuple of the same length{{endif}}.{{if single_comma}}
 
 The trailing comma helps disambiguate tuples of length 1.{{endif}}"""
 book = "ch18-03-pattern-syntax.html#destructuring-structs-and-tuples"
@@ -637,16 +637,37 @@ title = "Associated Function Implementation"
 info = "The implementation of an associated function from the `{ trait_ }` trait for `{ self_ty }`."
 book = "ch05-03-method-syntax.html"
 
-[help.AsRename]
-title = "Rename"
+[help.AsRename-normal]
+title = "Rename Import"
 info = "The `as` keyword allows renames of imported items, for instance, to avoid conflict with locally defined items."
 book = "ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#providing-new-names-with-the-as-keyword"
 keyword = "as"
+variant = "AsRename"
+pattern = "underscore: false"
 
-[help.AsRenameExternCrate]
-title = "Rename"
+[help.AsRename-underscore]
+title = "Underscore Import"
+info = "By binding the imported item to `_`, no new symbol is added to the scope. This is specially useful for importing traits."
+keyword = "as"
+variant = "AsRename"
+pattern = "underscore: true"
+reference = "items/use-declarations.html#underscore-imports"
+
+[help.AsRenameExternCrate-normal]
+title = "Rename Extern Crate"
 info = "The `as` keyword allows renames of external crates."
 keyword = "as"
+variant = "AsRenameExternCrate"
+pattern = "underscore: false"
+
+[help.AsRenameExternCrate-underscore]
+title = "Extern Crate Underscore Import"
+info = """By renaming an external crate to `_`, it is not possible to refer to it by name later.
+This might be useful for crates we want to link with, but not use in any other way."""
+keyword = "as"
+variant = "AsRenameExternCrate"
+pattern = "underscore: true"
+reference = "items/extern-crates.html#underscore-imports"
 
 [help.AsCast]
 title = "Cast"
@@ -692,7 +713,7 @@ keyword = "const"
 
 [help.VisPublic]
 title = "`pub` Visibility"
-info = "This item is accessible and re-exportable from the parent module."
+info = "This {{if field}}field{{else}}item{{endif}} is accessible{{if not field}} and re-exportable{{endif}} from the parent module."
 book = "ch07-02-defining-modules-to-control-scope-and-privacy.html"
 
 [help.VisCrate]
