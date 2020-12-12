@@ -142,7 +142,6 @@ pub fn init(debug: bool) {
 
 #[wasm_bindgen]
 impl Session {
-    #[wasm_bindgen(constructor)]
     pub fn new(source: String) -> SessionResult {
         utils::set_panic_hook();
         let parse_result = syn::parse_file(&source);
