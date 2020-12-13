@@ -2,7 +2,7 @@ use super::NodeAnalyzer;
 use crate::{
     help::{GenericsOf, HelpItem},
     ir::NodeId,
-    syn_wrappers::Syn,
+    syn_wrappers::{Syn, SynKind},
 };
 use quote::ToTokens;
 
@@ -10,9 +10,9 @@ const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 
 #[derive(Clone)]
 pub(super) struct Generics {
+    /// ids of the type parameters:
+    /// - The ident of TypeParam
     pub types: Vec<NodeId>,
-    pub of: GenericsOf,
-    pub of_name: String,
 }
 
 impl<'a> NodeAnalyzer<'a> {
@@ -31,13 +31,10 @@ impl<'a> NodeAnalyzer<'a> {
             .filter_map(|ty| self.syn_to_id((&ty.ident).into()))
             .collect();
 
-        // TODO(generics): a bit absurd, given that we are already at the item
-        let (of, of_name) = self.id_to_syn(self.id).map(|syn| (&syn).into())?;
-
-        Some(Generics { types, of, of_name })
+        Some(Generics { types })
     }
     pub(super) fn visit_const_param(&mut self, node: &syn::ConstParam) {
-        if let Some(declaration) = self.find_declaration() {
+        if let Some(declaration) = self.find_containing_generics() {
             let (of, of_name) = (&declaration).into();
             return self.set_help(
                 node,
@@ -47,6 +44,10 @@ impl<'a> NodeAnalyzer<'a> {
                     of_name,
                 },
             );
+        }
+        #[cfg(features = "dev")]
+        {
+            panic!("Should find const param");
         }
         token![self, node.const_token, ConstParamSimple];
     }
@@ -62,7 +63,9 @@ impl<'a> NodeAnalyzer<'a> {
             return;
         }
 
-        if let Some(declaration) = self.find_declaration_at(DISTANCE_TYPE_PARAM_TO_CONTAINER - 1) {
+        if let Some(declaration) =
+            self.find_containing_generics_at(DISTANCE_TYPE_PARAM_TO_CONTAINER - 1)
+        {
             let (of, of_name) = (&declaration).into();
             return self.set_help_between(
                 lifetime_range.0,
@@ -83,7 +86,8 @@ impl<'a> NodeAnalyzer<'a> {
         if !self.between_spans(node.ident.span(), node.ident.span()) {
             return;
         }
-        if let Some(declaration) = self.find_declaration() {
+
+        if let Some(declaration) = self.find_containing_generics() {
             let (of, of_name) = (&declaration).into();
             return self.set_help(
                 &node.ident,
@@ -99,14 +103,21 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.where_token, WhereClause];
     }
 
-    fn find_declaration(&self) -> Option<Syn> {
-        self.find_declaration_at(DISTANCE_TYPE_PARAM_TO_CONTAINER)
+    fn find_containing_generics(&self) -> Option<Syn> {
+        self.find_containing_generics_at(DISTANCE_TYPE_PARAM_TO_CONTAINER)
     }
-    fn find_declaration_at(&self, height: usize) -> Option<Syn> {
-        self.get_ancestor_id(height)
-            .and_then(|container_id| self.generics_state.from_item.get(&container_id))
-            .and_then(|&idx| self.generics_state.generics.get(idx))
-            .and_then(|_| self.get_ancestor(height))
+
+    fn find_containing_generics_at(&self, height: usize) -> Option<Syn> {
+        let (id, ancestor) = {
+            let (id, ancestor) = self.get_ancestor(height)?;
+            if ancestor.kind() == SynKind::Signature {
+                self.get_ancestor(height + 1)?
+            } else {
+                (id, ancestor)
+            }
+        };
+
+        self.generics_state.get_from_item(id).map(|_| ancestor)
     }
 }
 

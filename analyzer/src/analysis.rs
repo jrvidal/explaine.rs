@@ -39,7 +39,7 @@ macro_rules! token {
 macro_rules! get_ancestor {
     ($self:ident, $ty:ident, $depth:expr) => {
         match $self.get_ancestor($depth) {
-            Some(Syn::$ty(node)) => Some(node),
+            Some((_, Syn::$ty(node))) => Some(node),
             _ => None,
         }
     };
@@ -98,6 +98,14 @@ struct GenericsState {
     from_item: HashMap<NodeId, usize>,
     from_node: HashMap<NodeId, usize>,
     stack: Vec<NodeId>,
+}
+
+impl GenericsState {
+    fn get_from_item(&self, id: NodeId) -> Option<&Generics> {
+        self.from_item
+            .get(&id)
+            .and_then(|idx| self.generics.get(*idx))
+    }
 }
 
 pub struct AnalysisResult {
@@ -568,20 +576,12 @@ impl<'a> NodeAnalyzer<'a> {
 
     fn has_ancestor(&self, ancestor: usize, kind: SynKind) -> bool {
         self.get_ancestor(ancestor)
-            .map(|node| node.kind() == kind)
+            .map(|(_, node)| node.kind() == kind)
             .unwrap_or(false)
     }
 
-    fn get_ancestor(&self, ancestor: usize) -> Option<Syn> {
-        self.ancestors
-            .get(self.ancestors.len() - ancestor)
-            .map(|(_, node)| *node)
-    }
-
-    fn get_ancestor_id(&self, ancestor: usize) -> Option<NodeId> {
-        self.ancestors
-            .get(self.ancestors.len() - ancestor)
-            .map(|(node_id, _)| *node_id)
+    fn get_ancestor(&self, ancestor: usize) -> Option<(NodeId, Syn)> {
+        self.ancestors.get(self.ancestors.len() - ancestor).cloned()
     }
 
     fn id_to_syn(&self, id: NodeId) -> Option<Syn> {
@@ -1266,10 +1266,7 @@ impl<'a> NodeAnalyzer<'a> {
         return self.set_help(node, HelpItem::VisCrate);
     }
     fn visit_vis_public(&mut self, node: &syn::VisPublic) {
-        let field = self
-            .get_ancestor(2)
-            .map(|syn| syn.kind() == SynKind::Field)
-            .unwrap_or(false);
+        let field = self.has_ancestor(2, SynKind::Field);
         return self.set_help(node, HelpItem::VisPublic { field });
     }
     fn visit_vis_restricted_first_pass(&mut self, node: &syn::VisRestricted) {

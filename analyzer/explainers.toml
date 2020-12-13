@@ -1378,10 +1378,42 @@ title = "`'static` lifetime"
 info = "The `'static` lifetime is a special, constant lifetime that represents a value that can potentially live indefinitely."
 book = "ch10-03-lifetime-syntax.html#the-static-lifetime"
 
-[help.LifetimeParam]
-title = "Lifetime generic parameter"
+[help.LifetimeParam-type]
+variant = "LifetimeParam"
+patterns = [
+  "of: GenericsOf::Struct, ..",
+  "of: GenericsOf::Union, ..",
+  "of: GenericsOf::Enum, ..",
+]
+title = "Lifetime Generic Parameter"
 info = """`'{ name }` is a generic lifetime parameter of the `{ of_name }` { of }.
 A generic lifetime parameter indicates that this { of } is subject to the borrow checker."""
+book = "ch10-03-lifetime-syntax.html"
+
+[help.LifetimeParam-fn]
+variant = "LifetimeParam"
+patterns = [
+  "of: GenericsOf::Fn, ..",
+  "of: GenericsOf::ImplMethod, ..",
+]
+title = "Lifetime Generic Parameter"
+info = """`'{ name }` is a generic lifetime parameter of the `{ of_name }` { of }.
+
+It works as an annotation that describes the relationships between the lifetimes of the references that
+this { of } takes as input or returns."""
+book = "ch10-03-lifetime-syntax.html"
+
+[help.LifetimeParam-rest]
+variant = "LifetimeParam"
+patterns = [
+  "of: GenericsOf::Trait, ..",
+  "of: GenericsOf::Impl, ..",
+  "of: GenericsOf::Type, ..",
+  "of: GenericsOf::TraitAlias, ..",
+  "of: GenericsOf::TraitType, ..",
+]
+title = "Lifetime Generic Parameter"
+info = """`'{ name }` is a generic lifetime parameter of the `{ of_name }` { of }."""
 book = "ch10-03-lifetime-syntax.html"
 
 [help.Comment-block]

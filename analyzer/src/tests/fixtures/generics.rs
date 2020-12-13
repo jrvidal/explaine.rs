@@ -48,8 +48,12 @@ span: [0, 0] => [0, 0]
 item: null
 ---
 fn foo<A>() {
-  
   fn bar() {
     let x: Baz<A<|>>;
   }
 }
+---
+span: [1, 7] => [1, 8]
+item: TypeParam name: A, of: Fn, of_name: foo
+---
+fn foo<A<|>>() {}

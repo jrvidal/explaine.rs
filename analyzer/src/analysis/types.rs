@@ -41,36 +41,36 @@ impl<'a> NodeAnalyzer<'a> {
             return self.set_help(node, item);
         }
 
+        // TODO: false positives, item declarations might shadow the parameter
         if let Some(ident) = node.path.get_ident() {
-            let find_generics = |id| {
-                self.generics_state
-                    .from_item
-                    .get(id)
-                    .and_then(|idx| self.generics_state.generics.get(*idx))
-                    .filter(|generics| {
-                        generics
-                            .types
-                            .iter()
-                            .filter_map(|&ident_id| self.id_to_syn(ident_id))
-                            .any(|syn| match syn {
-                                Syn::Ident(id) if id == ident => true,
-                                _ => false,
-                            })
-                    })
+            let find_generics = |&id| {
+                self.generics_state.get_from_item(id).filter(|generics| {
+                    generics
+                        .types
+                        .iter()
+                        .filter_map(|&ident_id| self.id_to_syn(ident_id))
+                        .any(|syn| match syn {
+                            Syn::Ident(id) if id == ident => true,
+                            _ => false,
+                        })
+                })
             };
 
-            let help = if let Some((_, declaration)) = self
+            let help = if let Some(declaration) = self
                 .generics_state
                 .stack
                 .iter()
                 .rev()
-                .find_map(|item_id| find_generics(item_id).map(|gen| (*item_id, gen)))
+                .filter(|item_id| find_generics(item_id).is_some())
+                .next()
+                .and_then(|item_id| self.id_to_syn(*item_id))
             {
+                let (of, of_name) = (&declaration).into();
                 HelpItem::TypeParamUse {
-                    of: declaration.of,
-                    of_name: declaration.of_name.clone(),
+                    of,
+                    of_name,
                     name: ident.to_string(),
-                    implementation: match declaration.of {
+                    implementation: match of {
                         GenericsOf::Impl => true,
                         _ => false,
                     },

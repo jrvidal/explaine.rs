@@ -3,7 +3,7 @@ use crate::help::HelpItem;
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 
-macro_rules! generics {
+macro_rules! fill_generics {
     ($self:expr, $node:expr) => {
         $self.fill_generics_info($self.id, &$node.generics, true);
     };
@@ -14,7 +14,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.const_token, ItemConst];
     }
     pub(super) fn visit_item_enum_first_pass(&mut self, node: &syn::ItemEnum) {
-        generics![self, node];
+        fill_generics![self, node];
     }
     pub(super) fn visit_item_enum(&mut self, node: &syn::ItemEnum) {
         token![self, node.enum_token => node.ident, * HelpItem::ItemEnum {
@@ -38,7 +38,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.abi, ItemForeignModAbi];
     }
     pub(super) fn visit_item_impl_first_pass(&mut self, node: &syn::ItemImpl) {
-        generics![self, node];
+        fill_generics![self, node];
     }
     pub(super) fn visit_item_impl(&mut self, node: &syn::ItemImpl) {
         token![self, some node.unsafety, ItemUnsafeImpl];
@@ -103,7 +103,7 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     pub(super) fn visit_item_struct_first_pass(&mut self, node: &syn::ItemStruct) {
-        generics![self, node];
+        fill_generics![self, node];
     }
     pub(super) fn visit_item_struct(&mut self, node: &syn::ItemStruct) {
         let unit = match node.fields {
@@ -123,7 +123,7 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     pub(super) fn visit_item_trait_first_pass(&mut self, node: &syn::ItemTrait) {
-        generics![self, node];
+        fill_generics![self, node];
     }
     pub(super) fn visit_item_trait(&mut self, node: &syn::ItemTrait) {
         token![self, some node.unsafety, ItemUnsafeTrait];
@@ -147,7 +147,7 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     pub(super) fn visit_item_trait_alias_first_pass(&mut self, node: &syn::ItemTraitAlias) {
-        generics![self, node];
+        fill_generics![self, node];
     }
     pub(super) fn visit_item_trait_alias(&mut self, node: &syn::ItemTraitAlias) {
         token![self, node.trait_token, ItemTraitAlias];
@@ -156,7 +156,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.type_token => node.ident, ItemType];
     }
     pub(super) fn visit_item_union_first_pass(&mut self, node: &syn::ItemUnion) {
-        generics![self, node];
+        fill_generics![self, node];
     }
     pub(super) fn visit_item_union(&mut self, node: &syn::ItemUnion) {
         token![
