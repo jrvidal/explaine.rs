@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>explaine.rs blog</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf8" />
+</head>
+
+<body>
+<h1>These Months in explaine.rs</h1>
+<h4>2020-12-09</h4>
+<p><strong>TL;DR</strong>: we now <a href="#the-actual-explaining">explain more</a>.</p>
+<p><a href="https://jrvidal.github.io/explaine.rs">explaine.rs</a> is a playground to explore and learn the syntax of
+  the Rust programming language. Our <a href="https://jrvidal.github.io/explaine.rs/blog/hello-world.html">initial
+    post</a> ended with:</p>
+<blockquote>
+  <p>[...] I suspect there's probably a better way of doing this. <code>rustc</code> or rust-analyzer lower the AST to
+    some intermediate representation that might be more amenable to be inspected. However [...] that sounds like a lot
+    of work [...]</p>
+</blockquote>
+<p>Well, that work is already done 😅. I had a pretty long post prepared giving details of how I did it, but it felt
+  like too much. The short version is:</p>
+<ul>
+  <li>We wrap <code>syn</code> nodes and do some <code>unsafe</code> shenanigans (!) to build a &quot;syntax nodes
+    pool&quot;.</li>
+  <li>We pre-compute an ordered <code>[(id, start, end)]</code> list that allows for efficient &quot;hitbox&quot;
+    search.</li>
+  <li>We build and visit the ancestors chain as before.</li>
+</ul>
+<p>Another unsatisfactory aspect of the initial implementation was the &quot;exploration phase&quot;, where we
+  pre-compute all possible hitboxes for efficient highlight-on-hover. I went over several versions and optimizations of
+  the algorithm. In the end, the solution is simple and blunt: instead of a single Wasm worker we spawn <em>two</em>,
+  and dedicate one to the &quot;exploration loop&quot;. This consumes more memory but allows the computation to finish
+  very quickly by not interrupting the loop trying to attend other user requests.<sup><a
+      href="#threads">a</a></sup><span id="threads-ref"></span></p>
+<p>But the really important work is the amount of hints that we currently deliver.</p>
+<p><span id="the-actual-explaining"></span></p>
+<h2>The actual explaining</h2>
+<p>At the end of the day, what I'd like for explaine.rs is to be useful. Rust syntax is a bit heavyweight and has its
+  own share of fun corner cases and less-known bits. There is plenty we can do, however, within the limits of a purely
+  syntax-based analysis. Here is a short tour of examples that I fancy:</p>
+<h3>Generics</h3>
+<p>Deciphering generics was high on my todo list, only recently we've started showing hints about them.</p>
+<pre><code class="language-rust">fn foo&lt;T&gt;(x: T) {}
+</code></pre>
+<p><a href="https://jrvidal.github.io/explaine.rs?code=fn+foo%3CT%3E%28x%3A+T%29+%7B%7D&amp;line=0&amp;ch=14">[link]</a>
+  This produces:</p>
+<blockquote>
+  <p>This <code>T</code> refers to the type parameter in the declaration of the <code>foo</code> function.</p>
+</blockquote>
+<p>We also report <a
+    href="https://jrvidal.github.io/explaine.rs?code=struct+Foo%3C%27a%2C+const+n%3A+u8%3E%7B%7D">lifetime and
+    <code>const</code> parameters</a>, though there are still plenty of cases to cover.</p>
+<h3>Comments</h3>
+<p>Comments are a funny one, because they're (mostly) ignored by <code>syn</code>, so we have to tweak our wrapping to
+  fake a &quot;<code>syn</code> comment node&quot;.</p>
+<pre><code class="language-rust">fn main() {
+  /* Hello */
+}
+</code></pre>
+<p><a
+    href="https://jrvidal.github.io/explaine.rs?code=fn+main%28%29+%7B%0A++%2F*+Hello+*%2F%0A%7D&amp;line=1&amp;ch=10">[link]</a>
+  This outputs <code>A block comment</code>. (Still a WIP when you use weird doc comments like <code>/** foo */</code>).
+</p>
+<h3>Empty Type</h3>
+<p>A nice corner case when defining an enum.</p>
+<pre><code class="language-rust">enum Void {}
+</code></pre>
+<p><a href="https://jrvidal.github.io/explaine.rs?code=enum+Void+%7B%7D&amp;line=0&amp;ch=8">[link]</a> This outputs:
+</p>
+<blockquote>
+  <p>[...] This is an <em>empty enum</em> without variants, which constitutes an <a
+      href="https://doc.rust-lang.org/nomicon/exotic-sizes.html#empty-types">empty type</a> which cannot be
+    instantiated.</p>
+</blockquote>
+<h3>Legacy Trait Objects</h3>
+<p>Sometimes, we can recognize a trait object being used without <code>dyn</code>.</p>
+<pre><code class="language-rust">fn foo(x: Foo + Send) {}
+</code></pre>
+<p><a
+    href="https://jrvidal.github.io/explaine.rs?code=fn+foo%28x%3A+Foo+%2B+Send%29+%7B%7D&amp;line=0&amp;ch=12">[link]</a>
+  This outputs:</p>
+<blockquote>
+  <p>[...] A trait object is usually marked with the <code>dyn</code> keyword.</p>
+</blockquote>
+<h3>Catch-all wildcard</h3>
+<p>Using the wildcard pattern <code>_</code> as final catch-all is a usual pattern.</p>
+<pre><code class="language-rust">match x {
+  1 =&gt; {},
+  _ =&gt; {}
+}
+</code></pre>
+<p><a
+    href="https://jrvidal.github.io/explaine.rs?code=fn+main%28%29+%7B%0A++++match+x+%7B%0A++++++1+%3D%3E+%7B%7D%2C%0A++++++_+%3D%3E+%7B%7D%0A++++%7D%0A%7D&amp;line=3&amp;ch=7">[link]</a>
+  This outputs:</p>
+<blockquote>
+  <p>The wildcard pattern <code>_</code> [...] In this case it acts like a final &quot;catchall&quot; in this
+    <code>match</code> expression.</p>
+</blockquote>
+<h3>And more...</h3>
+<p>There are many more minor contextual details that I've enjoyed adding (some of them were already mentioned in my <a
+    href="https://jrvidal.github.io/explaine.rs/blog/hello-world.html">previous post</a>):</p>
+<ul>
+  <li>Writing the receiver of a method explicitly: <code>mut self: &amp;Self</code> <a
+      href="https://jrvidal.github.io/explaine.rs?code=impl+Foo+%7B%0A%09fn+foo%28mut+self%3A+%26mut+Self%29+%7B%7D%0A%7D&amp;line=2&amp;ch=1">[link]</a>
+  </li>
+  <li>Complicated numeric literals like <code>0xA_B_C</code> <a
+      href="https://jrvidal.github.io/explaine.rs?code=fn+main%28%29+%7B%0A++++let+x+%3D+0xA_B%3B%0A%7D&amp;line=1&amp;ch=14">[link]</a>
+  </li>
+  <li>Trait method vs. associated function, with/without default implementation <a
+      href="https://jrvidal.github.io/explaine.rs?code=trait+Foo+%7B%0A++++fn+foo%28%26self%29%3B%0A++++fn+bar%28%29%3B%0A%09fn+foo_default%28%26self%29+%7B%7D%0A++++fn+bar_default%28%29+%7B%7D%0A%7D">[link]</a>
+  </li>
+  <li><code>Fn</code>-like generic arguments <a
+      href="https://jrvidal.github.io/explaine.rs?code=fn+foo%3CT%3A+Fn%28A%29%3E%28%29+%7B%7D&amp;line=0&amp;ch=11">[link]</a>
+  </li>
+  <li>Trailing commas in tuples <a
+      href="https://jrvidal.github.io/explaine.rs?code=fn+main%28%29+%7B%0A++++let+x+%3D+%281%2C%29%3B%0A%7D&amp;line=1&amp;ch=15">[link]</a>
+  </li>
+  <li>Unit struct vs. &quot;normal&quot; structs <a
+      href="https://jrvidal.github.io/explaine.rs?code=struct+Normal+%7B+x%3A+u8+%7D%0Astruct+Empty%3B&amp;line=1&amp;ch=10">[link]</a>
+  </li>
+  <li><code>mut</code> bindings of several classes <a
+      href="https://jrvidal.github.io/explaine.rs?code=fn+foo%28mut+x%3A+u8%29+%7B%0A++++for+mut+y+in+0..x+%7B%0A++++%7D%0A%7D&amp;line=0&amp;ch=9">[link]</a>
+  </li>
+  <li><code>break</code>/<code>continue</code> with labels and values <a
+      href="https://jrvidal.github.io/explaine.rs?code=fn+main%28%29+%7B%0A++++%27a%3A+loop+%7B%0A++++%09break+%27a+7%3B%0A++++%7D%0A%7D&amp;line=2&amp;ch=9">[link]</a>
+  </li>
+  <li>A neat detail: we can fix your code if you write a bunch of statements (see the &quot;Wrap&quot; button) <a
+      href="https://jrvidal.github.io/explaine.rs/?code=let+x+%3D+1%3B">[link]</a></li>
+</ul>
+<h2>The Future</h2>
+<pre><code>$ grep -R TODO --include &quot;*.rs&quot; | wc -l
+29
+</code></pre>
+<p>Fun times.</p>
+<p><strong>_rvidal</strong>   <a href="https://twitter.com/_rvidal">🐦</a> · <a href="https://github.com/jrvidal">gh</a>
+</p>
+<p><span id="threads"><sup><a href="#threads-ref">a</a></sup></span> I don't feel like getting into multi-threaded Wasm
+  modules <em>just yet</em>, but that would be the cool/right solution: sharing memory, i.e. the analysis session,
+  between the two workers.</p>
+
+</body>
+
+</html>
