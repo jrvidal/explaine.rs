@@ -106,6 +106,15 @@ impl GenericsState {
             .get(&id)
             .and_then(|idx| self.generics.get(*idx))
     }
+
+    fn declarations(&self) -> impl Iterator<Item = (NodeId, &Generics)> {
+        self.stack
+            .iter()
+            .rev()
+            .map(move |id| (*id, self.from_item.get(id)))
+            .map(move |(id, idx)| (id, idx.and_then(|idx| self.generics.get(*idx))))
+            .filter_map(|(id, gen)| gen.map(|gen| (id, gen)))
+    }
 }
 
 pub struct AnalysisResult {
@@ -337,6 +346,7 @@ impl<'a> NodeAnalyzer<'a> {
 
     fn analyze_node_first_pass(&mut self, node: Syn) {
         match node {
+            Syn::BoundLifetimes(i) => self.visit_bound_lifetimes_first_pass(i),
             Syn::ExprForLoop(i) => self.visit_expr_for_loop_first_pass(i),
             Syn::ItemEnum(i) => self.visit_item_enum_first_pass(i),
             Syn::ItemFn(i) => self.visit_item_fn_first_pass(i),
@@ -346,7 +356,10 @@ impl<'a> NodeAnalyzer<'a> {
             Syn::ItemTraitAlias(i) => self.visit_item_trait_alias_first_pass(i),
             Syn::ItemUnion(i) => self.visit_item_union_first_pass(i),
             Syn::ImplItemMethod(i) => self.visit_impl_item_method_first_pass(i),
+            Syn::PredicateType(i) => self.visit_predicate_type_first_pass(i),
+            Syn::TraitBound(i) => self.visit_trait_bound_first_pass(i),
             Syn::TraitItemMethod(i) => self.visit_trait_item_method_first_pass(i),
+            Syn::TypeBareFn(i) => self.visit_type_bare_fn_first_pass(i),
             Syn::Local(i) => self.visit_local_first_pass(i),
             Syn::VisRestricted(i) => self.visit_vis_restricted_first_pass(i),
             _ => {}
@@ -592,7 +605,7 @@ impl<'a> NodeAnalyzer<'a> {
         self.analyzer.syn_to_id(syn)
     }
 
-    fn fill_generics_info(&mut self, item_id: NodeId, generics: &syn::Generics, reset: bool) {
+    fn fill_generics_info(&mut self, item_id: NodeId, generics: Syn, reset: bool) {
         if self.generics_state.from_item.contains_key(&item_id) {
             return;
         }
@@ -935,6 +948,42 @@ impl<'a> NodeAnalyzer<'a> {
         if node.ident == "static" {
             return self.set_help(node, HelpItem::StaticLifetime);
         }
+
+        if self.has_ancestor(1, SynKind::LifetimeDef) {
+            return;
+        }
+
+        let mut item = None;
+        for (id, generics) in self.generics_state.declarations() {
+            let declaration = generics
+                .types
+                .iter()
+                .filter_map(|id| self.id_to_syn(*id))
+                .filter_map(|syn| match syn {
+                    Syn::LifetimeDef(def) => Some(&def.lifetime),
+                    _ => None,
+                })
+                .filter(|&lf| lf == node)
+                .next()
+                .and_then(|_| self.id_to_syn(id));
+
+            if let Some(declaration) = declaration {
+                let (of, of_name) = (&declaration).into();
+                let name = node.ident.to_string();
+
+                item = Some(HelpItem::LifetimeParamUse {
+                    of,
+                    of_name,
+                    name,
+                    implementation: std::matches!(of, GenericsOf::Impl),
+                });
+                break;
+            }
+        }
+
+        if let Some(item) = item {
+            return self.set_help(node, item);
+        }
     }
     fn visit_lit_bool(&mut self, node: &syn::LitBool) {
         return self.set_help(
@@ -1150,6 +1199,17 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, some node.constness, ConstFn];
         token![self, some node.abi, FnAbi];
         token![self, some node.unsafety, UnsafeFn];
+    }
+    fn visit_trait_bound_first_pass(&mut self, node: &syn::TraitBound) {
+        let lifetimes = node
+            .lifetimes
+            .as_ref()
+            .map(|lf| lf.into())
+            .and_then(|syn| self.syn_to_id(syn).map(|id| (id, syn)));
+
+        if let Some((id, syn)) = lifetimes {
+            self.fill_generics_info(id, syn, false)
+        }
     }
     fn visit_trait_bound(&mut self, node: &syn::TraitBound) {
         if let Some((bound_lifetimes, lifetime, multiple)) = node

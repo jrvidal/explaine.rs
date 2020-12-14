@@ -11,12 +11,19 @@ const DISTANCE_TYPE_PARAM_TO_CONTAINER: usize = 3;
 #[derive(Clone)]
 pub(super) struct Generics {
     /// ids of the type parameters:
-    /// - The ident of TypeParam
+    /// - A TypeParam
     pub types: Vec<NodeId>,
 }
 
 impl<'a> NodeAnalyzer<'a> {
-    pub(super) fn analyze_generics(&mut self, node: &syn::Generics) -> Option<Generics> {
+    pub(super) fn analyze_generics(&self, node: Syn) -> Option<Generics> {
+        match node {
+            Syn::Generics(i) => self.analyze_syn_generics(i),
+            Syn::BoundLifetimes(i) => self.analyze_bound_lifetimes(i),
+            _ => None,
+        }
+    }
+    fn analyze_syn_generics(&self, node: &syn::Generics) -> Option<Generics> {
         if node.lt_token.is_none() {
             return None;
         }
@@ -25,13 +32,27 @@ impl<'a> NodeAnalyzer<'a> {
             .params
             .iter()
             .filter_map(|param| match param {
-                syn::GenericParam::Type(ty) => Some(ty),
+                syn::GenericParam::Type(ty) => Some(ty.into()),
+                syn::GenericParam::Lifetime(def) => Some(def.into()),
                 _ => None,
             })
-            .filter_map(|ty| self.syn_to_id((&ty.ident).into()))
+            .filter_map(|syn: Syn| self.syn_to_id(syn))
             .collect();
 
         Some(Generics { types })
+    }
+    fn analyze_bound_lifetimes(&self, node: &syn::BoundLifetimes) -> Option<Generics> {
+        let types = node
+            .lifetimes
+            .iter()
+            .filter_map(|def| self.syn_to_id(def.into()));
+
+        Some(Generics {
+            types: types.collect(),
+        })
+    }
+    pub(super) fn visit_bound_lifetimes_first_pass(&mut self, node: &syn::BoundLifetimes) {
+        self.fill_generics_info(self.id, node.into(), false);
     }
     pub(super) fn visit_const_param(&mut self, node: &syn::ConstParam) {
         if let Some(declaration) = self.find_containing_generics() {
@@ -79,6 +100,17 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
 
+    pub(super) fn visit_predicate_type_first_pass(&mut self, node: &syn::PredicateType) {
+        let lifetimes = node
+            .lifetimes
+            .as_ref()
+            .map(|lf| lf.into())
+            .and_then(|syn| self.syn_to_id(syn).map(|id| (id, syn)));
+
+        if let Some((id, syn)) = lifetimes {
+            self.fill_generics_info(id, syn, false)
+        }
+    }
     pub(super) fn visit_predicate_type(&mut self, node: &syn::PredicateType) {
         token![self, node.lifetimes, BoundLifetimes];
     }
@@ -133,6 +165,7 @@ impl<'a, 'b> From<&'a Syn<'b>> for (GenericsOf, String) {
             Syn::ItemImpl(_) => (GenericsOf::Impl, "".to_string()),
             Syn::ImplItemMethod(item) => (GenericsOf::ImplMethod, item.sig.ident.to_string()),
             Syn::TraitItemMethod(item) => (GenericsOf::ImplMethod, item.sig.ident.to_string()),
+            Syn::BoundLifetimes(_) => (GenericsOf::BoundLifetime, "".to_string()),
             node => {
                 debug_assert!(false, "unreachable {:?}", node.kind());
                 (GenericsOf::Struct, "".to_string())

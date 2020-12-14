@@ -57,3 +57,8 @@ span: [1, 7] => [1, 8]
 item: TypeParam name: A, of: Fn, of_name: foo
 ---
 fn foo<A<|>>() {}
+---
+span: [1, 24] => [1, 26]
+item: LifetimeParamUse name: a, of: BoundLifetime, of_name: "", implementation: false
+---
+fn foo(fun: for<'a> fn(&'<|>a u32)) {}

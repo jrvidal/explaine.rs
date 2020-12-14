@@ -9,7 +9,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.const_token, ImplItemConst];
     }
     pub(super) fn visit_impl_item_method_first_pass(&mut self, node: &syn::ImplItemMethod) {
-        self.fill_generics_info(self.id, &node.sig.generics, false);
+        self.fill_generics_info(self.id, (&node.sig.generics).into(), false);
     }
     pub(super) fn visit_impl_item_method(&mut self, node: &syn::ImplItemMethod) {
         if !self.between(&node.sig.fn_token, &node.sig.ident) {
@@ -48,7 +48,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.const_token, TraitItemConst];
     }
     pub(super) fn visit_trait_item_method_first_pass(&mut self, node: &syn::TraitItemMethod) {
-        self.fill_generics_info(self.id, &node.sig.generics, false);
+        self.fill_generics_info(self.id, (&node.sig.generics).into(), false);
     }
     pub(super) fn visit_trait_item_method(&mut self, node: &syn::TraitItemMethod) {
         let of = if receiver_help(&node.sig).is_some() {

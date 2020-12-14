@@ -1154,7 +1154,7 @@ std = "primitive.never.html"
 
 [help.TypeParam]
 title = "Type Parameter"
-info = """`{ name }` is a type parameter of the `{ of_name }` { of }, which is _generic_.
+info = """`{ name }` is a type parameter of {{if of_name}}the `{ of_name }`{{else}}this{{endif}} { of }, which is _generic_.
 It can be _instantiated_ for different types taking the place of `{ name }`."""
 book = "ch10-01-syntax.html"
 
@@ -1403,6 +1403,17 @@ It works as an annotation that describes the relationships between the lifetimes
 this { of } takes as input or returns."""
 book = "ch10-03-lifetime-syntax.html"
 
+# TODO: what to do about this
+[help.LifetimeParam-bound]
+variant = "LifetimeParam"
+patterns = [
+  "of: GenericsOf::BoundLifetime, ..",
+]
+title = "Lifetime Generic Parameter"
+info = """`'{ name }` refers to the generic lifetime parameter of the enclosing higher-ranked `for<..>` bound."""
+# TODO: better reference
+book = "ch10-03-lifetime-syntax.html"
+
 [help.LifetimeParam-rest]
 variant = "LifetimeParam"
 patterns = [
@@ -1413,8 +1424,13 @@ patterns = [
   "of: GenericsOf::TraitType, ..",
 ]
 title = "Lifetime Generic Parameter"
-info = """`'{ name }` is a generic lifetime parameter of the `{ of_name }` { of }."""
+info = """`'{ name }` is a generic lifetime parameter of {{if of_name}}the `{ of_name }` { of }{{else}}this { of }{{endif}}."""
 book = "ch10-03-lifetime-syntax.html"
+
+[help.LifetimeParamUse]
+title = "Lifetime Parameter"
+book = "ch10-03-lifetime-syntax.html"
+info = "This `'{ name }` lifetime refers to the parameter of the {{if of_name}}`{ of_name }`{{else}}surrounding{{endif}} { of }."
 
 [help.Comment-block]
 title = "Block Comment"

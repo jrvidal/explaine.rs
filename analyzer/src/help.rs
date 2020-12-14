@@ -460,6 +460,12 @@ pub enum HelpItem {
         name: String,
         of_name: String,
     },
+    LifetimeParamUse {
+        of: GenericsOf,
+        of_name: String,
+        name: String,
+        implementation: bool,
+    },
     Comment {
         block: bool,
     },
@@ -597,6 +603,8 @@ help_data![
         TraitAlias,
         #[serde(rename(serialize = "type alias"))]
         TraitType,
+        #[serde(rename(serialize = "higher-ranked bound"))]
+        BoundLifetime,
     }
 ];
 

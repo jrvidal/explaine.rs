@@ -5,7 +5,7 @@ use syn::spanned::Spanned;
 
 macro_rules! fill_generics {
     ($self:expr, $node:expr) => {
-        $self.fill_generics_info($self.id, &$node.generics, true);
+        $self.fill_generics_info($self.id, (&$node.generics).into(), true);
     };
 }
 
@@ -29,7 +29,7 @@ impl<'a> NodeAnalyzer<'a> {
         token![self, node.extern_token => node.crate_token, ItemExternCrate];
     }
     pub(super) fn visit_item_fn_first_pass(&mut self, node: &syn::ItemFn) {
-        self.fill_generics_info(self.id, &node.sig.generics, true);
+        self.fill_generics_info(self.id, (&node.sig.generics).into(), true);
     }
     pub(super) fn visit_item_fn(&mut self, node: &syn::ItemFn) {
         token![self, node.sig.fn_token => node.sig.ident, ItemFn];

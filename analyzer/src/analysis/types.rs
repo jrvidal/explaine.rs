@@ -1,4 +1,4 @@
-use super::NodeAnalyzer;
+use super::{generics::Generics, NodeAnalyzer};
 use crate::{
     help::GenericsOf,
     syn_wrappers::{Syn, SynKind},
@@ -13,6 +13,16 @@ impl<'a> NodeAnalyzer<'a> {
             || self.between_spans(node.semi_token.span(), node.span())
         {
             return self.set_help(node, HelpItem::TypeArray);
+        }
+    }
+    pub(super) fn visit_type_bare_fn_first_pass(&mut self, node: &syn::TypeBareFn) {
+        let lifetimes = node
+            .lifetimes
+            .as_ref()
+            .map(|lf| lf.into())
+            .and_then(|syn| self.syn_to_id(syn).map(|id| (id, syn)));
+        if let Some((id, syn)) = lifetimes {
+            self.fill_generics_info(id, syn, false);
         }
     }
     pub(super) fn visit_type_bare_fn(&mut self, node: &syn::TypeBareFn) {
@@ -43,27 +53,25 @@ impl<'a> NodeAnalyzer<'a> {
 
         // TODO: false positives, item declarations might shadow the parameter
         if let Some(ident) = node.path.get_ident() {
-            let find_generics = |&id| {
-                self.generics_state.get_from_item(id).filter(|generics| {
-                    generics
-                        .types
-                        .iter()
-                        .filter_map(|&ident_id| self.id_to_syn(ident_id))
-                        .any(|syn| match syn {
-                            Syn::Ident(id) if id == ident => true,
-                            _ => false,
-                        })
-                })
+            let find_generics = |generics: &Generics| {
+                // self.generics_state.get_from_item(id).filter(|generics| {
+                generics
+                    .types
+                    .iter()
+                    .filter_map(|&ident_id| self.id_to_syn(ident_id))
+                    .any(|syn| match syn {
+                        Syn::TypeParam(param) => &param.ident == ident,
+                        _ => false,
+                    })
+                // })
             };
 
             let help = if let Some(declaration) = self
                 .generics_state
-                .stack
-                .iter()
-                .rev()
-                .filter(|item_id| find_generics(item_id).is_some())
+                .declarations()
+                .filter(|(_, gen)| find_generics(gen))
                 .next()
-                .and_then(|item_id| self.id_to_syn(*item_id))
+                .and_then(|(item_id, _)| self.id_to_syn(item_id))
             {
                 let (of, of_name) = (&declaration).into();
                 HelpItem::TypeParamUse {
@@ -101,6 +109,10 @@ impl<'a> NodeAnalyzer<'a> {
         }
     }
     pub(super) fn visit_type_reference(&mut self, node: &syn::TypeReference) {
+        if let Some(lifetime) = &node.lifetime {
+            if self.within(lifetime) {}
+        }
+
         if let syn::Type::Path(type_path) = &*node.elem {
             if let Some(HelpItem::KnownTypeStr) = well_known_type(type_path) {
                 return self.set_help(
