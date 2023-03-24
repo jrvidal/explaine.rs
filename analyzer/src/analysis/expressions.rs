@@ -231,7 +231,9 @@ impl<'a> NodeAnalyzer<'a> {
             Some(let_token) => {
                 token![self, node.while_token => let_token, ExprWhileLet];
             }
-            None => token![self, node.while_token, ExprWhile],
+            None => {
+                token![self, node.while_token, ExprWhile];
+            }
         }
     }
     pub(super) fn visit_expr_yield(&mut self, node: &syn::ExprYield) {

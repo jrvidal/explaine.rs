@@ -1,19 +1,19 @@
 [package]
 name = "analyzer"
 version = "0.1.0"
-authors = ["Roberto Vidal <vidal.roberto.j@gmail.com>"]
-edition = "2018"
+authors = ["Roberto Vidal <roberto.vidal@ikumene.com>"]
+edition = "2021"
 build = "build.rs"
 
 [features]
 dev = ["syn/extra-traits", "log"]
 
 [dependencies]
-syn = { version = "=1.0.84", default-features = false }
-proc-macro2 = { version = "1.0.9", features = ["span-locations"] }
-serde = "1.0.105"
+syn = { version = "1", default-features = false, features = ["visit", "parsing", "printing", "full", "derive", "clone-impls"]}
+proc-macro2 = { version = "1", features = ["span-locations"] }
+serde = { version = "1", features = ["derive"] }
 tinytemplate = "1.1"
-quote = "1.0.3"
+quote = "1"
 log = { version = "0.4.8", optional = true }
 
 [build-dependencies]

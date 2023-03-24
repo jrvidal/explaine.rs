@@ -1,8 +1,8 @@
 [package]
 name = "hints"
 version = "0.1.0"
-authors = ["Roberto Vidal <vidal.roberto.j@gmail.com>"]
-edition = "2018"
+authors = ["Roberto Vidal <roberto.vidal@ikumene.com>"]
+edition = "2021"
 
 [dependencies]
 syn-codegen = "0.1.0"
