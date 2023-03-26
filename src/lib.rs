@@ -129,7 +129,7 @@ pub struct Session {
 }
 
 #[wasm_bindgen]
-pub fn init(debug: bool) {
+pub fn initialize(debug: bool) {
     if !debug {
         return;
     }

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "webpack-dev-server --config web/webpack.config.dev.js",
     "build": "./build.sh",
-    "prettier": "prettier --write web/**/*.ts web/**/*.js"
+    "fmt": "prettier --write web/**/*.ts web/**/*.js"
   },
   "author": "",
   "private": true,
@@ -17,18 +17,8 @@
   },
   "devDependencies": {
     "@types/codemirror": "0.0.90",
-    "css-loader": "^3.4.2",
-    "exports-loader": "^0.7.0",
-    "file-loader": "^6.0.0",
-    "mini-css-extract-plugin": "^0.9.0",
-    "optimize-css-assets-webpack-plugin": "^5.0.3",
-    "prettier": "^2.2.1",
-    "terser": "^4.6.10",
-    "ts-loader": "^6.2.2",
+    "prettier": "^2.8.7",
     "typescript": "^3.8.3",
-    "webpack": "^4.42.1",
-    "webpack-cli": "^3.3.11",
-    "webpack-dev-server": "^3.11.0",
-    "worker-loader": "^2.0.0"
+    "vite": "^4.2.1"
   }
 }

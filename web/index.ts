@@ -344,7 +344,7 @@ function initialCodeRender(cm: any) {
     return promise;
   }
 
-  const local = getFromStorage("code");
+  const local = getFromStorage("explainers.code");
   if (typeof local === "string" && local.trim() !== "") {
     cm.setValue(local);
     return promise;

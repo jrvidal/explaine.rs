@@ -1,4 +1,3 @@
-import AnalyzerWorker from "worker-loader!./worker.js";
 import { READY, SECONDARY_LOAD, MAIN_LOAD } from "./messages";
 import { logInfo, reportError } from "./logging";
 import { defer } from "./util";
@@ -8,13 +7,17 @@ export default function worker({
 }: {
   onMessage: (message: any) => void;
 }) {
-  const mainWorker: Worker = new AnalyzerWorker();
-  const secondaryWorker: Worker = new AnalyzerWorker();
+  const mainWorker: Worker = new Worker(
+    new URL("./worker.js", import.meta.url),
+    { type: "module" }
+  );
+  const secondaryWorker: Worker = new Worker(
+    new URL("./worker.js", import.meta.url),
+    { type: "module" }
+  );
 
-  let {
-    promise: mainWorkerIsReadyPromise,
-    resolve: resolveMainWorkerIsReady,
-  } = defer();
+  let { promise: mainWorkerIsReadyPromise, resolve: resolveMainWorkerIsReady } =
+    defer();
   let {
     promise: secondaryWorkerIsReadyPromise,
     resolve: resolveSecondaryWorkerIsReady,
@@ -26,10 +29,10 @@ export default function worker({
   ]);
 
   mainWorker.onerror = (e) => reportError("mainworker.onerror", e);
-  ((mainWorker as any) as MessagePort).onmessageerror = (e) =>
+  (mainWorker as any as MessagePort).onmessageerror = (e) =>
     reportError("mainworker.onmessageerror", e);
   secondaryWorker.onerror = (e) => reportError("secondaryworker.onerror", e);
-  ((secondaryWorker as any) as MessagePort).onmessageerror = (e) =>
+  (secondaryWorker as any as MessagePort).onmessageerror = (e) =>
     reportError("secondaryworker.onmessageerror", e);
 
   mainWorker.onmessage = (e) => {

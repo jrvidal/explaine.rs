@@ -1,11 +1,9 @@
-import wasm_bindgen from "../pkg/explainers";
+import init, { Session, initialize } from "../pkg/explainers";
 import * as messages from "./messages";
-import wasmUrl from "../pkg/explainers_bg.wasm";
 import { logInfo, reportError, handleLogging } from "./logging";
 
 logInfo("workerMain");
 
-let instance;
 let isMain = undefined;
 
 const state = {
@@ -67,13 +65,12 @@ function compileWasm(compiledModule) {
 
   isMain = compiledModule == null;
 
-  wasm_bindgen(compiledModule || wasmUrl)
+  init()
     .then(() => {
-      instance = wasm_bindgen;
-      instance.init(!isMain);
+      initialize();
       postMessage({
         type: messages.READY,
-        compiledModule: wasm_bindgen.__wbindgen_wasm_module,
+        compiledModule: init.__wbindgen_wasm_module,
       });
     })
     .catch((e) => reportError("wasm_bindgen", e));
@@ -84,7 +81,7 @@ function compile(source) {
     state.session.free();
     state.session = null;
   }
-  const result = instance.Session.new(source);
+  const result = Session.new(source);
   const errorMsg = result.error_message();
   const location = result.error_location();
 
