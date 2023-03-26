@@ -4,9 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "webpack-dev-server --config web/webpack.config.dev.js",
-    "build": "./build.sh",
-    "fmt": "prettier --write web/**/*.ts web/**/*.js"
+    "build": "./etc/build.sh",
+    "build-wasm": "./etc/build-wasm.sh",
+    "fmt": "prettier --write web/**/*.ts web/**/*.js",
+    "start": "./etc/start.sh",
+    "test-analyzer": "cargo test -p analyzer"
   },
   "author": "",
   "private": true,

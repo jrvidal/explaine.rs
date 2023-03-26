@@ -1,16 +1,7 @@
-#!/bin/bash
-
-rm -r dist
-rm -r pkg
-
 set -e
 
-wasm-pack build -t no-modules
-./node_modules/.bin/webpack --config web/webpack.config.js
+cd playground
+wasm-pack build -t web -d ../pkg
+cd ..
 
-cd dist
-
-cat ../web/index.html | \
-  sed -e "s;web/style.css;$(ls -1 *css);" \
-      -e "s;main.js;$(ls -1 index*js);" \
-  > index.html
+npx vite build
