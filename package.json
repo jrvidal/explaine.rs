@@ -21,6 +21,6 @@
     "@types/codemirror": "0.0.90",
     "prettier": "^2.8.7",
     "typescript": "^3.8.3",
-    "vite": "^4.2.1"
+    "vite": "^4.2.3"
   }
 }
